@@ -26,8 +26,6 @@
   remaining database key is appended in alphabetical order.
 */ -}}
 {{- $p := .page -}}
-{{- $suffix := "" -}}
-{{- with .seq }}{{ if gt (int .) 1 }}{{ $suffix = printf "-%d" (int .) }}{{ end }}{{ end -}}
 {{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
 {{- $where := "" -}}
 {{- with $p.File }}{{ $where = .Path }}{{ else }}{{ $where = $p.RelPermalink }}{{ end -}}
@@ -50,9 +48,9 @@
   {{- $heading = printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.heading" "default" "") (or $p.RelPermalink $p.Path) "bibliography.heading" | default "") -}}
   {{- if not $heading -}}
     {{- if $root -}}
-      {{- $heading = T "bibliography" | default "Bibliography" -}}
+      {{- $heading = partial "func/t.html" "bibliography" | default "Bibliography" -}}
     {{- else -}}
-      {{- $heading = T "references" | default "References" -}}
+      {{- $heading = partial "func/t.html" "references" | default "References" -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
@@ -128,7 +126,11 @@
     {{- $num := "" -}}
     {{- if $nobib }}{{ $num = printf `<span class="bib-num">[%d]</span> ` .n }}{{ end -}}
     {{- $cls := cond (not .entry) "bib-entry bib-missing" "bib-entry" -}}
-    {{- $lis = $lis | append (printf `<li id="ref-%s%s" class="%s">%s%s</li>` (htmlEscape .key) $suffix $cls $num $inner) -}}
+    {{- /* ref-KEY (ref-KEY-SEQ in later lists), or the next free id when
+           the page content uses it ("## Ref KEY": tufte/gen-id.html;
+           postprocess points the citation links there). */ -}}
+    {{- $rid := partial "tufte/gen-id.html" (dict "page" $p "base" (printf "ref-%s" (htmlEscape .key)) "seq" ($.seq | default 1)) -}}
+    {{- $lis = $lis | append (printf `<li id="%s" class="%s">%s%s</li>` $rid $cls $num $inner) -}}
   {{- end -}}
   {{- $out = printf `%s<ol class="bibliography-list%s">%s</ol>` $out (cond $nobib " bibliography-numbered" "") (delimit $lis "") -}}
 {{- end -}}

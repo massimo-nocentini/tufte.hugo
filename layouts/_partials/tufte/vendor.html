@@ -1,9 +1,12 @@
 {{- /*
-  Emits a <link rel="stylesheet"> (.css URLs) or a <script> for a
-  third-party asset, with its SRI hash.
+  Emits a <link rel="stylesheet"> or a <script> for a third-party asset,
+  with its SRI hash.
 
   Takes a dict:
     url        the CDN URL                                         required
+    kind       "css" (stylesheet) or "js" (script); by default it is
+               "css" when the URL path, without its ?query and #fragment,
+               ends in .css, else "js"
     integrity  its SRI hash ("" = no integrity attribute)
     dir        publish directory with params.selfHosted (default "vendor")
     defer      bool, scripts only
@@ -18,14 +21,30 @@
 {{- if not $url -}}
   {{- errorf "tufte.hugo: tufte/vendor.html needs a url" -}}
 {{- end -}}
+{{- /* The URL path alone: a ?query or #fragment is not part of the file
+       name (path.Ext of "katex.min.css?v=1" is ".css?v=1"). */ -}}
+{{- $upath := replaceRE `[?#].*$` "" $url -}}
+{{- $kind := lower (printf "%v" (.kind | default "")) -}}
+{{- if not $kind -}}
+  {{- $kind = cond (eq (lower (path.Ext $upath)) ".css") "css" "js" -}}
+{{- end -}}
+{{- if not (in (slice "css" "js") $kind) -}}
+  {{- errorf "tufte.hugo: tufte/vendor.html: kind = %q, expected \"css\" or \"js\"" $kind -}}
+{{- end -}}
 {{- $href := $url -}}
-{{- if site.Params.selfHosted -}}
+{{- if partial "func/flag.html" (dict "value" site.Params.selfHosted "default" false) -}}
   {{- with try (resources.GetRemote $url) -}}
     {{- with .Err -}}
       {{- errorf "tufte.hugo: cannot fetch %s (params.selfHosted): %s" $url . -}}
     {{- else -}}
       {{- with .Value -}}
-        {{- $r := . | resources.Copy (path.Join ($.dir | default "vendor") (path.Base $url)) | fingerprint "sha384" -}}
+        {{- /* Name the copy after the URL path, with the extension of its
+               kind so that the server sends the right MIME type. */ -}}
+        {{- $name := path.Base $upath -}}
+        {{- if in (slice "" "." "/") $name }}{{ $name = "asset" }}{{ end -}}
+        {{- $ext := cond (eq $kind "css") ".css" ".js" -}}
+        {{- if ne (lower (path.Ext $name)) $ext }}{{ $name = printf "%s%s" $name $ext }}{{ end -}}
+        {{- $r := . | resources.Copy (path.Join ($.dir | default "vendor") $name) | fingerprint "sha384" -}}
         {{- if and $integrity (ne $r.Data.Integrity $integrity) -}}
           {{- errorf "tufte.hugo: %s does not match its SRI hash %s (got %s)" $url $integrity $r.Data.Integrity -}}
         {{- end -}}
@@ -37,7 +56,7 @@
     {{- end -}}
   {{- end -}}
 {{- end -}}
-{{- if eq (path.Ext $url) ".css" }}
+{{- if eq $kind "css" }}
 <link rel="stylesheet" href="{{ $href }}"{{ with $integrity }} integrity="{{ . }}"{{ end }} crossorigin="anonymous">
 {{- else }}
 <script{{ if .defer }} defer{{ end }} src="{{ $href }}"{{ with $integrity }} integrity="{{ . }}"{{ end }} crossorigin="anonymous"></script>

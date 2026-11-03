@@ -1,0 +1,24 @@
+{{- /*
+  URL filter for attributes the theme builds as strings (iframe and video
+  src, a figure's link, a quote's cite/url, a linked stand-alone image),
+  where html/template's own filter does not run.
+
+  The URL is first normalised as a browser's URL parser does (WHATWG):
+  every ASCII tab and newline (\t \n \r) is removed, and leading and
+  trailing C0 controls and spaces are trimmed. So "java<TAB>script:" or
+  "\x01javascript:" are seen as the javascript: scheme they are.
+
+  A URL with a scheme (letters, digits, + - . before the first ":") is
+  kept only for http, https and mailto, as html/template does; any other
+  scheme (javascript:, vbscript:, data:, file:, …) becomes "#ZgotmplZ".
+  A URL with no scheme (a path, "//host/…", "?q", "#sec:x") is kept.
+
+  Takes: the URL (any value, printed with %v).
+  Returns: the normalised URL, or "#ZgotmplZ". Not HTML-escaped: the
+  caller escapes it for its attribute.
+*/ -}}
+{{- $u := printf "%v" . | replaceRE `[\t\n\r]` "" | replaceRE `^[\x00-\x20]+|[\x00-\x20]+$` "" -}}
+{{- with findRESubmatch `^([a-zA-Z][a-zA-Z0-9+.-]*):` $u 1 -}}
+  {{- if not (in (slice "http" "https" "mailto") (lower (index . 0 1))) }}{{ $u = "#ZgotmplZ" }}{{ end -}}
+{{- end -}}
+{{- return $u -}}

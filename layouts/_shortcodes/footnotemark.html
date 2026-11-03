@@ -8,13 +8,19 @@
     {{< footnotetext "fm" >}}The front matter of a book …{{< /footnotetext >}}
 
   Positional: the name; or named: name="fm". The name only pairs the mark
-  with its text (letters, digits, - and _).
+  with its text (tufte/ft-name.html). A name may be used again: each
+  footnotetext takes the marks of its name written since the previous
+  footnotetext of that name (func/content-raw.html numbers the ids:
+  NAME, NAME.2, NAME.3…), so two tables can each use "w".
 
   No other numbered sidenote may sit between the mark and its text: the
   number shown next to the text is the current value of the sidenote
   counter, as in LaTeX.
 
-  Output: <label for="sn-HASH6-ft-NAME" class="margin-toggle sidenote-number"></label>
+  Output: <label for="sn-HASH6-ft-NAME[.K]" class="margin-toggle sidenote-number" data-ft="ID"></label>
+  (data-ft: a note id, func/note-id.html, so that two marks of one name
+  are two different tags: tufte/counts.html and tufte/labels.html count
+  each distinct mark once, and each steps the sidenote counter).
 */ -}}
 {{- $name := "" -}}
 {{- if .IsNamedParams -}}
@@ -22,10 +28,10 @@
 {{- else -}}
   {{- $name = printf "%v" (.Get 0 | default "") -}}
 {{- end -}}
-{{- $name = replaceRE `[^a-zA-Z0-9_-]` "-" (strings.TrimSpace $name) -}}
+{{- $name = partial "tufte/ft-name.html" $name -}}
 {{- if not $name -}}
   {{- errorf "footnotemark shortcode: a name is required, e.g. {{< footnotemark \"fm\" >}} (%s)" .Position -}}
 {{- end -}}
 {{- $hash := substr (md5 (or .Page.RelPermalink .Page.Path)) 0 6 -}}
-{{- $out := printf `<label for="sn-%s-ft-%s" class="margin-toggle sidenote-number"></label>` $hash $name -}}
+{{- $out := printf `<label for="sn-%s-ft-%s" class="margin-toggle sidenote-number" data-ft="%s"></label>` $hash $name (partial "func/note-id.html" .Page) -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

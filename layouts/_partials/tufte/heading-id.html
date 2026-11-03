@@ -11,6 +11,12 @@
   tufte/page-toc.html and tufte/book/toc-headings.html clean the TOC links
   the same way, so they still match.
 
+  A heading in the inner text of a block shortcode (details, fullwidth…)
+  is rendered by tufte/render-inner.html while a nested shortcode in it is
+  still its nest token (tufte/nest.html), so its id holds
+  "tuftenest<16 hex>end", which changes with the nested HTML: removed
+  the same way.
+
   Two headings that differ only by their shortcodes end up with the same
   id: give such headings an explicit {#id} (README, "Headings").
 
@@ -18,8 +24,9 @@
   Returns: the id (string); unchanged when it holds no placeholder.
 */ -}}
 {{- $id := string . -}}
-{{- if strings.Contains (lower $id) "hahahugoshortcode" -}}
+{{- if or (strings.Contains (lower $id) "hahahugoshortcode") (strings.Contains (lower $id) "tuftenest") -}}
   {{- $id = replaceRE `(?i)-?hahahugoshortcode[0-9a-z]*?hbhb` "" $id -}}
+  {{- $id = replaceRE `(?i)-?tuftenest[0-9a-f]{16}end` "" $id -}}
   {{- $id = strings.Trim $id "-" -}}
   {{- if not $id }}{{ $id = "heading" }}{{ end -}}
 {{- end -}}

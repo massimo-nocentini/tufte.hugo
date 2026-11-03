@@ -1,0 +1,76 @@
+{{- /*
+  A piece of HTML as plain text that keeps its math: the text a
+  cross-reference name, an xref "page" or an index locator prints for a
+  heading or a caption (\nameref prints the typeset title).
+
+  plainify alone cannot do it: server KaTeX output (span.katex) holds the
+  formula twice, as MathML (logical order) and as the visual HTML of
+  span.katex-html, whose text is in layout order (x^2 reads "x2",
+  \frac{a}{b} reads "ba", a radical loses its sign). So every KaTeX span
+  (span.katex, span.katex-display), with its nested spans, is set aside
+  first, the rest is made plain (tags removed, entities decoded, white
+  space collapsed), and the formula comes back:
+
+    math = "keep"  (default) the KaTeX HTML itself (the page that prints
+                   it then holds math, so head.html loads the KaTeX CSS);
+    math = "tex"   its TeX, from <annotation encoding="application/x-tex">,
+                   as $TeX$: for attributes (alt text) and warnings.
+
+  The client engine's span.math holds the TeX as text: it is set aside
+  too (kept as the span, which KaTeX renders in the browser, or as its
+  text "\(x^2\)"), so that a cut never splits a formula.
+
+  Takes: a dict with
+    html  the HTML
+    math  optional: "keep" or "tex"
+    max   optional int: cut the text to this many characters, with "…"
+          (a formula counts as one)
+  Returns: string, HTML-escaped (with the KaTeX HTML when kept).
+*/ -}}
+{{- $html := string .html -}}
+{{- $mode := .math | default "keep" -}}
+{{- $max := int (.max | default 0) -}}
+{{- $maths := slice -}}
+{{- if or (strings.Contains $html `class="katex`) (strings.Contains $html `class="math math-`) -}}
+  {{- /* Each formula becomes one private-use character (U+E000 + n):
+         plainify, the white-space collapse and the cut keep it whole. */ -}}
+  {{- $out := "" }}{{ $cur := "" }}{{ $depth := 0 -}}
+  {{- range $t := findRE `<[^>]*>|[^<]+` $html -}}
+    {{- if gt $depth 0 -}}
+      {{- $cur = printf "%s%s" $cur $t -}}
+      {{- if strings.HasPrefix $t "<span" }}{{ $depth = add $depth 1 }}{{ else if eq $t "</span>" }}{{ $depth = sub $depth 1 }}{{ end -}}
+      {{- if eq $depth 0 -}}
+        {{- $out = printf "%s%c" $out (add 57344 (len $maths)) -}}
+        {{- $maths = $maths | append $cur -}}
+        {{- $cur = "" -}}
+      {{- end -}}
+    {{- else if findRE `^<span class="(?:katex|katex-display|math math-inline|math math-display)"` $t 1 -}}
+      {{- $cur = $t -}}
+      {{- $depth = 1 -}}
+    {{- else -}}
+      {{- $out = printf "%s%s" $out $t -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Unbalanced (cannot happen with KaTeX output): keep what is left. */ -}}
+  {{- with $cur }}{{ $out = printf "%s%s" $out . }}{{ end -}}
+  {{- $html = $out -}}
+{{- end -}}
+{{- $text := $html | plainify | htmlUnescape | replaceRE `\s+` " " | strings.TrimSpace -}}
+{{- if and (gt $max 0) (gt (strings.RuneCount $text) $max) -}}
+  {{- $text = printf "%s…" (strings.TrimSpace (substr $text 0 $max)) -}}
+{{- end -}}
+{{- $text = htmlEscape $text -}}
+{{- range $i, $m := $maths -}}
+  {{- $tok := printf "%c" (add 57344 $i) -}}
+  {{- if not (strings.Contains $text $tok) }}{{ continue }}{{ end -}}
+  {{- $r := $m -}}
+  {{- if eq $mode "tex" -}}
+    {{- with findRESubmatch `<annotation encoding="application/x-tex">([^<]*)</annotation>` $m 1 -}}
+      {{- $r = htmlEscape (printf "$%s$" (strings.TrimSpace (htmlUnescape (index (index . 0) 1)))) -}}
+    {{- else -}}
+      {{- $r = htmlEscape (replaceRE `(?s)<span class="katex-html".*$` "" $m | plainify | htmlUnescape | strings.TrimSpace) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $text = replace $text $tok $r -}}
+{{- end -}}
+{{- return $text -}}

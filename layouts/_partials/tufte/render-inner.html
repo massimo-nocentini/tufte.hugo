@@ -30,8 +30,17 @@
   nested Goldmark footnote list: they become real-footnote markers (as the
   footnote shortcode emits), numbered and listed with the page's other
   footnotes. A definition written elsewhere on the page (RenderString
-  cannot see it) is copied from the page source first; a reference with
-  no definition is warned (tufte-undefined-ref).
+  cannot see it) is copied from the page source first, with the
+  definitions it references in turn; a reference with no definition is
+  warned (tufte-undefined-ref). Each marker carries the Markdown label
+  (data-md), so a footnote also referenced in the text or in another
+  shortcode is one footnote, with one item; a reference inside a note's
+  text becomes a marker inside the marker (tufte/fn-split.html moves it
+  out). A note's text is block HTML (in inline mode taken from a block
+  rendering of the same text, its paragraphs written <tufte-p> so that the
+  holder's flattening leaves them alone; tufte/fn-split.html reads them
+  back), and a cite in it becomes the footnote's citation block
+  (tufte/fn-cites.html).
 
   A shortcode inside a Markdown blockquote gets its inner text with the
   enclosing quote's markers on each line: they are removed first (step 0).
@@ -42,7 +51,10 @@
   Block elements left after that (a list, code block, quote or table)
   cannot sit in a <span>: tufte/inline-blocks.html turns them into
   span[data-sn] (laid out as blocks by tufte-latex.css) and
-  "tufte-block-in-note" is warned, unless blocks = "keep".
+  "tufte-block-in-note" is warned, unless blocks = "keep". The HTML of a
+  nested shortcode (a figure, table, listing, iframe, epigraph… in a
+  sidenote) gets the same treatment as its token is swapped back
+  (tufte/inline-nested.html), also with "tufte-block-in-note".
 
   If Goldmark still dropped HTML ("raw HTML omitted"), warnidf
   "tufte-raw-html" with a hint.
@@ -57,7 +69,29 @@
     shortcodes  optional: "run" when the text is not a shortcode's .Inner
              (a caption= parameter, front-matter Markdown): shortcodes
              written in it run, as RenderString does, instead of being
-             taken for escaped ones
+             taken for escaped ones; in inline mode such a parameter
+             text is also literal (below)
+    literal  optional bool, inline mode: every leading block marker of a
+             line is text (verse lines). Otherwise only a lone list item,
+             a heading or a rule marker is (step 1b)
+    tips    optional: "keep" leaves the marked titles of images (below)
+             as they are (the subfigures shortcode makes them subcaptions)
+
+  An image whose title holds a nested shortcode (a nest token) has its
+  title marked after the img by render-image.html, with the token kept
+  as TUFTENESTTIP…END so that it never lands in the title attribute.
+  After the swap (step 5) the plain text of the title becomes the img's
+  title attribute and its notes and citations follow the img
+  (tufte/img-tips.html), so that a holder (sidenote, marginnote…) still
+  gathers them.
+
+  Headings: RenderString gives each text its own Goldmark document, so a
+  heading here may take an id that the page's text or another inner text
+  already uses (two `### Proof` in two details blocks). Each heading the
+  render hook made here is marked <hN data-tufte-inner id="…">;
+  func/content-raw.html then gives the marked headings ids that are unique
+  on the page (ID-1, ID-2…; the page's own headings keep theirs) and drops
+  the mark.
 
   Returns: the HTML string.
 */ -}}
@@ -176,53 +210,219 @@
   {{- $md = replaceRE `(?s)\{\{%(.*?)%\}\}` "TUFTESCPO${1}TUFTESCPC" $md -}}
 {{- end -}}
 
+{{- /* Inline mode: block markers at the start of a line are text.
+       RenderString parses the text as a whole Markdown document, so a
+       caption, note or verse line that starts like a block ("1869. Minard's
+       map", "- said she", "* * *", "# 1 rated") would become a list, rule
+       or heading and lose its marker (a list item shows "1."), where
+       \caption, \sidenote and verse print it as written. As in
+       tufte/title-html.html, the marker is backslash-escaped, at the start
+       of the text and of each line (outside fenced code):
+       - headings, thematic breaks and setext underlines (---, ===) always;
+       - a list item when it is the only item of its kind (same bullet, or
+         same ordered delimiter) in the text: two or more items are a list
+         the author meant, kept and shown as inline blocks (README);
+       - in literal texts (the lines of verse, `literal` true, and parameter
+         texts, `shortcodes` "run": caption=, author=, cite=, an image
+         title, a details summary), every list item, a quote marker, a
+         code fence and a link definition too. */ -}}
+{{- if and (not $isBlock) (findRE "(?m)^[ \\t]*(?:[-+*=_#>\\[]|[0-9]{1,9}[.)]|~~~|```)" $md 1) -}}
+  {{- $literal := or (eq .literal true) (eq .shortcodes "run") -}}
+  {{- $lines := split $md "\n" -}}
+  {{- $itemRE := `^[ \t]*(?:([-+*])|[0-9]{1,9}([.)]))(?:[ \t]|$)` -}}
+  {{- $hrRE := `^[ \t]*(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|-+[ \t]*|=+[ \t]*)$` -}}
+  {{- $fenceRE := "^[ \\t]{0,3}(?:`{3,}|~{3,})" -}}
+  {{- /* Items per kind, outside fenced code. */ -}}
+  {{- $kinds := dict -}}
+  {{- if not $literal -}}
+    {{- $fence := "" -}}
+    {{- range $lines -}}
+      {{- if $fence -}}
+        {{- if findRE (printf `^[ \t]{0,3}%s[ \t]*$` $fence) . 1 }}{{ $fence = "" }}{{ end -}}
+        {{- continue -}}
+      {{- end -}}
+      {{- with findRE $fenceRE . 1 -}}
+        {{- $f := strings.TrimLeft " \t" (index . 0) -}}
+        {{- $fence = printf "%s{%d,}" (substr $f 0 1) (len $f) -}}
+        {{- continue -}}
+      {{- end -}}
+      {{- if findRE $hrRE . 1 }}{{ continue }}{{ end -}}
+      {{- with findRESubmatch $itemRE . 1 -}}
+        {{- $g := index . 0 -}}
+        {{- $k := printf "k%s%s" (index $g 1) (index $g 2) -}}
+        {{- $kinds = merge $kinds (dict $k (add (index $kinds $k | default 0) 1)) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $out := slice -}}
+  {{- $fence := "" -}}
+  {{- range $lines -}}
+    {{- $l := . -}}
+    {{- if $fence -}}
+      {{- if findRE (printf `^[ \t]{0,3}%s[ \t]*$` $fence) $l 1 }}{{ $fence = "" }}{{ end -}}
+    {{- else if and (not $literal) (findRE $fenceRE $l 1) -}}
+      {{- $f := strings.TrimLeft " \t" (index (findRE $fenceRE $l 1) 0) -}}
+      {{- $fence = printf "%s{%d,}" (substr $f 0 1) (len $f) -}}
+    {{- else if findRE $hrRE $l 1 -}}
+      {{- $l = replaceRE `([-*_=])` `\${1}` $l -}}
+    {{- else if findRE `^[ \t]*#{1,6}(?:[ \t]|$)` $l 1 -}}
+      {{- $l = replaceRE `^([ \t]*)#` `${1}\#` $l -}}
+    {{- else if findRE $itemRE $l 1 -}}
+      {{- $g := index (findRESubmatch $itemRE $l 1) 0 -}}
+      {{- if or $literal (lt (index $kinds (printf "k%s%s" (index $g 1) (index $g 2)) | default 0) 2) -}}
+        {{- $l = replaceRE `^([ \t]*)([-+*])` `${1}\${2}` $l | replaceRE `^([ \t]*[0-9]{1,9})([.)])` `${1}\${2}` -}}
+      {{- end -}}
+    {{- else if $literal -}}
+      {{- $l = replaceRE "^([ \\t]*)(>|~~~|```)" `${1}\${2}` $l | replaceRE `^([ \t]*)(\[[^\]^][^\]]*\]:)` `${1}\${2}` -}}
+    {{- end -}}
+    {{- $out = $out | append $l -}}
+  {{- end -}}
+  {{- $md = delimit $out "\n" -}}
+{{- end -}}
+
 {{- /* Markdown footnote references whose definition is on the page, not
        in the inner text ({{< fig >}}Caption[^c]{{< /fig >}} … [^c]: …):
        RenderString cannot see the page's definitions (the reference would
        print as "[^c]", and Goldmark drops the then unreferenced definition
        from the page), so the definition is copied from the page source
        after the inner text and handled below like one written there.
-       Code spans and fenced code are ignored. A reference with no
+       Code spans and code blocks are ignored when looking for references
+       and definitions, but a definition is copied whole, with its fenced
+       and indented code. A definition may sit in a block quote
+       (> [^x]: …) or a list item (- [^x]: …), as Goldmark allows: the
+       container's markers are removed from its lines. A reference with no
        definition anywhere is warned (tufte-undefined-ref). */ -}}
 {{- if strings.Contains $md "[^" -}}
   {{- $probe := $md | replaceRE "(?ms)^[ \\t]*```.*?^[ \\t]*```[^\\n]*$" "" | replaceRE "(?ms)^[ \\t]*~~~.*?^[ \\t]*~~~[^\\n]*$" "" | replaceRE "`[^`\\n]*`" "" -}}
+  {{- /* Nor indented code, math, or an escaped \[^x] (func/fn-strip.html). */ -}}
+  {{- $probe = partial "func/fn-strip.html" (dict "md" (partial "func/fn-strip.html" (dict "md" $probe "what" "code")) "what" "inline") -}}
   {{- $labels := slice -}}
   {{- range findRE `\[\^[^\]\s]+\]` $probe -}}
     {{- $l := strings.TrimSuffix "]" (strings.TrimPrefix "[^" .) -}}
     {{- if not (in $labels $l) }}{{ $labels = $labels | append $l }}{{ end -}}
   {{- end -}}
-  {{- $src := "" -}}
+  {{- /* The page source as lines ($srcL), and the same lines masked
+         ($mskL) for the search: the inside of a fenced code block becomes
+         "TUFTEFENCE" (after the line's indentation and quote markers, so
+         that it still continues a definition it belongs to), and indented
+         code blocks are emptied (func/fn-strip.html). */ -}}
+  {{- $srcL := slice -}}
+  {{- $mskL := slice -}}
   {{- $defs := slice -}}
-  {{- range $l := $labels -}}
-    {{- $q := replaceRE `([.+*?()|\[\]{}^$\\])` `\$1` $l -}}
-    {{- $defRE := printf `^ {0,3}\[\^%s\]:` $q -}}
-    {{- if findRE (printf `(?m)%s` $defRE) $probe 1 }}{{ continue }}{{ end -}}
-    {{- if not $src -}}
-      {{- $src = string $page.RawContent | replaceRE "(?ms)^[ \\t]*```.*?^[ \\t]*```[^\\n]*$" "" | replaceRE "(?ms)^[ \\t]*~~~.*?^[ \\t]*~~~[^\\n]*$" "" -}}
-    {{- end -}}
-    {{- /* The definition: its line, indented continuation lines (blank
-           lines between them included) and lazy continuation lines. */ -}}
-    {{- $buf := "" -}}
-    {{- $on := false -}}
-    {{- $blank := false -}}
-    {{- range split $src "\n" -}}
-      {{- if not $on -}}
-        {{- if findRE $defRE . 1 }}{{ $on = true }}{{ $buf = . }}{{ end -}}
-      {{- else if not (strings.TrimSpace .) -}}
-        {{- $blank = true -}}
-      {{- else if findRE `^(?: {4}|\t)` . 1 -}}
-        {{- $buf = printf "%s%s%s" $buf (cond $blank "\n\n" "\n") . -}}
-        {{- $blank = false -}}
-      {{- else if and (not $blank) (not (findRE "^ {0,3}(?:\\[\\^|\\{\\{|#|<|>|[-*+] |\\d+[.)] |\\||```|~~~)" . 1)) -}}
-        {{- $buf = printf "%s\n%s" $buf . -}}
-      {{- else -}}
-        {{- break -}}
+  {{- $cPfx := `^((?:[ \t]{0,3}>[ \t]?)*)((?:[ \t]{0,3}(?:[-*+]|[0-9]{1,9}[.)])[ \t]+)?)[ \t]{0,3}` -}}
+  {{- /* Also the definitions of the footnotes referenced in a copied
+         definition ([^a]: see [^b]), a few levels deep. */ -}}
+  {{- $done := slice -}}
+  {{- range $pass := seq 4 -}}
+    {{- $todo := slice -}}
+    {{- range $labels }}{{ if not (in $done .) }}{{ $todo = $todo | append . }}{{ end }}{{ end -}}
+    {{- if not $todo }}{{ break }}{{ end -}}
+    {{- range $l := $todo -}}
+      {{- $done = $done | append $l -}}
+      {{- $q := replaceRE `([.+*?()|\[\]{}^$\\])` `\$1` $l -}}
+      {{- $defRE := printf `%s\[\^%s\]:` $cPfx $q -}}
+      {{- if findRE (printf `(?m)%s` $defRE) $probe 1 }}{{ continue }}{{ end -}}
+      {{- if not $srcL -}}
+        {{- $srcL = split (string $page.RawContent) "\n" -}}
+        {{- $fence := "" -}}
+        {{- $m := slice -}}
+        {{- range $srcL -}}
+          {{- $pre := replaceRE `^((?:[ \t]*>)*[ \t]*).*$` "$1" . -}}
+          {{- $rest := strings.TrimPrefix $pre . -}}
+          {{- if $fence -}}
+            {{- if findRE (printf `^%s[ \t]*$` $fence) $rest 1 -}}
+              {{- $fence = "" -}}
+              {{- $m = $m | append . -}}
+            {{- else if strings.TrimSpace $rest -}}
+              {{- $m = $m | append (printf "%sTUFTEFENCE" $pre) -}}
+            {{- else -}}
+              {{- $m = $m | append . -}}
+            {{- end -}}
+          {{- else -}}
+            {{- with findRE "^(?:`{3,}|~{3,})" $rest 1 -}}
+              {{- $f := index . 0 -}}
+              {{- /* A backtick fence's info string has no backtick. */ -}}
+              {{- if or (strings.HasPrefix $f "~") (not (strings.Contains (strings.TrimPrefix $f $rest) "`")) -}}
+                {{- $fence = printf "%s{%d,}" (substr $f 0 1) (len $f) -}}
+              {{- end -}}
+            {{- end -}}
+            {{- $m = $m | append . -}}
+          {{- end -}}
+        {{- end -}}
+        {{- $mskL = split (partial "func/fn-strip.html" (dict "md" (delimit $m "\n") "what" "code")) "\n" -}}
       {{- end -}}
-    {{- end -}}
-    {{- if $buf -}}
-      {{- $defs = $defs | append $buf -}}
-    {{- else -}}
-      {{- warnidf "tufte-undefined-ref" "tufte.hugo: footnote reference [^%s] with no definition ([^%s]: …) in %s" $l $l $at -}}
+      {{- /* The definition: its line, indented continuation lines (blank
+             lines between them included) and lazy continuation lines;
+             inside a block quote or list item, the lines of that
+             container, its markers removed. */ -}}
+      {{- $buf := "" -}}
+      {{- $mbuf := "" -}}
+      {{- $on := false -}}
+      {{- $blanks := 0 -}}
+      {{- $qn := 0 -}}
+      {{- $lw := 0 -}}
+      {{- range $i, $mk := $mskL -}}
+        {{- $o := index $srcL $i -}}
+        {{- if not $on -}}
+          {{- with findRESubmatch $defRE $mk 1 -}}
+            {{- $g := index . 0 -}}
+            {{- $on = true -}}
+            {{- $qn = strings.Count ">" (index $g 1) -}}
+            {{- $lw = len (index $g 2) -}}
+            {{- $cut := len (printf "%s%s" (index $g 1) (index $g 2)) -}}
+            {{- $buf = substr $o $cut -}}
+            {{- $mbuf = substr $mk $cut -}}
+          {{- end -}}
+        {{- else -}}
+          {{- /* The container's markers. A line without them can only be
+                 a lazy continuation of the paragraph. */ -}}
+          {{- $lazyOnly := false -}}
+          {{- if gt $qn 0 -}}
+            {{- $have := strings.Count ">" (replaceRE `^((?:[ \t]{0,3}>[ \t]?)*).*$` "$1" $mk) -}}
+            {{- if ge $have $qn -}}
+              {{- $strip := printf `^(?:[ \t]{0,3}>[ \t]?){%d}` $qn -}}
+              {{- $o = replaceRE $strip "" $o -}}
+              {{- $mk = replaceRE $strip "" $mk -}}
+            {{- else if not (strings.TrimSpace $mk) -}}
+              {{- break -}}
+            {{- else -}}
+              {{- $lazyOnly = true -}}
+            {{- end -}}
+          {{- end -}}
+          {{- if and (gt $lw 0) (strings.TrimSpace $mk) (not $lazyOnly) -}}
+            {{- $ind := len (replaceRE `^( *).*$` "$1" $mk) -}}
+            {{- if ge $ind $lw -}}
+              {{- $o = substr $o $lw -}}
+              {{- $mk = substr $mk $lw -}}
+            {{- else -}}
+              {{- $lazyOnly = true -}}
+            {{- end -}}
+          {{- end -}}
+          {{- if not (strings.TrimSpace $mk) -}}
+            {{- $blanks = add $blanks 1 -}}
+          {{- else if and (not $lazyOnly) (findRE `^(?: {4}|\t)` $mk 1) -}}
+            {{- $sep := "\n" -}}
+            {{- if gt $blanks 0 }}{{ $sep = strings.Repeat (add $blanks 1) "\n" }}{{ end -}}
+            {{- $buf = printf "%s%s%s" $buf $sep $o -}}
+            {{- $mbuf = printf "%s%s%s" $mbuf $sep $mk -}}
+            {{- $blanks = 0 -}}
+          {{- else if and (eq $blanks 0) (not (findRE "^ {0,3}(?:\\[\\^|\\{\\{|#|<|>|[-*+] |\\d+[.)] |\\||```|~~~)" $mk 1)) -}}
+            {{- $buf = printf "%s\n%s" $buf $o -}}
+            {{- $mbuf = printf "%s\n%s" $mbuf $mk -}}
+          {{- else -}}
+            {{- break -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if $buf -}}
+        {{- $defs = $defs | append $buf -}}
+        {{- range findRE `\[\^[^\]\s]+\]` (replaceRE `^ {0,3}\[\^[^\]\s]+\]:` "" $mbuf | replaceRE "`[^`\\n]*`" "") -}}
+          {{- $l2 := strings.TrimSuffix "]" (strings.TrimPrefix "[^" .) -}}
+          {{- if not (in $labels $l2) }}{{ $labels = $labels | append $l2 }}{{ end -}}
+        {{- end -}}
+      {{- else -}}
+        {{- warnidf "tufte-undefined-ref" "tufte.hugo: footnote reference [^%s] with no definition ([^%s]: …) in %s" $l $l $at -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
   {{- with $defs -}}
@@ -234,6 +434,12 @@
 {{- $html := "" -}}
 {{- with strings.TrimSpace $md -}}
   {{- $html = $page.RenderString (dict "display" $display) . | string -}}
+{{- end -}}
+{{- /* Headings of this render (render-heading.html writes the id first;
+       raw HTML runs are still tokens here): marked for the page-wide id
+       dedup of func/content-raw.html (see "Headings" above). */ -}}
+{{- if strings.Contains $html ` id="` -}}
+  {{- $html = replaceRE `<(h[1-6]) id="` `<$1 data-tufte-inner id="` $html -}}
 {{- end -}}
 {{- if $scEsc -}}
   {{- $html = replace $html "TUFTESCLT" "{{&lt;" -}}
@@ -262,18 +468,109 @@
       {{- $t = replaceRE `(?s)(&#160;|&nbsp;|\s)*<a [^>]*class="footnote-backref"[^>]*>.*?</a>` "" $t | strings.TrimSpace -}}
       {{- with $id }}{{ $notes = merge $notes (dict . $t) }}{{ end -}}
     {{- end -}}
+    {{- /* A real footnote is block content in its list: in inline mode
+           (a sidenote, margin note or caption) Hugo rendered the notes
+           inline too (paragraphs without <p>), so they are taken from a
+           block rendering of the same text, by Goldmark number. */ -}}
+    {{- if not $isBlock -}}
+      {{- $b := $page.RenderString (dict "display" "block") (strings.TrimSpace $md) | string -}}
+      {{- if $scEsc -}}
+        {{- $b = replace (replace (replace (replace $b "TUFTESCLT" "{{&lt;") "TUFTESCGT" "&gt;}}") "TUFTESCPO" "{{%") "TUFTESCPC" "%}}" -}}
+      {{- end -}}
+      {{- $bp := split $b $fnOpen -}}
+      {{- $bb := index $bp (sub (len $bp) 1) -}}
+      {{- if and (gt (len $bp) 1) (findRE `(?s)</ol>\s*</div>\s*$` $bb 1) -}}
+        {{- $byNum := dict -}}
+        {{- range after 1 (split $bb `<li id="`) -}}
+          {{- $bid := replaceRE `(?s)^([^"]*)".*$` "$1" . -}}
+          {{- $t := replaceRE `(?s)^[^"]*"[^>]*>` "" . -}}
+          {{- $t = replaceRE `(?s)</li>\s*(</ol>\s*</div>\s*)?$` "" $t -}}
+          {{- $t = replaceRE `(?s)(&#160;|&nbsp;|\s)*<a [^>]*class="footnote-backref"[^>]*>.*?</a>` "" $t | strings.TrimSpace -}}
+          {{- with findRESubmatch `:([0-9]+)$` $bid 1 }}{{ $byNum = merge $byNum (dict (index (index . 0) 1) $t) }}{{ end -}}
+        {{- end -}}
+        {{- $nb := dict -}}
+        {{- range $id, $t := $notes -}}
+          {{- with findRESubmatch `:([0-9]+)$` $id 1 -}}
+            {{- with index $byNum (index (index . 0) 1) }}{{ $t = . }}{{ end -}}
+          {{- end -}}
+          {{- $nb = merge $nb (dict $id $t) -}}
+        {{- end -}}
+        {{- $notes = $nb -}}
+      {{- end -}}
+    {{- end -}}
+    {{- /* A cite in a note: a citation block at the end of the footnote
+           (tufte/fn-cites.html), as for a footnote of the text. */ -}}
+    {{- $nc := dict -}}
+    {{- range $id, $t := $notes -}}
+      {{- $nc = merge $nc (dict $id (partial "tufte/fn-cites.html" (dict "page" $page "html" $t))) -}}
+    {{- end -}}
+    {{- $notes = $nc -}}
+    {{- /* Inline mode: the holder flattens its text again (</p><p> →
+           <br>); the notes' paragraphs travel as <tufte-p>, read back as
+           <p> by tufte/fn-split.html. */ -}}
+    {{- if not $isBlock -}}
+      {{- $ne := dict -}}
+      {{- range $id, $t := $notes -}}
+        {{- $ne = merge $ne (dict $id (replace (replaceRE `<p([\s>])` "<tufte-p$1" $t) "</p>" "</tufte-p>")) -}}
+      {{- end -}}
+      {{- $notes = $ne -}}
+    {{- end -}}
+    {{- /* The Markdown label of each note (data-md), so that a footnote
+           referenced here and elsewhere on the page (in the text, in
+           another shortcode) is one footnote with one item: in
+           Goldmark's numbering order (func/fn-order.html), as
+           func/footnotes.html reads the page's. Labels that do not
+           match the rendered notes one to one are left out (the marker
+           then has its own identity, data-key). */ -}}
+    {{- $mdOf := dict -}}
+    {{- $scan := $md | replaceRE "(?ms)^[ \\t]*```.*?^[ \\t]*```[^\\n]*$" "" | replaceRE "(?ms)^[ \\t]*~~~.*?^[ \\t]*~~~[^\\n]*$" "" | replaceRE "``[^`]*``|`[^`\\n]*`" "" -}}
+    {{- $scan = replaceRE `(\]\(\s*(?:<[^<>\n]*>|[^\s()<]*(?:\([^\s()]*\)[^\s()]*)*))\s+(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\((?:[^()\\]|\\.)*\))\s*\)` "$1)" $scan -}}
+    {{- $scan = replaceRE `(?m)^[ \t]{0,3}\{[ \t]*[#.a-zA-Z_][^\n]*\}[ \t]*$` "" $scan -}}
+    {{- $scan = partial "func/fn-strip.html" (dict "md" (partial "func/fn-strip.html" (dict "md" $scan "what" "code")) "what" "inline") -}}
+    {{- $flabels := (partial "func/fn-order.html" $scan).labels -}}
+    {{- if eq (len $flabels) (len $notes) -}}
+      {{- range $id, $_ := $notes -}}
+        {{- with findRESubmatch `:([0-9]+)$` $id 1 -}}
+          {{- $k := int (index (index . 0) 1) -}}
+          {{- if and (gt $k 0) (le $k (len $flabels)) }}{{ $mdOf = merge $mdOf (dict $id (index $flabels (sub $k 1))) }}{{ end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if ne (len $mdOf) (len $notes) }}{{ $mdOf = dict }}{{ end -}}
+    {{- end -}}
+    {{- $refRE := `<sup [^>]*>\s*<a [^>]*class="footnote-ref"[^>]*>[^<]*</a>\s*</sup>` -}}
     {{- $keys := dict -}}
-    {{- range findRE `<sup [^>]*>\s*<a [^>]*class="footnote-ref"[^>]*>[^<]*</a>\s*</sup>` $html -}}
+    {{- range $id, $_ := $notes -}}
+      {{- $keys = merge $keys (dict $id (printf "s%s" (replaceRE `^.*-` "" (partial "func/note-id.html" $page)))) -}}
+    {{- end -}}
+    {{- /* References inside a note's text ([^a]: see [^b]): the inner
+           note's marker goes in the text, a few levels deep (a cycle stops
+           there); tufte/fn-split.html moves it after the outer marker. */ -}}
+    {{- range seq 4 -}}
+      {{- $next := dict -}}
+      {{- range $id, $t := $notes -}}
+        {{- range findRE $refRE $t -}}
+          {{- $tg := replaceRE `(?s)^.*href="#([^"]+)".*$` "$1" . -}}
+          {{- $m := "" -}}
+          {{- if isset $notes $tg -}}
+            {{- $a := printf ` data-key="%s"` (index $keys $tg) -}}
+            {{- with index $mdOf $tg }}{{ $a = printf `%s data-md="%s"` $a (htmlEscape .) }}{{ end -}}
+            {{- $m = printf `<span class="tufte-fn"%s hidden>%s</span>` $a (index $notes $tg) -}}
+          {{- end -}}
+          {{- $t = replace $t . $m 1 -}}
+        {{- end -}}
+        {{- $next = merge $next (dict $id $t) -}}
+      {{- end -}}
+      {{- $notes = $next -}}
+    {{- end -}}
+    {{- range findRE $refRE $html -}}
       {{- $ref := . -}}
       {{- $target := replaceRE `(?s)^.*href="#([^"]+)".*$` "$1" $ref -}}
       {{- if isset $notes $target -}}
-        {{- $key := index $keys $target -}}
-        {{- if not $key -}}
-          {{- $key = printf "s%s" (replaceRE `^.*-` "" (partial "func/note-id.html" $page)) -}}
-          {{- $keys = merge $keys (dict $target $key) -}}
-        {{- end -}}
+        {{- $a := printf ` data-key="%s"` (index $keys $target) -}}
+        {{- with index $mdOf $target }}{{ $a = printf `%s data-md="%s"` $a (htmlEscape .) }}{{ end -}}
+        {{- $t := replaceRE $refRE "" (index $notes $target) -}}
         {{- $tok := printf "TUFTEFNMARK%dEND" (len $fnSaved) -}}
-        {{- $fnSaved = $fnSaved | append (printf `<span class="tufte-fn" data-key="%s" hidden>%s</span>` $key (index $notes $target)) -}}
+        {{- $fnSaved = $fnSaved | append (printf `<span class="tufte-fn"%s hidden>%s</span>` $a $t) -}}
         {{- $html = replace $html $ref $tok 1 -}}
       {{- end -}}
     {{- end -}}
@@ -307,20 +604,48 @@
 {{- end -}}
 
 {{- /* 5. Swap nest tokens (a few passes: stored HTML may itself hold
-       tokens when a middle shortcode printed its .Inner raw). */ -}}
+       tokens when a middle shortcode printed its .Inner raw). In inline
+       mode a nested block shortcode (figure, fig, fullwidthfigure, table,
+       listing, iframe, youtube, video, epigraph…) cannot sit in the
+       note's <span>: its HTML goes through the same flattening as the
+       Markdown part (tufte/inline-nested.html), and tufte-block-in-note is
+       warned. */ -}}
+{{- $tips := and (ne .tips "keep") (strings.Contains $html `<i class="tufte-tip" hidden></i>`) -}}
+{{- if and $tips (strings.Contains $html "TUFTENESTTIP") -}}
+  {{- $html = replace $html "TUFTENESTTIP" "TUFTENEST" -}}
+{{- end -}}
 {{- if strings.Contains $html "TUFTENEST" -}}
   {{- $map := $page.Store.Get "tufteNest" | default dict -}}
+  {{- $nestFlat := false -}}
   {{- range seq 4 -}}
     {{- if strings.Contains $html "TUFTENEST" -}}
       {{- range $tok := findRE `TUFTENEST[0-9a-f]{16}END` $html | uniq -}}
         {{- $h := substr $tok 9 16 -}}
         {{- with index $map $h -}}
-          {{- $html = replace $html (printf "<p>%s</p>" $tok) . -}}
-          {{- $html = replace $html $tok . -}}
+          {{- $v := string . -}}
+          {{- if and (not $isBlock) (not $keepBlocks) -}}
+            {{- $r := partial "tufte/inline-nested.html" $v -}}
+            {{- if $r.changed }}{{ $v = $r.html }}{{ $nestFlat = true }}{{ end -}}
+          {{- end -}}
+          {{- $html = replace $html (printf "<p>%s</p>" $tok) $v -}}
+          {{- $html = replace $html $tok $v -}}
         {{- end -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
+  {{- if $nestFlat -}}
+    {{- warnidf "tufte-block-in-note" "tufte.hugo: a block shortcode (figure, fig, fullwidthfigure, table, listing, iframe, youtube, video, epigraph…) in inline text in %s: a note or caption is a <span> and cannot hold a float (in LaTeX: \"Float(s) lost\"), so a figure is shown as its plain image with its caption as text, unnumbered, and other blocks as inline blocks; put the float before or after the paragraph, or use marginfigure, margintable or marginblock in the text" $at -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Deferred alt texts and link titles (tufte/attr-marks.html), then
+       marked image titles, now that their shortcodes' HTML is in place
+       (not while Hugo's placeholder of a shortcode that ran in the text
+       is still there: func/content-raw.html resolves those). */ -}}
+{{- if and (strings.Contains $html "TUFTEATTR") (not (strings.Contains $html "HAHAHUGOSHORTCODE")) -}}
+  {{- $html = partial "tufte/attr-marks.html" (dict "page" $page "html" $html) -}}
+{{- end -}}
+{{- if and $tips (not (strings.Contains $html "HAHAHUGOSHORTCODE")) -}}
+  {{- $html = partial "tufte/img-tips.html" $html -}}
 {{- end -}}
 
 {{- if strings.Contains $html "raw HTML omitted" -}}

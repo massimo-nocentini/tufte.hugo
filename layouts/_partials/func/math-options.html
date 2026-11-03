@@ -61,11 +61,19 @@
 {{- $macros := $s.Get "macros" | default (dict) -}}
 
 {{- $errorColor := printf "%v" (index $cfg "errorcolor" | default "") -}}
-{{- $fleqn := eq (index $cfg "fleqn") true -}}
-{{- $leqno := eq (index $cfg "leqno") true -}}
+{{- /* func/flag.html: a HUGO_PARAMS_MATH_FLEQN=true string too. */ -}}
+{{- $fleqn := partial "func/flag.html" (dict "value" (index $cfg "fleqn") "default" false) -}}
+{{- $leqno := partial "func/flag.html" (dict "value" (index $cfg "leqno") "default" false) -}}
 {{- $minRule := 0.04 -}}
 {{- with index $cfg "minrulethickness" -}}
-  {{- $minRule = float . -}}
+  {{- /* A number of em: 0.05, "0.05" (an environment variable) or "0.05em".
+         Anything else would stop the build in float. */ -}}
+  {{- $v := strings.TrimSpace (printf "%v" .) | strings.TrimSuffix "em" | strings.TrimSpace -}}
+  {{- if findRE `^[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$` $v 1 -}}
+    {{- $minRule = float $v -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: params.math.minRuleThickness must be a number (in em), not %q; using 0.04" (printf "%v" .) -}}
+  {{- end -}}
 {{- end -}}
 {{- $strict := lower (printf "%v" (index $cfg "strict" | default "error")) -}}
 {{- if not (in (slice "error" "ignore" "warn") $strict) -}}

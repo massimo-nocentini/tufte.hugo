@@ -1,6 +1,7 @@
 {{- /*
   The parts of a book (\part): the sub-sections of the book root, in
-  weight order (weight 0 = last), then by directory name, numbered with
+  weight order (weight 0 = last), then by directory name (its rank in
+  tufte/book/name-ranks.html, so "a" sorts before "a-2"), numbered with
   roman numerals (SPEC-LATEX §4.1).
 
   Takes: the book root page.
@@ -9,12 +10,13 @@
   Callers: partialCached "tufte/book/parts.html" $root (or $root.RelPermalink $root.Path)
 */ -}}
 {{- $roman := split "I II III IV V VI VII VIII IX X XI XII XIII XIV XV XVI XVII XVIII XIX XX" " " -}}
+{{- $nameRanks := partialCached "tufte/book/name-ranks.html" . (or .RelPermalink .Path) -}}
 {{- $items := slice -}}
 {{- range .Sections -}}
   {{- $w := partial "tufte/book/weight-key.html" .Weight -}}
   {{- $name := .Title -}}
-  {{- with .File }}{{ $name = .Dir }}{{ end -}}
-  {{- $items = $items | append (dict "sortkey" (printf "%s|%s" $w $name) "Page" .) -}}
+  {{- with .File }}{{ $name = .ContentBaseName }}{{ end -}}
+  {{- $items = $items | append (dict "sortkey" (printf "%s|%s" $w (index $nameRanks $name | default "999999")) "Page" .) -}}
 {{- end -}}
 {{- $out := slice -}}
 {{- range $i, $it := sort $items "sortkey" -}}

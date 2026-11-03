@@ -1,0 +1,28 @@
+{{- /*
+  The title of a Markdown link or image ([t](url "TITLE"), ![a](src "TITLE"))
+  as plain text. Hugo hands the hooks the title as written in the source:
+  CommonMark backslash escapes and entity references are still there
+  (Goldmark resolves them only when it renders the link itself). Returns
+  the text the reader should see, unescaped: html/template (or htmlEscape)
+  escapes it again where it goes into an attribute.
+
+  Like CommonMark, in one left-to-right pass: "\\" is a backslash, "\&" a
+  literal ampersand, "\X" (X ASCII punctuation) the character X; an entity
+  or numeric reference is decoded only with its ";" ("&reg=2" stays as is,
+  where htmlUnescape alone would decode the legacy "&reg"), and only when no
+  escape interrupts it ("&amp\;" is the text "&amp;").
+  NUL never reaches a hook (Goldmark replaces it), so \x00 and \x01 are safe
+  placeholders.
+*/ -}}
+{{- $s := printf "%v" (. | default "") -}}
+{{- if or (strings.Contains $s `\`) (strings.Contains $s "&") -}}
+  {{- $s = replace $s `\\` "\x00" -}}
+  {{- $s = replace $s `\&` "\x01" -}}
+  {{- $s = replace $s "&" "&amp;" -}}
+  {{- $s = replaceRE `&amp;(#[0-9]{1,7};|#[xX][0-9a-fA-F]{1,6};|[A-Za-z][A-Za-z0-9]{1,31};)` "&$1" $s -}}
+  {{- $s = replaceRE `\\([[:punct:]])` "$1" $s -}}
+  {{- $s = htmlUnescape $s -}}
+  {{- $s = replace $s "\x00" `\` -}}
+  {{- $s = replace $s "\x01" "&" -}}
+{{- end -}}
+{{- return $s -}}

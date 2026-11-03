@@ -1,0 +1,30 @@
+{{- /*
+  Resolves the marked titles of images whose title held a shortcode:
+
+    <img …/>[</a>]<i class="tufte-tip" hidden></i>TITLE<i class="tufte-tip-end" hidden></i>
+
+  The marks come from render-image.html (an image in running text) and
+  tufte/cell-images.html (an image in a table cell). TITLE is the escaped
+  title with the shortcode's HTML in it: its plain text becomes the img's
+  title attribute (a tooltip) and its notes and citations follow the img
+  (tufte/img-tip.html).
+
+  Callers: func/content-raw.html (a shortcode written in the page's
+  Markdown: Hugo puts its HTML in place after the hooks have run) and
+  tufte/render-inner.html (a shortcode nested in a theme shortcode's inner
+  text: a nest token, swapped there), each once the shortcode's HTML is in
+  the title.
+
+  Takes: the HTML (string or template.HTML).
+  Returns: the HTML string.
+*/ -}}
+{{- $html := string . -}}
+{{- if strings.Contains $html `<i class="tufte-tip" hidden></i>` -}}
+  {{- range findRESubmatch `(?s)(<img [^>]*?)\s*(/>(?:</a>)?)<i class="tufte-tip" hidden></i>(.*?)<i class="tufte-tip-end" hidden></i>` $html -}}
+    {{- $tip := partial "tufte/img-tip.html" (index . 3) -}}
+    {{- $img := index . 1 -}}
+    {{- if and $tip.title (not (findRE `\stitle="` $img 1)) }}{{ $img = printf `%s title="%s"` $img $tip.title }}{{ end -}}
+    {{- $html = replace $html (index . 0) (printf "%s%s%s" $img (index . 2) $tip.notes) 1 -}}
+  {{- end -}}
+{{- end -}}
+{{- return $html -}}

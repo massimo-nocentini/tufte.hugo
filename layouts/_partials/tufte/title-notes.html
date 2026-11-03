@@ -1,0 +1,129 @@
+{{- /*
+  The title-block notes of a page (\thanks): front matter `thanks` (a string
+  or a list; sidenotes after the title) and the `thanks` of authors given as
+  {name, thanks} (a sidenote after the name). Their texts are Markdown in
+  which shortcodes run (cite, xref, smallcaps, math…), so they go through
+  the content pipeline like a sidenote shortcode's text and like the
+  front-matter abstract (tufte/abstract.html):
+
+  1. mode "raw" (func/content-raw.html, full content only): each note is
+     rendered as the sidenote shortcode renders its text
+     (tufte/render-inner.html in inline mode, so a text that starts like a
+     Markdown block, "1984. A grant", stays text; tufte/note-in-note.html,
+     so a nested sidenote stays inline and a cite becomes a citation
+     block; tufte/cite-gather.html, which puts the citations after the
+     text) and the notes come first in the phase-1 HTML, before the
+     abstract:
+       <i class="tufte-tn" data-slot="title" hidden></i>NOTES<i class="tufte-tn" data-slot="aN" hidden></i>NOTE…<i class="tufte-tn-end" hidden></i>
+     So they are counted (tufte/counts.html), numbered (tufte/labels.html),
+     cited (the References list, citation numbers) and resolved
+     (tufte/postprocess.html: xrefs, sn-end and cite markers) with the rest
+     of the page. func/content.html cuts them off the sections.
+  2. mode "get" (the default; tufte/title-block.html, tufte/authors.html,
+     tufte/book/titlepage.html): the processed notes, from the same
+     processed HTML (tufte/processed.html), by slot.
+
+  Which notes a page shows (the title blocks that print them):
+    - a handout (a regular page outside a book): title and authors;
+    - a book landing with a title page (book.titlepage): title only, as
+      notes marked "*" (data-number) that take no number (\thanklesstitle);
+    - a book landing without a title page: title and authors;
+    - a book chapter: title only (chapter heads show no authors), none on a
+      dedication page;
+    - other pages (part pages, sections, taxonomies, the home page unless
+      it is a book landing): none.
+
+  NOTE markup (the sidenote shortcode's):
+    <label for="sn-ID" class="margin-toggle sidenote-number"[ data-number="*"]></label><input type="checkbox" id="sn-ID" class="margin-toggle"/><span class="sidenote"[ data-number="*"]>TEXT[<span class="citation-block">…</span>]</span><i class="sn-end" hidden></i>
+  Adjacent title notes get the \multfootsep comma from postprocess rule 8.
+
+  Takes: a dict with
+    page  the page
+    mode  "raw" or "get" (default)
+  Returns: "raw": the phase-1 HTML string ("" without notes); "get": a dict
+  "title" → the title notes' HTML, "a0", "a1"… → the note of the author at
+  that index of the author list (absent keys: no note).
+*/ -}}
+{{- $p := .page -}}
+{{- $mode := .mode | default "get" -}}
+{{- $key := or $p.RelPermalink $p.Path -}}
+{{- $end := `<i class="tufte-tn-end" hidden></i>` -}}
+{{- $result := "" -}}
+{{- if eq $mode "raw" -}}
+  {{- /* Which notes the title block shows. */ -}}
+  {{- $title := false -}}{{- $authors := false -}}{{- $star := false -}}
+  {{- $root := partialCached "tufte/book/root.html" $p $key -}}
+  {{- if $root -}}
+    {{- if eq $root $p -}}
+      {{- $title = true -}}
+      {{- if partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.titlepage") $key "book.titlepage") -}}
+        {{- $star = true -}}
+      {{- else -}}
+        {{- $authors = true -}}
+      {{- end -}}
+    {{- else if and $p.IsPage (not $p.Params.dedication) -}}
+      {{- $title = true -}}
+    {{- end -}}
+  {{- else if $p.IsPage -}}
+    {{- $title = true -}}{{- $authors = true -}}
+  {{- end -}}
+  {{- $at := $p.RelPermalink -}}
+  {{- with $p.File }}{{ $at = .Path }}{{ end -}}
+  {{- /* The texts, by slot. */ -}}
+  {{- $slots := slice -}}
+  {{- if $title -}}
+    {{- $texts := slice -}}
+    {{- with $p.Params.thanks -}}
+      {{- if reflect.IsSlice . }}{{ $texts = . }}{{ else }}{{ $texts = slice . }}{{ end -}}
+    {{- end -}}
+    {{- $t := slice -}}
+    {{- range $texts }}{{ with . }}{{ $t = $t | append (printf "%v" .) }}{{ end }}{{ end -}}
+    {{- with $t }}{{ $slots = $slots | append (dict "slot" "title" "texts" . "where" "front matter thanks") }}{{ end -}}
+  {{- end -}}
+  {{- if $authors -}}
+    {{- $list := slice -}}
+    {{- with $p.Params.author -}}
+      {{- if reflect.IsSlice . }}{{ $list = . }}{{ else }}{{ $list = slice . }}{{ end -}}
+    {{- end -}}
+    {{- range $i, $a := $list -}}
+      {{- if reflect.IsMap $a -}}
+        {{- if and $a.name $a.thanks -}}
+          {{- $slots = $slots | append (dict "slot" (printf "a%d" $i) "texts" (slice (printf "%v" $a.thanks)) "where" "front matter author thanks") -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $out := "" -}}
+  {{- range $slots -}}
+    {{- $where := .where -}}
+    {{- $out = printf `%s<i class="tufte-tn" data-slot="%s" hidden></i>` $out .slot -}}
+    {{- range .texts -}}
+      {{- $h := partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "shortcodes" "run" "where" $where) | string -}}
+      {{- $h = partial "tufte/note-in-note.html" (dict "page" $p "html" $h "holder" "thanks note" "where" (printf "%s (%s)" $at $where)) -}}
+      {{- $h = $h | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+      {{- with partial "tufte/cite-gather.html" (dict "page" $p "html" $h "keys" slice) -}}
+        {{- $h = printf "%s%s" .html .block -}}
+      {{- end -}}
+      {{- $id := partial "func/note-id.html" $p -}}
+      {{- $num := cond $star ` data-number="*"` "" -}}
+      {{- $out = printf `%s<label for="sn-%s" class="margin-toggle sidenote-number"%s></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote"%s>%s</span><i class="sn-end" hidden></i>` $out $id $num $id $num $h -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $out }}{{ $result = printf "%s%s\n" . $end }}{{ end -}}
+{{- else -}}
+  {{- $res := dict -}}
+  {{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) $key false | string -}}
+  {{- if strings.Contains $raw $end -}}
+    {{- $html := partial "tufte/processed.html" (dict "page" $p "summary" false) -}}
+    {{- with findRE (printf `(?s)^.*?%s` $end) $html 1 -}}
+      {{- $block := index . 0 | strings.TrimSuffix $end -}}
+      {{- range after 1 (split $block `<i class="tufte-tn" data-slot="`) -}}
+        {{- $slot := replaceRE `(?s)^([^"]*)".*$` "$1" . -}}
+        {{- $notes := replaceRE `(?s)^[^"]*" hidden></i>` "" . -}}
+        {{- $res = merge $res (dict $slot $notes) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $result = $res -}}
+{{- end -}}
+{{- return $result -}}

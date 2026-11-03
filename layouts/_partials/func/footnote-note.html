@@ -1,0 +1,206 @@
+{{- /*
+  One Goldmark footnote reference, converted (func/footnotes.html; SPEC-LATEX
+  §3.1, §11): a sidenote or a real-footnote marker, by mode and label.
+
+  A footnote definition may itself reference footnotes ([^a]: see [^b]):
+  Goldmark numbers them and leaves their references in the note text. They
+  are converted first, by this partial, each by its own label: inside a
+  note turned sidenote, a sidenote becomes inline text (tufte-note-in-note,
+  below) and a real footnote keeps its marker (its mark goes in the
+  sidenote); inside a real footnote, a real footnote's marker is moved
+  after the outer one by tufte/fn-split.html (its mark follows the outer
+  mark) and a sidenote stays in the footnote's list item. A note that
+  refers back to a note being converted (a cycle), or one nested deeper
+  than four levels, is converted without its own inner references.
+
+  Takes a dict:
+    page, summary   as func/footnotes.html
+    hash            6-char page hash (ids)
+    sideDefault     bool: plain labels become sidenotes
+    real            Markdown labels that stay real footnotes (also referenced
+                    in a shortcode's text, the abstract or a `thanks`)
+    labels          Markdown labels by Goldmark number (slice; may be empty)
+    notes           map target id (fn:N) → note HTML (back-references removed)
+    target          the target id of this reference
+    ref             the reference HTML (<sup id="fnref:N">…</sup>)
+    repeat          bool: an earlier reference to the same note was converted
+    path            slice of the target ids being converted around this one
+    flat            bool: drop the note's own references instead of converting them
+  Returns: the replacement HTML (string).
+*/ -}}
+{{- $page := .page -}}
+{{- $summary := eq .summary true -}}
+{{- $hash := .hash -}}
+{{- $labels := .labels | default slice -}}
+{{- $target := .target -}}
+{{- $ref := .ref -}}
+{{- $text := index .notes $target | default "" -}}
+{{- $refRE := `<sup [^>]*>\s*<a [^>]*class="footnote-ref"[^>]*>[^<]*</a>\s*</sup>` -}}
+{{- $num := 0 -}}
+{{- with findRESubmatch `:([0-9]+)$` $target 1 }}{{ $num = int (index (index . 0) 1) }}{{ end -}}
+{{- $label := "" -}}
+{{- if and (gt $num 0) (le $num (len $labels)) }}{{ $label = index $labels (sub $num 1) }}{{ end -}}
+{{- $side := .sideDefault -}}
+{{- if .sideDefault -}}
+  {{- if strings.HasPrefix (lower $label) "fn-" }}{{ $side = false }}{{ end -}}
+{{- else -}}
+  {{- if strings.HasPrefix (lower $label) "sn-" }}{{ $side = true }}{{ end -}}
+{{- end -}}
+{{- /* Already a real footnote in a shortcode's text, the abstract or a
+       `thanks` (func/footnotes.html): one footnote, one item. */ -}}
+{{- if and $side $label (in (.real | default slice) $label) }}{{ $side = false }}{{ end -}}
+
+{{- /* References inside the note text, innermost first. The markers of
+       inner real footnotes stand as tokens while a sidenote's text is
+       flattened below (their own paragraphs and blocks are kept). */ -}}
+{{- $kept := slice -}}
+{{- if strings.Contains $text "footnote-ref" -}}
+  {{- $path := (.path | default slice) | append $target -}}
+  {{- range findRE $refRE $text -}}
+    {{- $in := . -}}
+    {{- $t2 := replaceRE `(?s)^.*href="#([^"]+)".*$` "$1" $in -}}
+    {{- $repl := "" -}}
+    {{- if and (not $.flat) (index $.notes $t2) -}}
+      {{- $flat := or (in $path $t2) (ge (len $path) 4) -}}
+      {{- $repl = partial "func/footnote-note.html" (merge $ (dict "target" $t2 "ref" $in "path" $path "flat" $flat)) -}}
+      {{- if and $side (strings.HasPrefix $repl `<span class="tufte-fn"`) -}}
+        {{- $kept = $kept | append $repl -}}
+        {{- $repl = printf "TUFTEFNKEEP%dEND" (sub (len $kept) 1) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $text = replace $text $in $repl 1 -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $repl := "" -}}
+{{- if $side -}}
+  {{- $t := partial "func/inline-figures.html" $text -}}
+  {{- /* A figure shortcode in the note (figure, fig, fullwidthfigure,
+         marginfigure) is flattened by func/inline-figures.html like the
+         image hook's figure of an image alone in the note (README: a plain
+         image with its title as text), but it is a float lost in a note
+         (in LaTeX: "Float(s) lost"): unnumbered, its label gone. The HTML
+         cannot tell the two apart (Hugo unwraps a shortcode alone in its
+         paragraph), so the definition's source is read: a flattened
+         figure with a figure shortcode there warns tufte-block-in-note, a
+         flattened margin figure with marginfigure tufte-note-in-note, as
+         the same shortcodes do in the sidenote shortcode
+         (tufte/render-inner.html). */ -}}
+  {{- if and (not $summary) (not .repeat) $label (ne $t $text) -}}
+    {{- $figLost := sub (len (findRE `<figure[\s>]` $text)) (len (findRE `<figure[\s>]` $t)) -}}
+    {{- $mfRE := `<span class="marginnote margin-figure[\s"]` -}}
+    {{- $mfLost := sub (len (findRE $mfRE $text)) (len (findRE $mfRE $t)) -}}
+    {{- if or (gt $figLost 0) (gt $mfLost 0) -}}
+      {{- $q := replaceRE `([.+*?()|\[\]{}^$\\])` `\$1` $label -}}
+      {{- $def := "" -}}
+      {{- with findRESubmatch (printf `(?s)(?:^|\n)[ \t]{0,3}(?:>[ \t]?)*\[\^%s\]:(.*?)(?:\n[ \t]*\n[^ \t\n]|\n[ \t]{0,3}(?:>[ \t]?)*\[\^[^\]\n]+\]:|$)` $q) (string $page.RawContent) 1 }}{{ $def = index (index . 0) 1 }}{{ end -}}
+      {{- $at := $page.RelPermalink -}}
+      {{- with $page.File }}{{ $at = .Path }}{{ end -}}
+      {{- if and (gt $figLost 0) (findRE `\{\{[<%]\s*(?:figure|fig|fullwidthfigure)[\s/>%]` $def 1) -}}
+        {{- warnidf "tufte-block-in-note" "tufte.hugo: a figure shortcode (figure, fig, fullwidthfigure) in footnote [^%s] in %s, which is turned into a sidenote: a note is a <span> and cannot hold a float (in LaTeX: \"Float(s) lost\"), so the figure is shown as its plain image with its caption as text, unnumbered, and its label is lost; put the figure before or after the paragraph, use marginfigure in the text, or name the footnote [^fn-…] to keep it a real footnote" $label $at -}}
+      {{- end -}}
+      {{- if and (gt $mfLost 0) (findRE `\{\{[<%]\s*marginfigure[\s/>%]` $def 1) -}}
+        {{- warnidf "tufte-note-in-note" "tufte.hugo: footnote [^%s] in %s holds a margin figure, but it is itself a sidenote: the figure is shown as its plain image with its caption as text, unnumbered, and its label is lost; move the margin figure out of the footnote, or name the footnote [^fn-…] to keep it a real footnote" $label $at -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $t = replaceRE `</p>\s*<p>` "<br>" $t -}}
+  {{- $t = replaceRE `</?p>` "" $t | strings.TrimSpace -}}
+  {{- /* A note that starts like a list item ([^y]: 1999. The year…) is a
+         one-item list for Goldmark: in a sidenote (an inline text, like
+         \sidenote{1999. …}) the marker is text, as in the sidenote
+         shortcode (tufte/render-inner.html). Its marker is read from the
+         definition in the source (else "N." or "-"). Two or more items
+         stay a list. */ -}}
+  {{- with findRESubmatch `(?s)^<(ol|ul)(?: start="([0-9]+)")?>\s*<li>(.*?)</li>\s*</(?:ol|ul)>` $t 1 -}}
+    {{- $g := index . 0 -}}
+    {{- $item := index $g 3 -}}
+    {{- if not (findRE `<(?:li|ol|ul|pre|blockquote|table|div|h[1-6])[\s>]` $item 1) -}}
+      {{- $mk := "-" -}}
+      {{- if eq (index $g 1) "ol" }}{{ $mk = printf "%s." (index $g 2 | default "1") }}{{ end -}}
+      {{- with $label -}}
+        {{- $q := replaceRE `([.+*?()|\[\]{}^$\\])` `\$1` . -}}
+        {{- with findRESubmatch (printf `(?m)^[ \t]{0,3}\[\^%s\]:[ \t]*([-+*]|[0-9]{1,9}[.)])[ \t]` $q) (string $page.RawContent) 1 }}{{ $mk = index (index . 0) 1 }}{{ end -}}
+      {{- end -}}
+      {{- $rest := strings.TrimSpace (strings.TrimPrefix (index $g 0) $t) -}}
+      {{- $t = printf "%s %s" $mk (strings.TrimSpace $item) -}}
+      {{- with $rest }}{{ $t = printf "%s<br>%s" $t . }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* A list, code block, quote or table cannot sit in the sidenote
+         <span>: inline blocks (tufte/inline-blocks.html). */ -}}
+  {{- $flat := partial "tufte/inline-blocks.html" $t -}}
+  {{- if ne $flat $t -}}
+    {{- $t = $flat -}}
+    {{- if not $summary -}}
+      {{- $at := $page.RelPermalink -}}
+      {{- with $page.File }}{{ $at = .Path }}{{ end -}}
+      {{- warnidf "tufte-block-in-note" "tufte.hugo: footnote [^%s] in %s holds block content (a list, code block, quote or table) and is turned into a sidenote, which is a <span>: it is shown as inline blocks; name it [^fn-…] to keep it a real footnote" ($label | default (string $num)) $at -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* \cite inside \footnote: the note's text was rendered by Goldmark,
+         so a cite there had no holder (.Parent) and emitted its own
+         numbered citation sidenote. As in tufte-latex (and like a cite
+         nested in the sidenote shortcode), its references become one
+         citation block at the end of this note (tufte/cite-gather.html),
+         and the inner mark, which would step the counter, goes. */ -}}
+  {{- $citeRE := `(?s)<label for="[^"]*" class="margin-toggle sidenote-number"></label><input type="checkbox" id="[^"]*" class="margin-toggle"/><span class="sidenote citation"[^>]*>(.*?)</span><i class="sn-end" hidden></i>` -}}
+  {{- if strings.Contains $t `<span class="sidenote citation"` -}}
+    {{- $t = replaceRE $citeRE `<span class="citation-block" data-nested="1">$1</span><i class="cite-end" hidden></i>` $t -}}
+  {{- end -}}
+  {{- if strings.Contains $t `class="cite-end"` -}}
+    {{- with partial "tufte/cite-gather.html" (dict "page" $page "html" $t) }}{{ $t = printf "%s%s" .html .block }}{{ end -}}
+  {{- end -}}
+  {{- /* Any other note inside it (a sidenote or margin note shortcode in
+         the footnote text, or a footnote of the page referenced there and
+         turned sidenote) cannot float inside a sidenote: its toggle goes
+         and its text stays inline. */ -}}
+  {{- $toggleRE := `<label for="[^"]*" class="margin-toggle[^"]*"[^>]*>[^<]*</label><input type="checkbox" id="[^"]*" class="margin-toggle"/>` -}}
+  {{- if findRE $toggleRE $t 1 -}}
+    {{- $t = replaceRE $toggleRE "" $t -}}
+    {{- $t = replaceRE `<(span|div)( data-sn="[a-z0-9]+")? class="(?:sidenote|marginnote)\b[^"]*"[^>]*>` `<$1$2 class="note-in-note">` $t -}}
+    {{- $t = replace $t `<i class="sn-end" hidden></i>` "" -}}
+    {{- if not $summary -}}
+      {{- $at := $page.RelPermalink -}}
+      {{- with $page.File }}{{ $at = .Path }}{{ end -}}
+      {{- warnidf "tufte-note-in-note" "tufte.hugo: footnote [^%s] in %s holds a sidenote or margin note, but it is itself a sidenote: the inner note is shown inline in its text; use a cite (it becomes a citation block), move the inner note out, or name the footnote [^fn-…] to keep it a real footnote" ($label | default (string $num)) $at -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* A repeated reference repeats the note: anchors in it would
+         duplicate their ids, and a labelled equation its label and
+         number (tufte/labels.html counts each token), so only the first
+         copy keeps them; the copy's equations are unnumbered. */ -}}
+  {{- if .repeat -}}
+    {{- $t = replaceRE `<span class="(?:index-anchor|tufte-anchor)"[^>]*></span>` "" $t -}}
+    {{- if strings.Contains $t `data-kind="eq"` -}}
+      {{- $t = replaceRE `<span class="eq-number">\(<span class="tufte-num" data-kind="eq"[^>]*></span>\)</span>` "" $t -}}
+      {{- $t = replaceRE `<span class="tufte-num" data-kind="eq"[^>]*></span>` "" $t -}}
+      {{- $t = replaceRE `<span class="math-display numbered[^"]*" id="[^"]*">` `<span class="math-display">` $t -}}
+      {{- $t = replaceRE `<span class="math-display tagged" id="[^"]*">` `<span class="math-display tagged">` $t -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $i, $k := $kept }}{{ $t = replace $t (printf "TUFTEFNKEEP%dEND" $i) $k }}{{ end -}}
+  {{- $id := "" -}}
+  {{- with findRESubmatch `^<sup [^>]*\bid="([^"]+)"` $ref 1 -}}
+    {{- $id = printf "%s-%s" $hash (replaceRE `[^a-zA-Z0-9_-]` "-" (index (index . 0) 1)) -}}
+  {{- else -}}
+    {{- $id = partial "func/note-id.html" $page -}}
+  {{- end -}}
+  {{- $repl = printf `<label for="sn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote">%s</span><i class="sn-end" hidden></i>` $id $id $t -}}
+{{- else -}}
+  {{- $name := $label -}}
+  {{- if not $name }}{{ if gt $num 0 }}{{ $name = string $num }}{{ else }}{{ $name = $target }}{{ end }}{{ end -}}
+  {{- /* A cite in a real footnote: its references go in the footnote too
+         (a citation block at the end of its last paragraph), not in a
+         numbered sidenote floated from the footnote list. */ -}}
+  {{- if strings.Contains $text `<span class="sidenote citation"` -}}
+    {{- $text = partial "tufte/fn-cites.html" (dict "page" $page "html" $text) -}}
+  {{- end -}}
+  {{- /* A repeated reference is a mark only: the footnote list shows the
+         first copy's text (tufte/postprocess.html), and a repeated text
+         would count its labels, equations, index entries and inner
+         footnotes twice (tufte/labels.html), as \footnotemark does not. */ -}}
+  {{- if .repeat }}{{ $text = "" }}{{ end -}}
+  {{- $repl = printf `<span class="tufte-fn" data-md="%s" hidden>%s</span><i class="fn-end" hidden></i>` (htmlEscape $name) $text -}}
+{{- end -}}
+{{- return $repl -}}

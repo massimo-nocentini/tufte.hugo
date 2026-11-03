@@ -1,0 +1,66 @@
+{{- /*
+  plainnat's extra labels (natbib author-year): two or more cited entries
+  with the same author label (tufte/bib/cite-label.html: "Adams",
+  "Adams and Brown", "Adams et al.") and the same year get the letters
+  a, b, … after the year, in the citations ("Adams (1999a)",
+  "(Adams 1999a; Adams 1999b)") and in their references ("…, 1999a."),
+  as plainnat's calc.label / extra.label do. Within a group the letters
+  follow plainnat's sort order (author names, year, title: the sortkey of
+  tufte/bib/normalize.html).
+
+  The entries are the cited keys of the bibliography scope (the book or
+  the page: tufte/bib/numbers.html, nocite included), looked up like
+  tufte/bib/list.html does. The year of a formatted entry or an
+  author-year citation is followed by the inert marker
+    <span class="bib-extra" data-key="KEY"></span>
+  (tufte/bib/format.html, the cite shortcode), which tufte/postprocess.html
+  replaces with the letter, or removes.
+
+  Takes: a page.
+  Returns: a map  lowercased key → letter, for the keys that get one.
+  Callers cache it: partialCached "tufte/bib/extra.html" $p (or $p.RelPermalink $p.Path)
+  (inside a book every chapter delegates to the book root).
+*/ -}}
+{{- $p := . -}}
+{{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $res := dict -}}
+{{- if and $root (ne (or $root.RelPermalink $root.Path) (or $p.RelPermalink $p.Path)) -}}
+  {{- $res = partialCached "tufte/bib/extra.html" $root (or $root.RelPermalink $root.Path) -}}
+{{- else -}}
+  {{- $nums := partialCached "tufte/bib/numbers.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- if gt (len $nums) 1 -}}
+    {{- $db := partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path) -}}
+    {{- $scope := partial "tufte/scope.html" $p -}}
+    {{- $G := newScratch -}}
+    {{- range $k, $_ := $nums -}}
+      {{- $raw := index $db $k -}}
+      {{- $from := $p -}}
+      {{- if not $raw -}}
+        {{- range $scope -}}
+          {{- if not $raw -}}
+            {{- with index (partialCached "tufte/bib/db.html" . (or .RelPermalink .Path)) $k }}{{ $raw = . }}{{ end -}}
+            {{- if $raw }}{{ $from = . }}{{ end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- with $raw -}}
+        {{- $e := partialCached "tufte/bib/normalize.html" (dict "entry" . "key" $k) (or $from.RelPermalink $from.Path) $k -}}
+        {{- with printf "%v" ($e.year | default "") | strings.TrimSpace -}}
+          {{- $who := partial "tufte/bib/cite-label.html" (dict "n" $e "key" $k) -}}
+          {{- $G.Add (printf "%s|%s" (lower $who) .) (slice (dict "key" $k "sort" (printf "%s|%s" $e.sortkey $k))) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $letters := split "abcdefghijklmnopqrstuvwxyz" "" -}}
+    {{- range $g, $items := $G.Values -}}
+      {{- if gt (len $items) 1 -}}
+        {{- range $i, $it := sort $items "sort" -}}
+          {{- $l := index $letters (mod $i 26) -}}
+          {{- if ge $i 26 }}{{ $l = printf "%s%d" $l (div $i 26) }}{{ end -}}
+          {{- $res = merge $res (dict $it.key $l) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $res -}}

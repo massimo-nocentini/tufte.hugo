@@ -30,11 +30,20 @@ bibliography), the book (`books/sample-book`: continuous numbering, cross-chapte
 (including real footnotes and the list of listings). Variant builds run it
 in `markers` mode with `HUGO_PARAMS_TUFTE_STYLE=latex`, with `HUGO_PARAMS_MATH_ENGINE=client` (which also checks
 that the KaTeX script and stylesheet have the same version) and with A4 paper, `nobib` and numbered sections.
-A last step, "Build a 150-chapter book within the time limit", gates performance: it generates a book of 150
+The step "Build a 150-chapter book within the time limit" gates performance: it generates a book of 150
 chapters (html + `print.html`; sidenotes, cross-chapter xrefs, labelled figures, citations, index entries, a
 list of figures, a bibliography and an index) in `$RUNNER_TEMP`, builds it with `--panicOnWarning` under
 `timeout 240`, and checks a cross-chapter xref number and the print document. Cross-page results must stay
-memoised (`.Store`), or this step times out.
+memoised in `.Store`, or this step times out; read a memo only through `_partials/tufte/memo.html` and store
+it with the build stamp (`"b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")`), so that the rebuilds of
+`hugo server` and `hugo --watch` recompute it. The same step starts the book under `hugo server` and checks that
+an edit of chapter 1 renumbers chapter 150. The last step, "Check nested and mixed footnotes", builds a small
+site in `$RUNNER_TEMP/nested` (footnotes inside `footnote`/`sidenote`/`fig` shortcodes and inside Markdown
+footnotes, `[^x]` in an image title and a table caption, a label repeated in the body and in a `table` shortcode,
+`footnotes: endnotes`). It checks every post for leftover footnote markers, balanced `<span>`s, unique ids and
+no dangling `#` links; that inner notes follow the outer mark and no note text is lost; that `[^x]` in an image
+title or table caption does not change the kind of the page's other notes; one list item per footnote; and that
+the automatic summaries on the home and section pages are closed.
 Any change to the example content must keep those checks true.
 
 ## Hugo Version and Config
@@ -84,7 +93,10 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
 - Notes and captions are `<span>`s and must never hold block elements. `tufte/render-inner.html` (inline mode)
   and `func/footnotes.html` pass their HTML through `func/inline-figures.html`, which turns a `<figure>` made
   by the image render hook (an image alone in a note) back into a plain `<img>`.
-- `i18n/` has `en`, `it`, `fr`, `de`, `es`. Every key must exist in all five files.
+- `i18n/` has `en`, `it`, `fr`, `de`, `es`. Every key must exist in all five files. Templates translate with
+  `partial "func/t.html" KEY` (or a dict with `key`, `count`, `data`), never `T` directly: it falls back to
+  `i18n/en.yaml` (mounted as the asset `tufte/i18n-en.yaml` in `hugo.toml`, whose `[[module.mounts]]` must keep
+  Hugo's default mounts) for a language without a theme i18n file.
 - `layouts/_partials/func/lang.html` hides the Hugo 0.158 renames of the Language methods (`Lang` → `Name`,
   `LanguageName` → `Label`, `LanguageCode` → `Locale`, `LanguageDirection` → `Direction`). Never call those
   methods directly: the deprecated ones warn (and `--panicOnWarning` fails CI) on new Hugo, the new ones do not
@@ -131,16 +143,30 @@ The spec is the parity table in `README.md` ("tufte-latex parity"). Key mechanic
   (`tufte/processed.html`, memoised). The front-matter `abstract` is rendered first in phase 1
   (`<section class="abstract">…</section><i class="tufte-abstract-end" hidden></i>`), so it is counted and
   resolved with the content; `func/content.html` cuts it off and `tufte/abstract.html` hands it to the title
-  block. `head.html` decides on KaTeX from that final HTML (same cached calls as the body), never by
+  block. The title-block `thanks` notes (page and authors) come before it, up to
+  `<i class="tufte-tn-end" hidden></i>` (`tufte/title-notes.html`, slots `title`, `aN`), for the same reason:
+  never render a `thanks` text with `RenderString` in the title block. A book's front pages built from Markdown
+  front matter (epigraphs, frontispiece, publisher, copyright page, root or chapter dedication) work the same
+  way. `tufte/book/front-fields.html` renders them in phase 1 as
+  `<i class="tufte-ff" data-slot="S" hidden></i>…<i class="tufte-ff-end" hidden></i>`, in landing order (before
+  the title notes, before the abstract, after the abstract). `func/content.html` and `tufte/abstract.html` cut
+  them off, and the partials read them back with mode `get`. Footnotes defined inside a field are relabelled by
+  `tufte/book/fn-local.html`. `head.html` decides on KaTeX from that final HTML (same cached calls as the body), never by
   rendering content again (`.WordCount`).
 - **Markers** (fixed attribute order, matched by regexes in postprocess): `span.tufte-num` number tokens,
   `a.xref`, placeholders, `span.tufte-anchor`, `span.index-anchor`, `data-cite`, `<i class="sn-end" hidden>`,
   `<i class="cap-end" hidden>`, `<i class="tufte-float" …>` (label of an unnumbered float, read by
   `tufte/labels.html`, removed by postprocess) and `<i class="tufte-block" hidden>`/`tufte-block-end` (a linked
-  stand-alone image's figure, unwrapped from its `<p>` by `func/content-raw.html`), and
+  stand-alone image's figure, unwrapped from its `<p>` by `func/content-raw.html`),
+  `<i class="tufte-attr" data-key=… data-at="img|a" hidden>TEXT<i class="tufte-attr-end" hidden></i>` with
+  `TUFTEATTR<key>END` in the attribute (an image alt text or link title holding a shortcode or a `[^x]`,
+  resolved by `tufte/attr-marks.html` in phase 1 or in `render-inner.html`), `<span class="bib-extra" data-key>`
+  after a reference's or author-year citation's year (plainnat's 1999a, filled by postprocess from
+  `tufte/bib/extra.html`), and
   `<span class="citation-block" data-nested="1">…</span><i class="cite-end" hidden></i>` (a cite nested in a
   note or float; its holder cuts it out and merges it into one block after the text with
-  `tufte/cite-gather.html`). An xref marker copied into a
+  `tufte/cite-gather.html`), and `<hN data-tufte-inner id="…">` (a heading rendered by
+  `tufte/render-inner.html`; `func/content-raw.html` makes its id unique on the page and drops the mark). An xref marker copied into a
   figure's derived alt text stays HTML-escaped there and `tufte/resolve-refs.html` replaces it with plain text.
   Never write HTML comments as markers (html/template strips them).
 - **Nested shortcodes**: a child with `.Parent` stores its HTML in `.Page.Store` (`tufteNest`) and emits a

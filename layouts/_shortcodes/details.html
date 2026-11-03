@@ -1,0 +1,49 @@
+{{- /*
+  Collapsible block (block): the theme's version of Hugo's built-in
+  details shortcode, with the same parameters and output. Put it on its
+  own lines; the inner text is block Markdown:
+
+    {{< details summary="Why sidenotes?" >}}
+    Because the eye never leaves the sentence.[^why]
+    {{< /details >}}
+
+  Hugo's own shortcode renders its inner text with RenderString, which
+  cannot see the page's footnote definitions, so a [^x] inside it printed
+  as literal text and its note was lost. Here the inner text goes through
+  tufte/render-inner.html (block mode), as in epigraph, blockquote and
+  fullwidth: [^x] becomes a footnote of the page (a sidenote, or a real
+  footnote for fn- labels) and nested theme shortcodes are kept (nest
+  tokens).
+
+  Params (all optional, named):
+    summary  text of the <summary>, inline Markdown (default: the
+             translated "Details", i18n key details)
+    open     true/false: show the content initially (default false)
+    class    value of the class attribute
+    name     value of the name attribute (one open element per group)
+    title    value of the title attribute
+
+  Output: <details class="…" name="…" open title="…"><summary>…</summary>…</details>
+  (func/content-raw.html step 6 adds a span.sn-skip-details after it when
+  its content holds numbered sidenotes, so later marks keep their numbers
+  while it is closed.)
+*/ -}}
+{{- $p := .Page -}}
+{{- $where := printf "%s shortcode in %v" .Name .Position -}}
+{{- $get := dict -}}
+{{- if .IsNamedParams }}{{ $get = .Params }}{{ end -}}
+{{- $class := printf "%v" (index $get "class" | default "") | strings.TrimSpace -}}
+{{- $name := printf "%v" (index $get "name" | default "") | strings.TrimSpace -}}
+{{- $title := printf "%v" (index $get "title" | default "") -}}
+{{- $summary := printf "%v" (index $get "summary" | default (partial "func/t.html" "details") | default "Details") -}}
+{{- $open := partial "tufte/truthy.html" (index $get "open") -}}
+{{- $sum := partial "tufte/render-inner.html" (dict "page" $p "inner" $summary "display" "inline" "shortcodes" "run" "where" $where) | string -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" $text "display" "block" "where" $where) | string -}}
+{{- $attrs := "" -}}
+{{- with $class }}{{ $attrs = printf "%s class=\"%s\"" $attrs (htmlEscape .) }}{{ end -}}
+{{- with $name }}{{ $attrs = printf "%s name=\"%s\"" $attrs (htmlEscape .) }}{{ end -}}
+{{- if $open }}{{ $attrs = printf "%s open" $attrs }}{{ end -}}
+{{- with $title }}{{ $attrs = printf "%s title=\"%s\"" $attrs (htmlEscape .) }}{{ end -}}
+{{- $out := printf "<details%s>\n<summary>%s</summary>\n%s\n</details>" $attrs $sum $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

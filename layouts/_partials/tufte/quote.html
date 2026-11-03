@@ -11,20 +11,28 @@
             the footer already has links). Script URLs become #ZgotmplZ.
     footer  full footer, inline Markdown (replaces author/cite)
     class   classes of the blockquote
+    where   optional position text for warnings (e.g. the shortcode's
+            .Position)
+
+  author, cite and footer are rendered by tufte/render-inner.html (inline,
+  shortcodes run, as a caption= parameter): a Markdown footnote [^x] in
+  them becomes a real footnote of the page (tufte-undefined-ref when it
+  has no definition).
 
   Returns: the HTML string
     <blockquote[ class][ cite]>\nHTML\n<footer>…</footer>\n</blockquote>
 */ -}}
 {{- $p := .page -}}
+{{- $where := .where | default "" -}}
 {{- $footer := "" -}}
 {{- with .footer -}}
-  {{- $footer = $p.RenderString (printf "%v" .) | string -}}
+  {{- $footer = partial "tufte/render-inner.html" (dict "page" $p "inner" (printf "%v" .) "display" "inline" "shortcodes" "run" "where" $where) | string -}}
 {{- else -}}
   {{- with $.author -}}
-    {{- $footer = $p.RenderString (printf "%v" .) | string -}}
+    {{- $footer = partial "tufte/render-inner.html" (dict "page" $p "inner" (printf "%v" .) "display" "inline" "shortcodes" "run" "where" $where) | string -}}
   {{- end -}}
   {{- with $.cite -}}
-    {{- $c := printf "<cite>%s</cite>" ($p.RenderString (printf "%v" .)) -}}
+    {{- $c := printf "<cite>%s</cite>" (partial "tufte/render-inner.html" (dict "page" $p "inner" (printf "%v" .) "display" "inline" "shortcodes" "run" "where" $where) | string) -}}
     {{- if $footer -}}
       {{- $footer = printf "%s, %s" $footer $c -}}
     {{- else -}}
@@ -34,9 +42,7 @@
 {{- end -}}
 {{- $url := "" -}}
 {{- with .url -}}
-  {{- $url = printf "%v" . | strings.TrimSpace -}}
-  {{- if findRE `(?i)^\s*(javascript|vbscript|data):` $url 1 }}{{ $url = "#ZgotmplZ" }}{{ end -}}
-  {{- $url = htmlEscape $url -}}
+  {{- $url = partial "tufte/safe-url.html" . | htmlEscape -}}
 {{- end -}}
 {{- $foot := "" -}}
 {{- with $footer -}}

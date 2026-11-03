@@ -4,9 +4,23 @@
 
     <section class="dedication"><p>…</p></section>
 
-  Takes: the book root page.
+  Also a dedication chapter's (tufte/book/chapter-body.html). The text
+  is rendered in phase 1 with the page content
+  (tufte/book/front-fields.html), so its notes, footnotes ([^x]),
+  citations and cross-references are numbered and resolved with the
+  page's.
+
+  Takes: the page (the processed dedication), or a dict
+  {page, render: true} (tufte/book/front-fields.html: the phase-1 HTML).
 */ -}}
-{{- with .Params.dedication -}}
-  {{- $html := $.RenderString (dict "display" "block") (printf "%v" .) | string | strings.TrimSpace }}
+{{- $p := . -}}
+{{- $render := false -}}
+{{- if reflect.IsMap . }}{{ $p = .page }}{{ $render = eq .render true }}{{ end -}}
+{{- if not $render -}}
+  {{- partial "tufte/book/front-fields.html" (dict "page" $p "slot" "dedication") | safeHTML -}}
+{{- else -}}
+{{- with $p.Params.dedication -}}
+  {{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" (partial "tufte/book/fn-local.html" (dict "text" . "tag" "ded")) "display" "block" "shortcodes" "run" "where" "front matter dedication") | string | strings.TrimSpace }}
 <section class="dedication">{{ $html | safeHTML }}</section>
+{{- end -}}
 {{- end -}}

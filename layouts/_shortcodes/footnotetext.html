@@ -10,7 +10,10 @@
   text). The inner text is inline Markdown.
 
   Output (SPEC-LATEX §3.3):
-    <p class="footnotetext-anchor"><input type="checkbox" id="sn-HASH6-ft-NAME" class="margin-toggle"/><span class="sidenote"[ style]>TEXT</span></p>
+    <p class="footnotetext-anchor"><input type="checkbox" id="sn-HASH6-ft-NAME[.K]" class="margin-toggle"/><span class="sidenote"[ style]>TEXT</span></p>
+  (K: the K-th footnotetext of that name on the page, from 2; it pairs
+  with the marks of the name written since the previous one:
+  func/content-raw.html)
 */ -}}
 {{- $p := .Page -}}
 {{- $name := "" -}}{{- $offset := "" -}}
@@ -22,7 +25,7 @@
 {{- else -}}
   {{- $name = printf "%v" (.Get 0 | default "") -}}
 {{- end -}}
-{{- $name = replaceRE `[^a-zA-Z0-9_-]` "-" (strings.TrimSpace $name) -}}
+{{- $name = partial "tufte/ft-name.html" $name -}}
 {{- if not $name -}}
   {{- errorf "footnotetext shortcode: a name is required, e.g. {{< footnotetext \"fm\" >}}…{{< /footnotetext >}} (%s)" .Position -}}
 {{- end -}}
@@ -31,7 +34,7 @@
 {{- end -}}
 {{- $html := "" -}}
 {{- with $text -}}
-  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.Inner) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
   {{- /* A sidenote or margin note nested in it cannot float. */ -}}
   {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $.Name) "where" $.Position) -}}
   {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}

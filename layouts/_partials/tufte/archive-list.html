@@ -3,35 +3,45 @@
 
     <div class="archive">
       <section><h2 class="archive-year">YEAR</h2><ul class="archive-list">
-        <li><time datetime="YYYY-MM-DD">Mon D</time> <a href="…">TITLE</a></li>…
+        <li><time datetime="YYYY-MM-DD">DATE</time> <a href="…">TITLE</a></li>…
       </ul></section>…
       [<section><h2 class="archive-year">Undated</h2><ul class="archive-list">
         <li><a href="…">TITLE</a></li>…</ul></section>]
     </div>
 
-  Dated pages are grouped by year, newest first. Pages without a date
+  DATE is in params.archiveDateFormat, else the i18n archiveDateFormat
+  ("Jan 2" in English, "2 Jan" in Italian). Dated pages are grouped by year, newest first. Pages without a date
   (book chapters, SPEC R13) have no year: they come last, under the
   i18n "undated" heading, with no <time>, in the collection's order (for
   a book, weight = reading order), as post-meta.html shows no date for
   them either.
 
-  Takes: the pages (page.Pages).
+  Takes: the pages (page.Pages), or a dict with
+    pages  the pages
+    label  optional accessible name of the list (archive.html: i18n
+           "allPosts"), written as aria-label on div.archive
 */ -}}
 {{- $pages := . -}}
-<div class="archive">
+{{- $label := "" -}}
+{{- if reflect.IsMap . }}{{ $pages = .pages }}{{ $label = .label | default "" }}{{ end }}
+{{- /* The short date: params.archiveDateFormat, else the language's
+       i18n archiveDateFormat ("Jan 2"; "2 Jan" in Italian; a language
+       without the key gets the English one, func/t.html). */ -}}
+{{- $fmt := site.Params.archiveDateFormat | default (partial "func/t.html" "archiveDateFormat") | default "Jan 2" }}
+<div class="archive"{{ with $label }} role="region" aria-label="{{ . }}"{{ end }}>
   {{- range (where $pages "Date.IsZero" false).GroupByDate "2006" }}
   <section>
     <h2 class="archive-year">{{ .Key }}</h2>
     <ul class="archive-list">
       {{- range $p := .Pages }}
-      <li><time datetime="{{ .Date.Format "2006-01-02" }}">{{ partial "func/date.html" (dict "date" .Date "format" "Jan 2") }}</time> {{ with .RelPermalink }}<a href="{{ . }}">{{ partial "tufte/title-html.html" (dict "page" $p) }}</a>{{ else }}{{ partial "tufte/title-html.html" (dict "page" $p) }}{{ end }}</li>
+      <li><time datetime="{{ .Date.Format "2006-01-02" }}">{{ partial "func/date.html" (dict "date" .Date "format" $fmt) }}</time> {{ with .RelPermalink }}<a href="{{ . }}">{{ partial "tufte/title-html.html" (dict "page" $p) }}</a>{{ else }}{{ partial "tufte/title-html.html" (dict "page" $p) }}{{ end }}</li>
       {{- end }}
     </ul>
   </section>
   {{- end }}
   {{- with where $pages "Date.IsZero" true }}
   <section>
-    <h2 class="archive-year">{{ T "undated" }}</h2>
+    <h2 class="archive-year">{{ partial "func/t.html" "undated" }}</h2>
     <ul class="archive-list">
       {{- range $p := . }}
       <li>{{ with .RelPermalink }}<a href="{{ . }}">{{ partial "tufte/title-html.html" (dict "page" $p) }}</a>{{ else }}{{ partial "tufte/title-html.html" (dict "page" $p) }}{{ end }}</li>

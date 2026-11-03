@@ -4,11 +4,13 @@
   1. Regular pages of the root, plus the regular pages of each part (a
      sub-section of the root; one level: pages of deeper sections are
      flattened into their part, with a tufte-book-structure warning).
-  2. Sorted by matter (front, main, appendix, back), then by the weight of
-     the group (a part's weight for its chapters, the chapter's own weight
-     for chapters at the root, so parts and loose chapters interleave by
-     weight; weight 0 = unweighted = last), then the chapter's weight,
-     then its file name. Never by date.
+  2. Sorted by group: a chapter at the root is a group of its own, a part
+     is one group (its chapters stay together, as after \part in LaTeX).
+     Groups sort by matter (front, main, appendix, back; a part's is that
+     of its earliest chapter), then by weight (a part's weight, a loose
+     chapter's own, so parts and loose chapters interleave by weight;
+     weight 0 = unweighted = last), then by file name. Inside a part, its
+     chapters sort by matter, weight, then file name. Never by date.
   3. Num: 1-based index among main-matter chapters that are not
      `unnumbered`. Appendix chapters get the letters A, B, … as Display.
   4. Numbered: book.numberChapters (resolved for the chapter) and not
@@ -18,18 +20,21 @@
   Returns: a slice of dicts
     { Page, Matter, Num, Display, Numbered, Part, Index, SortKey }
   (Part is the part page or false; Index is the 0-based position; SortKey
-  is the reading-order key "MATTERRANK|GROUPWEIGHT|GROUPNAME|WEIGHT|NAME",
+  is the reading-order key
+  "GROUPMATTERRANK|GROUPWEIGHT|GROUPNAME|MATTERRANK|WEIGHT|NAME",
+  names as their rank in tufte/book/name-ranks.html,
   which tufte/book/toc.html uses to place parts without chapters).
   Callers: partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path)
 */ -}}
-{{- /* Memoized in the root's Store (not in hugo server): see
+{{- /* Memoized in the root's Store for the current build: see
        tufte/opts.html. */ -}}
 {{- $memoRes := false -}}
-{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoChapters") -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoChapters") -}}
   {{- $memoRes = .v -}}
 {{- else -}}
 {{- $root := . -}}
 {{- $ranks := dict "front" 0 "main" 1 "appendix" 2 "back" 3 -}}
+{{- $nameRanks := partialCached "tufte/book/name-ranks.html" $root (or $root.RelPermalink $root.Path) -}}
 {{- $items := slice -}}
 {{- $groups := slice -}}
 {{- range $root.RegularPages -}}
@@ -57,15 +62,36 @@
     {{- $groups = $groups | append (dict "part" $part "page" . "sub" $sub) -}}
   {{- end -}}
 {{- end -}}
+{{- /* A section with `book: true` inside this book is read as a part
+       (or a sub-section of one) of it, not as a book of its own
+       (tufte/book/root.html: the outermost book wins). */ -}}
+{{- $nested := slice -}}
+{{- range $root.Sections -}}
+  {{- $secs := slice . -}}
+  {{- range .RegularPagesRecursive }}{{ with .Parent }}{{ if not (in $secs .) }}{{ $secs = $secs | append . }}{{ end }}{{ end }}{{ end -}}
+  {{- range $secs -}}
+    {{- if partial "tufte/truthy.html" (index .Params "book") -}}
+      {{- $at := .RelPermalink -}}
+      {{- with .File }}{{ $at = .Path }}{{ end -}}
+      {{- if not (in $nested $at) }}{{ $nested = $nested | append $at }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- with $nested -}}
+  {{- $at := $root.RelPermalink -}}
+  {{- with $root.File }}{{ $at = .Path }}{{ end -}}
+  {{- warnidf "tufte-book-structure" "tufte.hugo: book %s: %s sets book: true inside this book; a book cannot hold another one, so it is read as a part of %s (remove its book: true, or move it out)" $at (delimit . ", ") $at -}}
+{{- end -}}
 {{- with $deep -}}
   {{- $at := $root.RelPermalink -}}
   {{- with $root.File }}{{ $at = .Path }}{{ end -}}
   {{- warnidf "tufte-book-structure" "tufte.hugo: book %s: parts are one level deep, but %s is a section inside a part; its pages are read as chapters of that part, and its own _index.md is not part of the book's reading order" $at (delimit . ", ") -}}
 {{- end -}}
+{{- /* Matter of each chapter, and of each part (its earliest chapter's). */ -}}
+{{- $partRank := newScratch -}}
+{{- $mgroups := slice -}}
 {{- range $groups -}}
   {{- $p := .page -}}
-  {{- $part := .part -}}
-  {{- $sub := .sub | default "" -}}
   {{- $matter := lower (printf "%v" (index $p.Params "matter" | default "main")) -}}
   {{- if not (isset $ranks $matter) -}}
     {{- $at := "" -}}
@@ -73,6 +99,22 @@
     {{- warnidf "tufte-bad-option" "tufte.hugo: matter must be front, main, appendix or back, not %q, in %s; using main" $matter $at -}}
     {{- $matter = "main" -}}
   {{- end -}}
+  {{- with .part -}}
+    {{- $pk := .Path -}}
+    {{- /* Stored as rank + 1 (0, front, would read as unset). */ -}}
+    {{- $r := add (index $ranks $matter) 1 -}}
+    {{- with $partRank.Get $pk }}{{ if lt . $r }}{{ $r = . }}{{ end }}{{ end -}}
+    {{- $partRank.Set $pk $r -}}
+  {{- end -}}
+  {{- $mgroups = $mgroups | append (merge . (dict "matter" $matter)) -}}
+{{- end -}}
+{{- range $mgroups -}}
+  {{- $p := .page -}}
+  {{- $part := .part -}}
+  {{- $sub := .sub | default "" -}}
+  {{- $matter := .matter -}}
+  {{- $grank := index $ranks $matter -}}
+  {{- with $part }}{{ $grank = sub ($partRank.Get .Path) 1 }}{{ end -}}
   {{- $name := $p.Title -}}
   {{- with $p.File }}{{ $name = .ContentBaseName }}{{ end -}}
   {{- with $sub }}{{ $name = printf "%s%s" . $name }}{{ end -}}
@@ -84,9 +126,15 @@
   {{- with $part -}}
     {{- $gw = partial "tufte/book/weight-key.html" .Weight -}}
     {{- $gname = .Title -}}
-    {{- with .File }}{{ $gname = .Dir }}{{ end -}}
+    {{- /* The part's directory name (ContentBaseName of its _index.md),
+           so that it sorts by file name against the loose chapters' file
+           names, not by its full path. */ -}}
+    {{- with .File }}{{ $gname = .ContentBaseName }}{{ end -}}
   {{- end -}}
-  {{- $sortkey := printf "%d|%s|%s|%s|%s" (index $ranks $matter) $gw $gname $w $name -}}
+  {{- /* Names as their file-name rank (tufte/book/name-ranks.html):
+         fixed-width fields, so a name that is a prefix of another
+         ("intro", "intro-2") sorts first. */ -}}
+  {{- $sortkey := printf "%d|%s|%s|%d|%s|%s" $grank $gw (index $nameRanks $gname | default "999999") (index $ranks $matter) $w (index $nameRanks $name | default "999999") -}}
   {{- $items = $items | append (dict "sortkey" $sortkey "Page" $p "Matter" $matter "Part" $part) -}}
 {{- end -}}
 {{- $items = sort $items "sortkey" -}}
@@ -128,6 +176,6 @@
     "SortKey" $it.sortkey) -}}
 {{- end -}}
 {{- $memoRes = $out -}}
-{{- if not hugo.IsServer }}{{ $root.Store.Set "tufteMemoChapters" (dict "v" $memoRes) }}{{ end -}}
+{{- $root.Store.Set "tufteMemoChapters" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $memoRes -}}

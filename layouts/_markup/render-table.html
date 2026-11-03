@@ -24,6 +24,11 @@
 
   renders exactly like {{< table caption=… label="tab:x" >}}: id → label,
   plus short, numbered, captionpos, offset, cite and the fullwidth class.
+
+  An image in a cell is inline content, even alone in its cell (where
+  Hugo gives the image hook .IsBlock = true): tufte/cell-images.html turns
+  the figure back into a plain <img> with its title as tooltip, so it
+  takes no figure number and no List of Figures entry.
 */ -}}
 {{- $fullwidth := false -}}
 {{- $extra := "" -}}
@@ -55,7 +60,7 @@
   {{- range . -}}
     {{- $cells := "" -}}
     {{- range . -}}
-      {{- $cells = printf "%s\n<th%s>%s</th>" $cells (cond (ne (printf "%v" .Alignment) "") (printf ` style="text-align: %s"` (htmlEscape (printf "%v" .Alignment))) "") (string .Text) -}}
+      {{- $cells = printf "%s\n<th%s>%s</th>" $cells (cond (ne (printf "%v" .Alignment) "") (printf ` style="text-align: %s"` (htmlEscape (printf "%v" .Alignment))) "") (partial "tufte/cell-images.html" (dict "html" .Text "page" $.Page)) -}}
     {{- end -}}
     {{- $rows = printf "%s\n<tr>%s\n</tr>" $rows $cells -}}
   {{- end -}}
@@ -66,7 +71,7 @@
   {{- range . -}}
     {{- $cells := "" -}}
     {{- range . -}}
-      {{- $cells = printf "%s\n<td%s>%s</td>" $cells (cond (ne (printf "%v" .Alignment) "") (printf ` style="text-align: %s"` (htmlEscape (printf "%v" .Alignment))) "") (string .Text) -}}
+      {{- $cells = printf "%s\n<td%s>%s</td>" $cells (cond (ne (printf "%v" .Alignment) "") (printf ` style="text-align: %s"` (htmlEscape (printf "%v" .Alignment))) "") (partial "tufte/cell-images.html" (dict "html" .Text "page" $.Page)) -}}
     {{- end -}}
     {{- $rows = printf "%s\n<tr>%s\n</tr>" $rows $cells -}}
   {{- end -}}

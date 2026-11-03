@@ -2,10 +2,16 @@
   bibtex-lite: parses the text of a .bib file into the theme's native
   bibliography map (SPEC-LATEX §5.1).
 
-  Takes: a string (the content of a .bib file).
+  Takes: a string (the content of a .bib file), or a dict
+    "text"  the content of the .bib file
+    "where" optional: the file (and page) named in warnings.
   Returns: a map  lowercased cite key → map of fields, where every field
   name is lowercased and "type" holds the lowercased entry type
-  (book, article, misc, …).
+  (book, article, misc, …); the BibTeX field `type` (a thesis or report
+  kind, "Doctoral dissertation") is stored as "genre", as in CSL.
+  Keys are case-insensitive, as in BibTeX: a key repeated in the file
+  (tufte01 and Tufte01 too) keeps its first entry, and the later one is
+  reported with warnidf "tufte-duplicate-cite" (BibTeX's "Repeated entry").
 
   Supported:
     - @string{name = "value"} macros, @comment and @preamble are skipped;
@@ -26,13 +32,21 @@
   Not supported: crossref, @string macros used before their definition,
   nested quotes inside "…" values.
 */ -}}
-{{- $text := printf "%s" . -}}
+{{- $text := "" -}}
+{{- $where := "" -}}
+{{- if reflect.IsMap . -}}
+  {{- $text = printf "%s" (.text | default "") -}}
+  {{- with .where }}{{ $where = printf "%s: " . }}{{ end -}}
+{{- else -}}
+  {{- $text = printf "%s" . -}}
+{{- end -}}
 {{- $text = replace $text "\r\n" "\n" -}}
 {{- $text = printf "\n%s" $text -}}
 {{- /* one chunk per @entry */ -}}
 {{- $chunks := split (replaceRE `\n[ \t]*@` "\x1d@" $text) "\x1d" -}}
 {{- $S := newScratch -}}
 {{- $S.Set "db" dict -}}
+{{- $S.Set "keys" dict -}}
 {{- $S.Set "macros" (dict
   "jan" "January" "feb" "February" "mar" "March" "apr" "April"
   "may" "May" "jun" "June" "jul" "July" "aug" "August"
@@ -75,6 +89,11 @@
     {{- $km := findRESubmatch `^@\s*\w+\s*[{(]\s*([^,\s]+)\s*,` $c 1 -}}
     {{- if not $km }}{{ continue }}{{ end -}}
     {{- $key = lower (index (index $km 0) 1) -}}
+    {{- with index ($S.Get "keys") $key -}}
+      {{- warnidf "tufte-duplicate-cite" "tufte.hugo: %srepeated entry %q in the .bib file (keys are case-insensitive); the first entry, %q, is kept" $where (index (index $km 0) 1) . -}}
+      {{- continue -}}
+    {{- end -}}
+    {{- $S.SetInMap "keys" $key (index (index $km 0) 1) -}}
     {{- $body = replaceRE `^@\s*\w+\s*[{(]\s*[^,\s]+\s*,` "" $c -}}
   {{- end -}}
 
@@ -158,18 +177,25 @@
         {{- $val = replaceRE `\\[a-zA-Z]+\s*` "" $val -}}
         {{- $val = replace $val "\\" "" -}}
       {{- end -}}
+      {{- /* TeX's dash and quote ligatures: --- — , -- – , ``…'' “…”,
+             `…' ‘…’ (an apostrophe is ’, as TeX sets it) */ -}}
       {{- $val = replace $val "---" "—" -}}
       {{- $val = replace $val "--" "–" -}}
+      {{- $val = replace $val "``" "“" -}}
+      {{- $val = replace $val "''" "”" -}}
+      {{- $val = replace $val "`" "‘" -}}
+      {{- $val = replace $val "'" "’" -}}
       {{- $val = replace $val "~" " " -}}
-      {{- if not (in (slice "author" "editor") $name) -}}
-        {{- $val = replaceRE `[{}]` "" $val -}}
-      {{- end -}}
       {{- if not (in (slice "author" "editor") $name) -}}
         {{- $val = replaceRE `[{}]` "" $val -}}
       {{- end -}}
       {{- $joined = printf "%s%s" $joined (replace $val "\x1a" `\$`) -}}
     {{- end -}}
     {{- $val = trim (replaceRE `\s+` " " $joined) " " -}}
+    {{- /* The BibTeX field `type` ("Doctoral dissertation", "Working
+           Paper") is kept as "genre" (CSL's name for it): "type" holds
+           the entry type. */ -}}
+    {{- if eq $name "type" }}{{ $name = "genre" }}{{ end -}}
     {{- $E.Set $name $val -}}
   {{- end -}}
   {{- if $key -}}

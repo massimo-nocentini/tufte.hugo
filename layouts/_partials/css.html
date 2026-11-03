@@ -1,6 +1,6 @@
 {{- /*
   Emits the single theme stylesheet. In order: ET Book @font-face rules
-  (when Params.etBook is not false), tufte.css, theme.css, tufte-latex.css,
+  (unless Params.etBook is false or "false", func/flag.html), tufte.css, theme.css, tufte-latex.css,
   syntax.css and
   every path listed in Params.customCSS (resolved in the site's assets/).
   The bundle is published as css/tufte-hugo.<hash>.css, so the relative
@@ -8,7 +8,7 @@
   Minified in production builds only, always fingerprinted with SRI.
 */ -}}
 {{- $paths := slice -}}
-{{- if ne site.Params.etBook false -}}
+{{- if partial "func/flag.html" (dict "value" site.Params.etBook "default" true) -}}
   {{- $paths = $paths | append "css/et-book.css" -}}
 {{- end -}}
 {{- $paths = $paths | append "css/tufte.css" -}}
@@ -25,8 +25,22 @@
     {{- errorf "tufte.hugo: theme stylesheet %q not found in assets/" . -}}
   {{- end -}}
 {{- end -}}
-{{- range site.Params.customCSS -}}
-  {{- with resources.Get . -}}
+{{- /* customCSS: a list of paths; a single string (`customCSS =
+       "css/custom.css"`, or HUGO_PARAMS_CUSTOMCSS, which is always a
+       string) is a list of comma-separated paths. Anything else is
+       reported and ignored. */ -}}
+{{- $custom := slice -}}
+{{- with site.Params.customCSS -}}
+  {{- if reflect.IsSlice . -}}
+    {{- $custom = . -}}
+  {{- else if eq (printf "%T" .) "string" -}}
+    {{- range split . "," }}{{ with strings.TrimSpace . }}{{ $custom = $custom | append . }}{{ end }}{{ end -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: customCSS must be a list of paths under assets/ (or one path), not %v; ignored" . -}}
+  {{- end -}}
+{{- end -}}
+{{- range $custom -}}
+  {{- with resources.Get (printf "%v" .) -}}
     {{- $resources = $resources | append . -}}
   {{- else -}}
     {{- warnidf "tufte-bad-option" "tufte.hugo: customCSS %q not found in assets/, skipped" . -}}

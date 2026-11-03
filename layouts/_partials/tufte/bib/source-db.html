@@ -43,7 +43,7 @@
   {{- $text := "" -}}
   {{- if eq $ext ".bib" -}}
     {{- $text = printf "%s" $res.Content -}}
-    {{- $data = partialCached "tufte/bib/bibtex.html" $text (printf "bibtex|%s" (md5 $text)) -}}
+    {{- $data = partialCached "tufte/bib/bibtex.html" (dict "text" $text "where" (printf "%s: %s" $where $path)) (printf "bibtex|%s" (md5 $text)) -}}
   {{- else if in (slice ".json" ".yaml" ".yml" ".toml") $ext -}}
     {{- with try (transform.Unmarshal $res) -}}
       {{- with .Err -}}
@@ -57,7 +57,7 @@
     {{- warnidf "tufte-bib-format" "tufte.hugo: %s: unsupported bibliography file %q (use .bib, .json, .yaml or .toml)" $where $path -}}
   {{- end -}}
   {{- if $data -}}
-    {{- range $k, $v := partialCached "tufte/bib/site-db.html" $data (printf "file|%s|%s" $ext (md5 $text)) -}}
+    {{- range $k, $v := partialCached "tufte/bib/site-db.html" (dict "data" $data "where" (printf "%s: %s" $where $path)) (printf "file|%s|%s" $ext (md5 $text)) -}}
       {{- $S.SetInMap "db" $k $v -}}
     {{- end -}}
   {{- end -}}
@@ -66,7 +66,7 @@
 {{- /* front matter `references`: inline entries */ -}}
 {{- with $src.Params.references -}}
   {{- if or (reflect.IsMap .) (reflect.IsSlice .) -}}
-    {{- range $k, $v := partial "tufte/bib/site-db.html" . -}}
+    {{- range $k, $v := partial "tufte/bib/site-db.html" (dict "data" . "where" (printf "%s: front matter references" $where)) -}}
       {{- $S.SetInMap "db" $k $v -}}
     {{- end -}}
   {{- end -}}

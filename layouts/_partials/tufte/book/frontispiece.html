@@ -13,9 +13,20 @@
 
     <section class="frontispiece"><figure class="tufte-figure">[caption toggle + span.marginnote.caption]<img …/></figure></section>
 
-  Takes: the book root page.
+  The figure is made in phase 1 with the page content
+  (tufte/book/front-fields.html), so the caption's notes, footnotes,
+  citations and cross-references (and the alt text derived from it) are
+  resolved with the landing's.
+
+  Takes: the book root page (the processed frontispiece), or a dict
+  {page, render: true} (tufte/book/front-fields.html: the phase-1 HTML).
 */ -}}
 {{- $p := . -}}
+{{- $render := false -}}
+{{- if reflect.IsMap . }}{{ $p = .page }}{{ $render = eq .render true }}{{ end -}}
+{{- if not $render -}}
+  {{- partial "tufte/book/front-fields.html" (dict "page" $p "slot" "frontispiece") | safeHTML -}}
+{{- else -}}
 {{- with $p.Params.frontispiece -}}
   {{- $src := "" }}{{ $alt := "" }}{{ $caption := "" -}}
   {{- if reflect.IsMap . -}}
@@ -26,7 +37,8 @@
     {{- $src = printf "%v" . -}}
   {{- end -}}
   {{- with strings.TrimSpace $src -}}
-    {{- $fig := partial "tufte/figure.html" (dict "Page" $p "Src" . "Alt" $alt "Caption" $caption "Type" "main" "Numbered" false) }}
+    {{- $fig := partial "tufte/figure.html" (dict "Page" $p "Src" . "Alt" $alt "Caption" (partial "tufte/book/fn-local.html" (dict "text" $caption "tag" "fp")) "Type" "main" "Numbered" false) }}
 <section class="frontispiece">{{ $fig | safeHTML }}</section>
   {{- end -}}
+{{- end -}}
 {{- end -}}

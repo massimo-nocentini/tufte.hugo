@@ -26,7 +26,7 @@
 */ -}}
 {{- $kind := .kind | default "figure" -}}
 {{- $words := dict "figure" "Figure" "table" "Table" "listing" "Listing" -}}
-{{- $word := T $kind | default (index $words $kind) | default $kind -}}
+{{- $word := partial "func/t.html" $kind | default (index $words $kind) | default $kind -}}
 {{- $attrs := printf ` data-kind="%s" data-key="%s"` (htmlEscape $kind) (htmlEscape .key) -}}
 {{- if .labeled -}}
   {{- $attrs = printf `%s data-labeled="1"` $attrs -}}

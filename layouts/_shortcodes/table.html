@@ -8,13 +8,14 @@
     | body | 10     |
     {{< /table >}}
 
-  Without caption, a first paragraph inside is the caption:
+  Without caption, a paragraph inside is the caption, before the table or
+  after it (where tufte-latex writes \caption, after the tabular):
 
     {{< table label="tab:x" >}}
-    Font sizes used in the class.
-
     | Size | Points |
     …
+
+    Font sizes used in the class.
     {{< /table >}}
 
   Named params: caption (inline Markdown), label (key for xref), short

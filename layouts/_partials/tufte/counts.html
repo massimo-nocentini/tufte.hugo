@@ -4,25 +4,32 @@
 
     sidenote  numbered sidenote marks (labels of class sidenote-number
               without data-number: sidenotes, footnotes, citations,
-              footnotemarks) plus the title-block \thanks notes (front
-              matter `thanks`, and in a handout each author's `thanks`),
-              which precede the content; none on a book title page
+              footnotemarks), including the title-block \thanks notes
+              (front matter `thanks`, authors' `thanks`), which come first
+              in the phase-1 HTML (tufte/title-notes.html); a book title
+              page's are marked "*" and not counted
     figure, table, listing
               number tokens of that kind; 0 when the page's floats are not
               numbered (floats.number false, or "auto" in a handout without
               any labelled float, xref or listoffigures/tables/listings)
     eq        equation number tokens (always numbered), except those of
               a \tag{X} equation (data-number)
-    thanks    the title-block notes alone (included in sidenote)
+    sec2      numbered h2 sections (a sec number token, headings.number),
+              for the section numbers of a book (tufte/book/sec-offset-map.html)
+    thanks    the numbered marks before the content alone (included in
+              sidenote): the title-block notes, the abstract's and those
+              of a book's front pages (tufte/book/front-fields.html),
+              which a summary does not show (post-summary.html starts
+              after them)
 
   Takes: a page.
-  Returns: dict sidenote figure table listing eq thanks (ints).
+  Returns: dict sidenote figure table listing eq thanks sec2 (ints).
   Callers: partialCached "tufte/counts.html" $p (or $p.RelPermalink $p.Path)
 */ -}}
-{{- /* Memoized in the page's Store (not in hugo server): see
+{{- /* Memoized in the page's Store for the current build: see
        tufte/opts.html. */ -}}
 {{- $memoRes := false -}}
-{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoCounts") -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoCounts") -}}
   {{- $memoRes = .v -}}
 {{- else -}}
 {{- $p := . -}}
@@ -35,35 +42,42 @@
 {{- $fn := partialCached "tufte/opt.html" (dict "page" $p "key" "floats.number") (or $p.RelPermalink $p.Path) "floats.number" -}}
 {{- $num := false -}}
 {{- if eq (lower (printf "%v" $fn)) "auto" -}}
-  {{- $num = or $inBook (gt (len (findRE `data-labeled="1"|class="xref"|class="tufte-placeholder" data-what="lo[ftl]"` $raw 1)) 0) -}}
+  {{- $num = or $inBook (gt (len (findRE `data-labeled="1"|<i class="tufte-float"|class="xref"|class="tufte-placeholder" data-what="lo[ftl]"` $raw 1)) 0) -}}
 {{- else -}}
   {{- $num = partial "tufte/truthy.html" $fn -}}
 {{- end -}}
 
-{{- /* Title-block notes. A book landing with a title page
-       (book.titlepage, \maketitlepage) counts none: the title page prints
-       \thanklesstitle, so its `thanks` are unnumbered (marked "*") and its
-       authors are names only (tufte/book/titlepage.html). */ -}}
-{{- $titlePage := false -}}
-{{- if and $inBook (eq $root $p) -}}
-  {{- $titlePage = partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.titlepage") (or $p.RelPermalink $p.Path) "book.titlepage") -}}
-{{- end -}}
+{{- /* The numbered marks before the content: the title-block notes that
+       tufte/title-notes.html puts first in the phase-1 HTML (none on a
+       book title page: \thanklesstitle marks them "*", data-number) and
+       those of the front-matter abstract after them, which a summary
+       does not show either. */ -}}
 {{- $thanks := 0 -}}
-{{- if not $titlePage -}}
-  {{- with index $p.Params "thanks" -}}
-    {{- if reflect.IsSlice . }}{{ $thanks = len . }}{{ else }}{{ $thanks = 1 }}{{ end -}}
+{{- $head := "" -}}
+{{- range slice `<i class="tufte-abstract-end" hidden></i>` `<i class="tufte-tn-end" hidden></i>` -}}
+  {{- if and (not $head) (strings.Contains $raw .) }}{{ $head = index (split $raw .) 0 }}{{ end -}}
+{{- end -}}
+{{- /* And a book's front pages (tufte/book/front-fields.html), which
+       a summary does not show either: those after the abstract too. */ -}}
+{{- if strings.Contains $raw `<i class="tufte-ff-end" hidden></i>` -}}
+  {{- $rest := strings.TrimPrefix $head $raw -}}
+  {{- range findRE `(?s)<i class="tufte-ff" data-slot="[a-z]+" hidden></i>.*?<i class="tufte-ff-end" hidden></i>` $rest -}}
+    {{- $head = printf "%s%s" $head . -}}
   {{- end -}}
 {{- end -}}
-{{- /* Author {name, thanks} sidenotes: written by the title block of a
-       handout (both title block styles) and of a book landing without a
-       title page (chapter heads show no authors). */ -}}
-{{- $authorNotes := and (not $titlePage) (or (not $inBook) (eq $root $p)) -}}
-{{- if $authorNotes -}}
-  {{- $thanks = add $thanks (partial "tufte/authors.html" (dict "page" $p)).notes -}}
+{{- with $head -}}
+  {{- range findRE `<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>` . | uniq -}}
+    {{- if not (strings.Contains . "data-number=") }}{{ $thanks = add $thanks 1 }}{{ end -}}
+  {{- end -}}
 {{- end -}}
 
 {{- $sn := 0 -}}
-{{- range findRE `<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>` $raw -}}
+{{- /* Each mark once: a real footnote referenced twice repeats its text
+       (and the marks of the sidenotes in it) at each reference, but the
+       footnote list shows it once. Footnotemarks of one name share for=
+       but each has its own data-ft (_shortcodes/footnotemark.html), so
+       \footnotemark twice counts twice, as the CSS counter does. */ -}}
+{{- range findRE `<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>` $raw | uniq -}}
   {{- if not (strings.Contains . "data-number=") }}{{ $sn = add $sn 1 }}{{ end -}}
 {{- end -}}
 
@@ -77,13 +91,15 @@
 {{- if not $num -}}
   {{- $fig = 0 -}}{{- $tab = 0 -}}{{- $lst = 0 -}}
 {{- end -}}
+{{- $sec2 := len (findRE `<h2[^>]*><span class="tufte-num" data-kind="sec"` $raw) -}}
 {{- $memoRes = dict
-  "sidenote" (add $sn $thanks)
+  "sec2" $sec2
+  "sidenote" $sn
   "figure" $fig
   "table" $tab
   "listing" $lst
   "eq" $eq
   "thanks" $thanks -}}
-{{- if not hugo.IsServer }}{{ $p.Store.Set "tufteMemoCounts" (dict "v" $memoRes) }}{{ end -}}
+{{- $p.Store.Set "tufteMemoCounts" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $memoRes -}}

@@ -1,0 +1,71 @@
+{{- /*
+  The <style> of a book's whole-book print document (…/print.html,
+  list.print.html), emitted in <head> by tufte/head-style.html (a <style>
+  element is metadata content: it is not allowed inside <main>).
+
+  - With tufte.book.continuous = false, the per-chapter (and per-part)
+    restart of the sidenote counter. It is not print-only: print.html is
+    also read on screen before it is printed, and its xref numbers are the
+    per-chapter ones.
+  - In print only: the part pages on a page of their own (\part), and,
+    with tufte.print.runningheads, the named pages that carry the running
+    heads of the front matter and of each chapter.
+
+  Takes: the book root page.
+*/ -}}
+{{- $root := . -}}
+{{- $key := (or $root.RelPermalink $root.Path) -}}
+{{- $chapters := partialCached "tufte/book/chapters.html" $root $key -}}
+{{- $continuous := partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $root "key" "book.continuous") $key "book.continuous") -}}
+{{- $heads := partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $root "key" "print.runningheads") $key "print.runningheads") -}}
+{{- /* Running-head font and position: as in tufte/head-style.html
+       (\smallcapsspacing, none under nols; baseline \headsep = 28pt above
+       the text). */ -}}
+{{- $ls := "0.05em" -}}
+{{- if not (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $root "key" "letterspacing") $key "letterspacing")) }}{{ $ls = "normal" }}{{ end -}}
+{{- $box := printf "font-family:et-book,Palatino,\"Palatino Linotype\",Georgia,serif;font-size:8pt;font-style:normal;text-transform:uppercase;letter-spacing:%s;vertical-align:bottom;padding-bottom:28pt" $ls }}
+{{- if not $continuous }}
+<style>article.chapter,article.part{counter-reset:sidenote-counter}</style>
+{{- end }}
+<style media="print">
+article.part{break-before:page;break-after:page}
+{{- if $heads }}
+{{- /* Front matter (tufte-book.cls \frontmatter: \fancyhf{} and
+       \fancyhead[LE,RO]{\thepage}): the landing's pages carry the folio
+       alone, and the pages sample-book.tex sets \thispagestyle{empty}
+       (half title, epigraphs, frontispiece, title page, copyright page)
+       carry nothing. A named page outranks the :left rule of
+       tufte/head-style.html (the book title on every verso). */}}
+article.book-landing{page:tufte-front}
+article.book-landing :is(.half-title,.open-epigraphs,.frontispiece,.title-page,.copyright-page){page:tufte-empty}
+@page tufte-front:left{@top-left{content:counter(page);{{ $box | safeCSS }}}}
+@page tufte-front:right{@top-right{content:counter(page);{{ $box | safeCSS }}}}
+@page tufte-empty{@top-left{content:none}@top-right{content:none}}
+{{- /* A part page has no head and no folio: \part sets
+       \thispagestyle{plain}, which tufte-common.def makes empty
+       (\fancyhf{}). Without a name it would take the generic :left rule
+       of tufte/head-style.html (the book title) on a verso. */}}
+article.part{page:tufte-empty}
+{{- /* The folio and the title are separated by \quad (tufte-book's
+       \thepage\quad\smallcaps{…}): an em space, U+2003, inside the
+       value (written \u2003 here). It is not CSS whitespace, so the
+       \00200B escape before it does not consume it as its terminator
+       (an ASCII space would be eaten: "14A TUFTE-STYLE BOOK").
+       Front-matter chapters get an empty value, hence no em space. */}}
+{{- $book := printf "\u2003%s" (partial "tufte/plain-title.html" (dict "page" $root)) }}
+{{- range $chapters }}
+{{- $name := printf "c%v" .Index }}
+{{- /* Main matter: the book title on versos, the chapter title on
+       rectos (\fancyhead[LE], [RO]); front matter: the folio alone. One
+       shape for both (an {{ if }} between CSS strings would make the
+       html/template context ambiguous). \00200B: see
+       tufte/head-style.html (html/template and CSS strings; six-digit
+       escapes). The named page of each chapter is set by
+       tufte/book/chapter-body.html (style="page: cN"). */}}
+{{- $left := $book }}{{ $right := printf "%s\u2003" (partial "tufte/plain-title.html" (dict "page" .Page)) }}
+{{- if eq .Matter "front" }}{{ $left = "" }}{{ $right = "" }}{{ end }}
+@page {{ $name | safeCSS }}:left{@top-left{content:counter(page) "\00200B{{ $left }}";{{ $box | safeCSS }}}}
+@page {{ $name | safeCSS }}:right{@top-right{content:"\00200B{{ $right }}" counter(page);{{ $box | safeCSS }}}}
+{{- end }}
+{{- end }}
+</style>

@@ -1,0 +1,97 @@
+{{- /*
+  The tooltip of an image whose title is not a caption (an image in a
+  table cell, tufte/cell-images.html; an image in running text whose title
+  holds a shortcode, render-image.html), and the deferred alt text of an
+  image or title of a link (tufte/attr-marks.html): the HTML split into
+  the plain text of the attribute and the notes that cannot live in an
+  attribute.
+
+    title  the text of the title, escaped for the attribute: tags dropped,
+           math as its TeX source ($x^2$, from KaTeX's annotation),
+           cross-reference markers and nobib citation numbers kept
+           escaped (tufte/postprocess.html resolves them there, as in a
+           figure's alt text)
+    notes  the sidenotes, margin notes, citations (with their toggles and
+           sn-end / cite-end markers), real-footnote markers (span.tufte-fn),
+           Goldmark footnote references (sup#fnref…) and anchors (spans
+           with an id) of the title, in order: they go
+           right after the <img>, so a [^x] in the title is still a footnote
+           of the page and a cite still a sidenote
+
+  Theme markers of a caption (tufte-capsc…, cap-end) are dropped.
+
+  Takes: the title HTML (string or template.HTML), shortcodes already run.
+  Returns: a dict {title, notes}.
+*/ -}}
+{{- $html := string . -}}
+{{- if strings.Contains $html `class="katex-mathml"` -}}
+  {{- $html = replaceRE `(?s)<span class="katex-mathml"><math[^>]*>.*?<annotation encoding="application/x-tex">(.*?)</annotation>.*?</math></span>` `<span class="tufte-tex">$1</span>` $html -}}
+{{- end -}}
+{{- $buf := "" -}}
+{{- $notes := "" -}}
+{{- $depth := 0 -}}
+{{- $skip := 0 -}}
+{{- $keep := 0 -}}
+{{- $inLabel := false -}}
+{{- $inSup := false -}}
+{{- $tex := false -}}
+{{- range $t := findRE `(?s)<a class="xref"[^>]*>[^<]*</a>|<span class="cite-num"[^>]*></span>|<i [^>]*></i>|<[^>]*>|[^<]+` $html -}}
+  {{- if gt $keep 0 -}}
+    {{- /* Inside a note: copied as it is, up to its closing tag. */ -}}
+    {{- $notes = printf "%s%s" $notes $t -}}
+    {{- if strings.HasPrefix $t "<span" }}{{ $depth = add $depth 1 }}{{ end -}}
+    {{- if eq $t "</span>" -}}
+      {{- if eq $keep $depth }}{{ $keep = 0 }}{{ end -}}
+      {{- $depth = sub $depth 1 -}}
+    {{- end -}}
+  {{- else if $inLabel -}}
+    {{- $notes = printf "%s%s" $notes $t -}}
+    {{- if eq $t "</label>" }}{{ $inLabel = false }}{{ end -}}
+  {{- else if $inSup -}}
+    {{- $notes = printf "%s%s" $notes $t -}}
+    {{- if eq $t "</sup>" }}{{ $inSup = false }}{{ end -}}
+  {{- else if findRE `^<sup [^>]*\bid="fnref` $t 1 -}}
+    {{- /* Goldmark's footnote reference, not yet converted (an alt text
+           inside a shortcode's inner text). */ -}}
+    {{- $notes = printf "%s%s" $notes $t -}}
+    {{- $inSup = true -}}
+  {{- else if gt $skip 0 -}}
+    {{- if strings.HasPrefix $t "<span" }}{{ $depth = add $depth 1 }}{{ end -}}
+    {{- if eq $t "</span>" -}}
+      {{- if eq $skip $depth }}{{ $skip = 0 }}{{ end -}}
+      {{- $depth = sub $depth 1 -}}
+    {{- end -}}
+  {{- else if strings.HasPrefix $t `<span class="cite-num"` -}}
+    {{- $buf = printf "%s%s" $buf $t -}}
+  {{- else if strings.HasPrefix $t `<a class="xref"` -}}
+    {{- $buf = printf "%s%s" $buf $t -}}
+  {{- else if strings.HasPrefix $t "<span" -}}
+    {{- $depth = add $depth 1 -}}
+    {{- if findRE `^<span class="(?:sidenote|marginnote|note-in-note|citation-block|tufte-fn)[" ]|^<span[^>]*\sid="` $t 1 -}}
+      {{- $keep = $depth -}}
+      {{- $notes = printf "%s%s" $notes $t -}}
+      {{- if strings.HasSuffix $t "/>" }}{{ $keep = 0 }}{{ $depth = sub $depth 1 }}{{ end -}}
+    {{- else if strings.HasPrefix $t `<span class="katex-html"` -}}
+      {{- $skip = $depth -}}
+    {{- else if strings.HasPrefix $t `<span class="tufte-tex"` -}}
+      {{- $tex = true -}}
+      {{- $buf = printf "%s$" $buf -}}
+    {{- end -}}
+  {{- else if eq $t "</span>" -}}
+    {{- if $tex }}{{ $buf = printf "%s$" $buf }}{{ $tex = false }}{{ end -}}
+    {{- $depth = sub $depth 1 -}}
+  {{- else if strings.HasPrefix $t "<label" -}}
+    {{- $notes = printf "%s%s" $notes $t -}}
+    {{- $inLabel = not (strings.HasSuffix $t "/>") -}}
+  {{- else if strings.HasPrefix $t "<input" -}}
+    {{- $notes = printf "%s%s" $notes $t -}}
+  {{- else if findRE `^<i class="(?:sn-end|cite-end)"` $t 1 -}}
+    {{- $notes = printf "%s%s" $notes $t -}}
+  {{- else if not (strings.HasPrefix $t "<") -}}
+    {{- $buf = printf "%s%s" $buf (htmlUnescape $t) -}}
+  {{- end -}}
+{{- end -}}
+{{- /* A shortcode placeholder still here (a page that never substituted
+       it) must not reach the attribute. */ -}}
+{{- $buf = $buf | replaceRE `HAHAHUGOSHORTCODE\w*?HBHB` "" | replaceRE `\s+` " " | strings.TrimSpace -}}
+{{- return dict "title" (htmlEscape $buf) "notes" $notes -}}

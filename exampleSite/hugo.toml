@@ -29,7 +29,6 @@ mainSections = ["posts"]
 [params]
   subtitle = "Sidenotes, margin figures and careful typography for Hugo"
   description = "A Hugo theme built on Tufte CSS: sidenotes, margin notes, margin and full-width figures, epigraphs and ET Book."
-  dateFormat = "January 2, 2006"
   sections = "h2"
   footnotes = "sidenotes"
   etBook = true

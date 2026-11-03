@@ -1,0 +1,54 @@
+{{- /*
+  File-name ranks of a book (SPEC-LATEX R13), for the reading-order keys of
+  tufte/book/chapters.html, parts.html, sequence.html and toc.html.
+
+  A key that joins variable-length names ("…|intro|…") does not sort by
+  file name: when one name is a prefix of another, the separator after it
+  is compared with the next character of the longer name ("intro|" against
+  "intro-2", and "-", "_", "." or a space sort before "|"). So every name
+  is replaced in the keys by its rank among all the names of the book,
+  sorted once (Hugo's string sort, as for any file name), as a fixed-width
+  number: the keys then hold only fixed-width fields.
+
+  Names: the ContentBaseName (else the title) of the chapters at the root,
+  of the parts (their directory name) and of the chapters of each part (a
+  page in a section inside a part: its sub-directory, then its name, as
+  tufte/book/chapters.html reads it).
+
+  Takes: the book root page.
+  Returns: map name → "%06d" rank (0-based).
+  Callers: partialCached "tufte/book/name-ranks.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- $root := . -}}
+{{- $names := slice -}}
+{{- range $root.RegularPages -}}
+  {{- $n := .Title -}}
+  {{- with .File }}{{ $n = .ContentBaseName }}{{ end -}}
+  {{- $names = $names | append $n -}}
+{{- end -}}
+{{- range $root.Sections -}}
+  {{- $part := . -}}
+  {{- $n := .Title -}}
+  {{- with .File }}{{ $n = .ContentBaseName }}{{ end -}}
+  {{- $names = $names | append $n -}}
+  {{- range $part.RegularPagesRecursive -}}
+    {{- $sub := "" -}}
+    {{- if ne .Parent $part -}}
+      {{- with .Parent -}}
+        {{- $sub = .Title -}}
+        {{- with .File }}{{ $sub = .Dir }}{{ end -}}
+        {{- with $part.File }}{{ $sub = strings.TrimPrefix .Dir $sub }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $n := .Title -}}
+    {{- with .File }}{{ $n = .ContentBaseName }}{{ end -}}
+    {{- $names = $names | append (printf "%s%s" $sub $n) -}}
+  {{- end -}}
+{{- end -}}
+{{- /* A Scratch map keeps the names as they are (case, dots). */ -}}
+{{- $R := newScratch -}}
+{{- $R.Set "r" dict -}}
+{{- range $i, $n := sort (uniq $names) -}}
+  {{- $R.SetInMap "r" $n (printf "%06d" $i) -}}
+{{- end -}}
+{{- return $R.Get "r" -}}

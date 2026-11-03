@@ -1,0 +1,10 @@
+{{- /*
+  The theme's English strings (i18n/en.yaml, mounted as the asset
+  tufte/i18n-en.yaml by hugo.toml), for func/t.html. Called through
+  partialCached.
+
+  Returns: a map.
+*/ -}}
+{{- $m := dict -}}
+{{- with resources.Get "tufte/i18n-en.yaml" }}{{ $m = . | transform.Unmarshal }}{{ end -}}
+{{- return $m -}}

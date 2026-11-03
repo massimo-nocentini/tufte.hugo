@@ -6,14 +6,14 @@
 {{- $main := site.Params.mainSections | default site.MainSections -}}
 {{- $pages := where site.RegularPages "Type" "in" $main }}
 <article>
-  <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" .Title "heading" true) }}</h1>
+  <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" (partial "tufte/page-title.html" .) "heading" true) }}</h1>
   {{- with .Params.subtitle }}
   <p class="subtitle">{{ . }}</p>
   {{- end }}
   {{ partial "before_content.html" . }}
   {{ partial "tufte/abstract.html" . }}
   {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
-  {{ partial "tufte/archive-list.html" $pages }}
+  {{ partial "tufte/archive-list.html" (dict "pages" $pages "label" (partial "func/t.html" "allPosts")) }}
   {{ partial "after_content.html" . }}
 </article>
 {{ end }}

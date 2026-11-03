@@ -14,10 +14,17 @@
        tufte-handout, tufte-justified, …): tufte/body-class.html. */}}
 <body class="{{ partial "tufte/body-class.html" . }}">
 {{- /* The landmark id is in the theme's tufte- namespace, so a heading
-       or label named "main" cannot collide with it. */}}
-<a class="skip-link" href="#tufte-main">{{ T "skipToContent" }}</a>
+       or label named "main" cannot collide with it; one the content uses
+       itself ("## Tufte main") makes it tufte-main-2 (tufte/gen-id.html),
+       and the skip link follows. A home page that does not show its
+       content (params.homeIntro = false) is not rendered for this. */}}
+{{- $mainId := "tufte-main" -}}
+{{- if or (not .IsHome) (partial "func/flag.html" (dict "value" site.Params.homeIntro "default" true)) (partialCached "tufte/book/root.html" . (or .RelPermalink .Path)) -}}
+  {{- $mainId = partial "tufte/gen-id.html" (dict "page" . "base" "tufte-main") -}}
+{{- end }}
+<a class="skip-link" href="#{{ $mainId }}">{{ partial "func/t.html" "skipToContent" }}</a>
 {{ partial "header.html" . }}
-<main id="tufte-main">
+<main id="{{ $mainId }}">
 {{ block "main" . }}{{ end }}
 </main>
 {{ partial "footer.html" . }}

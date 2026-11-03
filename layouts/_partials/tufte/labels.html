@@ -15,10 +15,14 @@
                            data-number X is the display and the counter
                            does not step); name = data-short, else
                            the caption HTML (caption-text span)
-    sidenote marks         counted (unless data-number); labelled ones
+    sidenote marks         counted (unless data-number), in display order
+                           when some sit in a real footnote's text (shown
+                           in the footnote list); labelled ones
                            (data-key) become kind "sidenote" entries
     tufte-anchor span/div  kind "label" (\label anywhere): display = the
-                           current section number, name = section title
+                           current section number (in a numbered chapter,
+                           the chapter's outside a numbered section, as
+                           after \chapter), name = section title
     span.run-in with id    kind "label" (\paragraph): name = run-in title
                            (its HTML, nested spans balanced, notes removed)
     i.tufte-float          a labelled float without a number (numbered =
@@ -30,7 +34,8 @@
   plus the page's own front-matter `label` (kind chapter, part or page).
 
   Floats are numbered when floats.number is true, or "auto" and the page is
-  in a book or has a labelled float (data-labeled="1"), an xref (R12) or a
+  in a book or has a labelled float (data-labeled="1", or the
+  i.tufte-float marker of one without a number), an xref (R12) or a
   list of figures, tables or listings (data-what="lof|lot|lol"): a
   \listoffigures lists numbered floats.
 
@@ -39,8 +44,9 @@
   document order, as the CSS counter does. A run-in heading (h4, \paragraph)
   displays the enclosing section number, like the paragraph shortcode.
 
-  Duplicate keys: ranks are automatic heading ids (Goldmark's, from the
-  title) 0 < \label anchors (tufte-anchor) 1 < everything else 2 (floats,
+  Duplicate keys: ranks are Markdown footnote labels (page-local, never
+  warned, never in the book map) -1 < automatic heading ids (Goldmark's,
+  from the title) 0 < \label anchors (tufte-anchor) 1 < everything else 2 (floats,
   equations, sidenotes, the page label, and headings with an explicit id
   {#…} in the Markdown, which are author labels). A higher rank wins; on
   equal ranks the first one wins. tufte-duplicate-label is warned for every
@@ -54,8 +60,12 @@
   Returns: dict
     numbered  bool
     entries   map normalised key → dict
-                { key, kind, display, name, short, caption, anchor, where,
-                  level, page }
+                { key, kind, display, word, name, short, caption, anchor,
+                  where, level, page }
+              word: the kind whose word xref fmt "full" prints when the
+              display is a section or chapter number borrowed by a
+              \label, run-in heading or textless float ("label",
+              "chapter", "appendix"; "" = kind)
               kind ∈ heading figure table listing eq sidenote label
               chapter appendix part page; name/caption/where are HTML
               (a page label's name is its title rendered as inline
@@ -85,10 +95,10 @@
     page      the page
   Callers: partialCached "tufte/labels.html" $p (or $p.RelPermalink $p.Path)
 */ -}}
-{{- /* Memoized in the page's Store (not in hugo server): see
+{{- /* Memoized in the page's Store for the current build: see
        tufte/opts.html. */ -}}
 {{- $memoRes := false -}}
-{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoLabels") -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoLabels") -}}
   {{- $memoRes = .v -}}
 {{- else -}}
 {{- $p := . -}}
@@ -103,7 +113,7 @@
 {{- $fn := partialCached "tufte/opt.html" (dict "page" $p "key" "floats.number") (or $p.RelPermalink $p.Path) "floats.number" -}}
 {{- $num := false -}}
 {{- if eq (lower (printf "%v" $fn)) "auto" -}}
-  {{- $num = or $inBook (gt (len (findRE `data-labeled="1"|class="xref"|class="tufte-placeholder" data-what="lo[ftl]"` $raw 1)) 0) -}}
+  {{- $num = or $inBook (gt (len (findRE `data-labeled="1"|<i class="tufte-float"|class="xref"|class="tufte-placeholder" data-what="lo[ftl]"` $raw 1)) 0) -}}
 {{- else -}}
   {{- $num = partial "tufte/truthy.html" $fn -}}
 {{- end -}}
@@ -122,32 +132,148 @@
   {{- end -}}
 {{- end -}}
 {{- $chPrefix := "" -}}
+{{- $h2Start := 0 -}}
 {{- with $chap -}}
   {{- if .Numbered }}{{ $chPrefix = printf "%s." .Display }}{{ end -}}
 {{- end -}}
-{{- /* Per-chapter float and equation counters (book.continuous = false) in
-       a numbered chapter read "2.1", like \thechapter.\arabic{figure} in
-       the LaTeX book classes; continuous counters stay plain. */ -}}
-{{- $floatPrefix := "" -}}
-{{- if and $chPrefix (not (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.continuous") (or $p.RelPermalink $p.Path) "book.continuous"))) -}}
-  {{- $floatPrefix = $chPrefix -}}
+{{- /* Section numbers on a page that does not step the chapter counter
+       (the landing, a part page, an unnumbered, front- or back-matter
+       chapter) of a book with numbered chapters: the prefix of the last
+       numbered chapter ("0." before the first) and the next section
+       number after its sections, as \section after \chapter* in LaTeX
+       (tufte/book/sec-offset-map.html). */ -}}
+{{- if and $root (not $chPrefix) (strings.Contains $raw `data-kind="sec"`) -}}
+  {{- with index (partialCached "tufte/book/sec-offset-map.html" $root (or $root.RelPermalink $root.Path)) (printf "%s|%s" $p.Path (or $p.RelPermalink "")) -}}
+    {{- $chPrefix = .prefix -}}
+    {{- $h2Start = .h2 -}}
+  {{- end -}}
 {{- end -}}
+{{- /* Per-chapter float and equation counters (book.continuous = false):
+       "2.1" in numbered chapter 2, like \thechapter.\arabic{figure} in
+       the LaTeX book classes, and the prefix and counters of the last
+       numbered chapter on a part page or in an unnumbered, front- or
+       back-matter chapter (tufte/offsets.html); continuous counters stay
+       plain. */ -}}
+{{- $off := partialCached "tufte/offsets.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $floatPrefix := $off.prefix | default "" -}}
 {{- /* Titles as plain text (Markdown such as `code` rendered, tags
        removed), HTML-escaped. */ -}}
 {{- $plainTitle := partial "tufte/plain-title.html" (dict "page" $p "title" $p.Title) | htmlEscape -}}
 {{- $plainLinkTitle := partial "tufte/plain-title.html" (dict "page" $p) | htmlEscape -}}
 
-{{- $off := partialCached "tufte/offsets.html" $p (or $p.RelPermalink $p.Path) -}}
-{{- $counts := partialCached "tufte/counts.html" $p (or $p.RelPermalink $p.Path) -}}
 {{- $S := newScratch -}}
 {{- $S.Set "figure" $off.figure -}}
 {{- $S.Set "table" $off.table -}}
 {{- $S.Set "listing" $off.listing -}}
 {{- $S.Set "eq" $off.eq -}}
-{{- $S.Set "sidenote" (add $off.sidenote $counts.thanks) -}}
-{{- $h2 := 0 -}}
+{{- /* The title-block \thanks notes are the first marks of $raw
+       (tufte/title-notes.html), so they are counted below. */ -}}
+{{- $S.Set "sidenote" $off.sidenote -}}
+{{- /* Sidenote marks inside a real footnote's text (a sidenote or a cite
+       in [^fn-x]: …, or in a footnote shortcode) sit at the footnote's
+       reference in the phase-1 HTML, but the page shows them in the
+       footnote list (tufte/postprocess.html, func/content.html), where the
+       CSS sidenote counter numbers them: after the text of the page, or of
+       the section with footnotePlacement = "section". So when there are
+       any, the marks are numbered in that display order (SN map: for id →
+       number), each footnote's text once (at its first reference, as the
+       list holds it). */ -}}
+{{- $SN := newScratch -}}
+{{- $SN.Set "n" dict -}}
+{{- $labelRE := `<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>` -}}
+{{- if strings.Contains $raw `<span class="tufte-fn"` -}}
+  {{- $sp := partial "tufte/fn-split.html" $raw -}}
+  {{- $inFn := false -}}
+  {{- range $sp.items }}{{ if strings.Contains .text "sidenote-number" }}{{ $inFn = true }}{{ end }}{{ end -}}
+  {{- if $inFn -}}
+    {{- $posTok := `<i class="tufte-fnpos" data-n="%d" hidden></i>` -}}
+    {{- $texts := slice -}}
+    {{- $seen := newScratch -}}
+    {{- $body := $sp.head -}}
+    {{- range $sp.items -}}
+      {{- if not ($seen.Get .ident) -}}
+        {{- $seen.Set .ident true -}}
+        {{- $body = printf "%s%s" $body (printf $posTok (len $texts)) -}}
+        {{- $texts = $texts | append .text -}}
+      {{- end -}}
+      {{- $body = printf "%s%s" $body .tail -}}
+    {{- end -}}
+    {{- $placement := "" -}}
+    {{- with index $p.Params "footnoteplacement" -}}
+      {{- $placement = . -}}
+    {{- else -}}
+      {{- $placement = partialCached "tufte/opt.html" (dict "page" $p "key" "footnoteplacement" "default" "page") (or $p.RelPermalink $p.Path) "footnoteplacement" -}}
+    {{- end -}}
+    {{- $sections := "h2" -}}
+    {{- with $p.Param "sections" }}{{ $sections = lower (strings.TrimSpace (printf "%v" .)) }}{{ end -}}
+    {{- $dom := "" -}}
+    {{- if and (eq (lower (printf "%v" $placement)) "section") (ne $sections "none") -}}
+      {{- /* Each section ends with the notes first referenced in it, the
+             last one with those left over. */ -}}
+      {{- $done := newScratch -}}
+      {{- $chunks := split (string (partial "func/sectionize.html" $body)) "\n</section>\n" -}}
+      {{- range $i, $chunk := $chunks -}}
+        {{- $add := "" -}}
+        {{- range findRE `<i class="tufte-fnpos" data-n="[0-9]+" hidden></i>` $chunk -}}
+          {{- $k := int (replaceRE `^.*data-n="([0-9]+)".*$` "$1" .) -}}
+          {{- if not ($done.Get (string $k)) }}{{ $done.Set (string $k) true }}{{ $add = printf "%s%s" $add (index $texts $k) }}{{ end -}}
+        {{- end -}}
+        {{- if eq (add $i 1) (len $chunks) -}}
+          {{- range $k, $t := $texts -}}
+            {{- if not ($done.Get (string $k)) }}{{ $done.Set (string $k) true }}{{ $add = printf "%s%s" $add $t }}{{ end -}}
+          {{- end -}}
+        {{- end -}}
+        {{- $dom = printf "%s%s%s" $dom $chunk $add -}}
+      {{- end -}}
+    {{- else -}}
+      {{- /* One list after the text (before a bibliography placeholder
+             that follows the last reference, as postprocess places it). */ -}}
+      {{- $all := delimit $texts "" -}}
+      {{- $dom = printf "%s%s" $body $all -}}
+      {{- with $sp.items -}}
+        {{- $tail := (index . (sub (len .) 1)).tail -}}
+        {{- $ph := `<div class="tufte-placeholder" data-what="bibliography"` -}}
+        {{- if strings.Contains $tail $ph -}}
+          {{- $pre := index (split $tail $ph) 0 -}}
+          {{- $dom = printf "%s%s%s%s" (strings.TrimSuffix $tail $body) $pre $all (strings.TrimPrefix $pre $tail) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $n := int ($S.Get "sidenote") -}}
+    {{- range findRE $labelRE $dom -}}
+      {{- if not (strings.Contains . "data-number=") -}}
+        {{- /* Keyed by the whole tag: two footnotemarks of one name
+               share for= but differ in data-ft (each steps the
+               counter); a copied mark is the same tag. */ -}}
+        {{- if not (isset ($SN.Get "n") .) -}}
+          {{- $n = add $n 1 -}}
+          {{- $SN.SetInMap "n" . (string $n) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $snNum := $SN.Get "n" -}}
+{{- $h2 := $h2Start -}}
 {{- $h3 := 0 -}}
-{{- $secnum := "" -}}
+{{- /* The current \@currentlabel for a \label, a run-in heading or a
+       labelled float with no text: in a numbered chapter (or appendix)
+       its number ("2", "A"), as after \chapter, kept by an unnumbered h2
+       (an unnumbered \section does not step a counter), and the section
+       number in a numbered section; "" elsewhere (handouts, unnumbered,
+       front- and back-matter chapters), so the reference prints the
+       title. secWord: the word xref fmt "full" prints with it (chapter,
+       appendix; "" = by kind). */ -}}
+{{- $chapNum := "" -}}
+{{- $chapWord := "" -}}
+{{- with $chap -}}
+  {{- if .Numbered -}}
+    {{- $chapNum = .Display -}}
+    {{- $chapWord = cond (eq .Matter "appendix") "appendix" "chapter" -}}
+  {{- end -}}
+{{- end -}}
+{{- $secnum := $chapNum -}}
+{{- $secWord := $chapWord -}}
 {{- $where := $plainTitle -}}
 {{- $list := slice -}}
 
@@ -165,7 +291,7 @@
       {{- $kind = "part" -}}
       {{- $d = $part.Display -}}
     {{- end -}}
-    {{- $list = $list | append (dict "key" $k "kind" $kind "display" $d "name" (strings.TrimSpace (replaceRE `</?a\b[^>]*>` "" (string ($p.RenderString (dict "display" "inline") $p.Title)))) "short" "" "caption" "" "anchor" "" "where" $plainLinkTitle "level" 0 "page" $p) -}}
+    {{- $list = $list | append (dict "key" $k "kind" $kind "display" $d "name" (strings.TrimSpace (replaceRE `</?a\b[^>]*>` "" (string (partial "tufte/title-html.html" (dict "page" $p "title" $p.Title "heading" true))))) "short" "" "caption" "" "anchor" "" "where" $plainLinkTitle "level" 0 "page" $p) -}}
   {{- end -}}
 {{- end -}}
 
@@ -219,33 +345,41 @@
       {{- $inner = replace $inner . $t -}}
     {{- end -}}
     {{- $inner = replaceRE `<span class="(index-anchor|tufte-anchor|tufte-num)[^>]*></span>` "" $inner -}}
-    {{- $inner = replaceRE `(?s)<math.*?</math>` "" $inner -}}
-    {{- $title := $inner | plainify | htmlUnescape | replaceRE `\s+` " " | strings.TrimSpace | htmlEscape -}}
+    {{- /* Plain text, but the math stays typeset (tufte/plain-math.html):
+           plainify would read KaTeX's visual HTML in layout order. */ -}}
+    {{- $title := partial "tufte/plain-math.html" (dict "html" $inner) -}}
     {{- $d := "" -}}
     {{- $hasSec := strings.Contains $m `data-kind="sec"` -}}
     {{- if eq $level 2 -}}
       {{- $where = $title -}}
-      {{- $secnum = "" -}}
+      {{- $secnum = $chapNum -}}
+      {{- $secWord = $chapWord -}}
       {{- if $hasSec -}}
         {{- $h2 = add $h2 1 -}}
         {{- $h3 = 0 -}}
         {{- $d = printf "%s%d" $chPrefix $h2 -}}
         {{- $secnum = $d -}}
+        {{- $secWord = "" -}}
       {{- end -}}
     {{- else if and (eq $level 3) $hasSec -}}
       {{- $h3 = add $h3 1 -}}
       {{- $d = printf "%s%d.%d" $chPrefix $h2 $h3 -}}
       {{- $secnum = $d -}}
-    {{- else if ge $level 4 -}}
+      {{- $secWord = "" -}}
+    {{- end -}}
+    {{- $word := "" -}}
+    {{- if ge $level 4 -}}
       {{- /* Run-in heading (\paragraph): like the paragraph shortcode,
-             \ref gives the enclosing section number. */ -}}
+             \ref gives the enclosing section number (the chapter's in a
+             numbered chapter outside a numbered section). */ -}}
       {{- $d = $secnum -}}
+      {{- $word = $secWord -}}
     {{- end -}}
     {{- $hk := partial "tufte/key.html" $id -}}
     {{- if and $hasSec (le $level 3) (not (isset ($S.Get "tokens") (printf "sec|%s" $hk))) -}}
       {{- $S.SetInMap "tokens" (printf "sec|%s" $hk) $d -}}
     {{- end -}}
-    {{- $list = $list | append (dict "key" $hk "kind" "heading" "display" $d "name" $title "short" "" "caption" "" "anchor" $id "where" $where "level" $level "explicit" $explicit "page" $p) -}}
+    {{- $list = $list | append (dict "key" $hk "kind" "heading" "display" $d "word" $word "name" $title "short" "" "caption" "" "anchor" $id "where" $where "level" $level "explicit" $explicit "page" $p) -}}
   {{- else if strings.HasPrefix $m `<span class="tufte-num"` -}}
     {{- /* Number token. */ -}}
     {{- $kind := replaceRE `(?s)^.*data-kind="([^"]*)".*$` "$1" $m -}}
@@ -257,9 +391,10 @@
         {{- $short = replaceRE `(?s)^.*data-short="([^"]*)".*$` "$1" $m -}}
         {{- /* The short caption is inline Markdown, like the caption
                (\caption[short] may hold math): render it once here, for
-               the lists and for xref fmt "name". */ -}}
+               the lists and for xref fmt "name"; a leading block marker
+               ("1869. Minard's map") is text (tufte/block-escape.html). */ -}}
         {{- with $short -}}
-          {{- $short = strings.TrimSpace (string ($p.RenderString (dict "display" "inline") (htmlUnescape .))) -}}
+          {{- $short = strings.TrimSpace (string ($p.RenderString (dict "display" "inline") (partial "tufte/block-escape.html" (htmlUnescape .)))) -}}
         {{- end -}}
       {{- end -}}
       {{- $d := "" -}}
@@ -296,10 +431,18 @@
       {{- $S.Add (printf "order-%s" $kind) (slice $k) -}}
     {{- end -}}
   {{- else if strings.HasPrefix $m "<label" -}}
-    {{- /* Sidenote mark. */ -}}
+    {{- /* Sidenote mark (once: the marks in the text of a real footnote
+           referenced twice are repeated at each reference, see
+           tufte/counts.html; footnotemarks of one name differ in
+           data-ft, so each counts). */ -}}
+    {{- if not ($SN.Get (printf "seen|%s" $m)) -}}
+    {{- $SN.Set (printf "seen|%s" $m) true -}}
     {{- $d := "" -}}
     {{- if strings.Contains $m "data-number=" -}}
       {{- $d = replaceRE `(?s)^.*data-number="([^"]*)".*$` "$1" $m -}}
+    {{- else if $snNum -}}
+      {{- /* Display order (above). */ -}}
+      {{- $d = index $snNum $m | default "" -}}
     {{- else -}}
       {{- $S.Add "sidenote" 1 -}}
       {{- $d = string ($S.Get "sidenote") -}}
@@ -311,6 +454,7 @@
         {{- $anchor = replaceRE `(?s)^.*\sid="([^"]*)".*$` "$1" $m -}}
       {{- end -}}
       {{- $list = $list | append (dict "key" (partial "tufte/key.html" $rawKey) "kind" "sidenote" "display" $d "name" $where "short" "" "caption" "" "anchor" $anchor "where" $where "level" 0 "page" $p) -}}
+    {{- end -}}
     {{- end -}}
   {{- else if strings.HasPrefix $m `<span class="run-in"` -}}
     {{- /* \paragraph with a label. */ -}}
@@ -336,7 +480,7 @@
     {{- end -}}
     {{- $title = replaceRE `<span class="(index-anchor|tufte-anchor)[^>]*></span>` "" $title -}}
     {{- $title = $title | replaceRE `\s+` " " | strings.TrimSpace -}}
-    {{- $list = $list | append (dict "key" (partial "tufte/key.html" $id) "kind" "label" "display" $secnum "name" $title "short" "" "caption" "" "anchor" $id "where" $where "level" 0 "page" $p) -}}
+    {{- $list = $list | append (dict "key" (partial "tufte/key.html" $id) "kind" "label" "display" $secnum "word" $secWord "name" $title "short" "" "caption" "" "anchor" $id "where" $where "level" 0 "page" $p) -}}
   {{- else if strings.HasPrefix $m `<i class="tufte-float"` -}}
     {{- /* Labelled float without a number. */ -}}
     {{- $kind := replaceRE `(?s)^.*data-kind="([^"]*)".*$` "$1" $m -}}
@@ -344,7 +488,7 @@
     {{- $short := "" -}}
     {{- if strings.Contains $m `data-short="` -}}
       {{- with replaceRE `(?s)^.*data-short="([^"]*)".*$` "$1" $m -}}
-        {{- $short = strings.TrimSpace (string ($p.RenderString (dict "display" "inline") (htmlUnescape .))) -}}
+        {{- $short = strings.TrimSpace (string ($p.RenderString (dict "display" "inline") (partial "tufte/block-escape.html" (htmlUnescape .)))) -}}
       {{- end -}}
     {{- end -}}
     {{- $cap := "" -}}
@@ -357,25 +501,32 @@
              reference shows the enclosing section number, else its title
              (never the raw key). */ -}}
       {{- $disp := "" -}}
+      {{- $word := "" -}}
       {{- $name := $short | default $cap -}}
       {{- if not (strings.TrimSpace (plainify $name)) -}}
         {{- $disp = $secnum -}}
+        {{- $word = $secWord | default "label" -}}
         {{- $name = $where -}}
       {{- end -}}
-      {{- $list = $list | append (dict "key" $k "kind" $kind "display" $disp "name" $name "short" $short "caption" $cap "anchor" $k "where" $where "level" 0 "page" $p) -}}
+      {{- $list = $list | append (dict "key" $k "kind" $kind "display" $disp "word" $word "name" $name "short" $short "caption" $cap "anchor" $k "where" $where "level" 0 "page" $p) -}}
     {{- end -}}
   {{- else -}}
     {{- /* tufte-anchor (\label anywhere). */ -}}
     {{- $id := replaceRE `(?s)^.*\sid="([^"]+)".*$` "$1" $m -}}
-    {{- $list = $list | append (dict "key" (partial "tufte/key.html" $id) "kind" "label" "display" $secnum "name" $where "short" "" "caption" "" "anchor" $id "where" $where "level" 0 "page" $p) -}}
+    {{- $list = $list | append (dict "key" (partial "tufte/key.html" $id) "kind" "label" "display" $secnum "word" $secWord "name" $where "short" "" "caption" "" "anchor" $id "where" $where "level" 0 "page" $p) -}}
   {{- end -}}
 {{- end -}}
 
-{{- /* Labelled real footnotes (§11.1): xref gives their mark. */ -}}
+{{- /* Labelled real footnotes (§11.1): xref gives their mark. A
+       Markdown label ([^fn-proof]) is local to its page, as Goldmark's
+       labels are (chapters reuse them): it is "local", below every other
+       label, never warned as a duplicate and never in the book-wide map
+       (tufte/book/labels.html); the footnote shortcode's label= is a
+       label like any other. */ -}}
 {{- if strings.Contains $raw `<span class="tufte-fn"` -}}
   {{- range $fi := (partialCached "tufte/fn-model.html" $p (or $p.RelPermalink $p.Path)).items -}}
     {{- if $fi.key -}}
-      {{- $list = $list | append (dict "key" $fi.key "kind" "footnote" "display" $fi.mark "name" $fi.mark "short" "" "caption" "" "anchor" (printf "fn-%s" $fi.id) "where" $plainTitle "level" 0 "page" $p) -}}
+      {{- $list = $list | append (dict "key" $fi.key "kind" "footnote" "display" $fi.mark "name" $fi.mark "short" "" "caption" "" "anchor" (printf "fn-%s" $fi.id) "where" $plainTitle "level" 0 "page" $p "local" (eq $fi.local true)) -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
@@ -390,7 +541,7 @@
   {{- if and (eq .kind "heading") .anchor }}{{ $R.SetInMap "h" .anchor true }}{{ end -}}
 {{- end -}}
 {{- range $list -}}
-  {{- if and (ne .kind "heading") .anchor (isset ($R.Get "h") .anchor) (not (isset ($R.Get "r") .anchor)) -}}
+  {{- if and (ne .kind "heading") (ne .local true) .anchor (isset ($R.Get "h") .anchor) (not (isset ($R.Get "r") .anchor)) -}}
     {{- $base := printf "%s-%s" .anchor .kind -}}
     {{- $new := $base -}}
     {{- range $i := seq 2 20 -}}
@@ -418,21 +569,24 @@
   {{- if $e.key -}}
     {{- $old := index ($E.Get "e") $e.key -}}
     {{- $rank := 2 -}}
-    {{- if eq $e.kind "heading" }}{{ $rank = cond (eq $e.explicit true) 2 0 }}{{ else if eq $e.kind "label" }}{{ $rank = 1 }}{{ end -}}
+    {{- if eq $e.kind "heading" }}{{ $rank = cond (eq $e.explicit true) 2 0 }}{{ else if eq $e.kind "label" }}{{ $rank = 1 }}{{ else if eq $e.local true }}{{ $rank = -1 }}{{ end -}}
     {{- if not $old -}}
       {{- $E.SetInMap "e" $e.key $e -}}
     {{- else -}}
       {{- $oldRank := 2 -}}
-      {{- if eq $old.kind "heading" }}{{ $oldRank = cond (eq $old.explicit true) 2 0 }}{{ else if eq $old.kind "label" }}{{ $oldRank = 1 }}{{ end -}}
+      {{- if eq $old.kind "heading" }}{{ $oldRank = cond (eq $old.explicit true) 2 0 }}{{ else if eq $old.kind "label" }}{{ $oldRank = 1 }}{{ else if eq $old.local true }}{{ $oldRank = -1 }}{{ end -}}
       {{- if gt $rank $oldRank -}}
         {{- $E.SetInMap "e" $e.key $e -}}
       {{- end -}}
       {{- $bothHeadings := and (eq $e.kind "heading") (eq $old.kind "heading") -}}
       {{- $ownAnchor := and (eq $e.anchor $old.anchor) (or (and (eq $e.kind "label") (in $floatKinds $old.kind)) (and (eq $old.kind "label") (in $floatKinds $e.kind))) -}}
-      {{- if not (or $bothHeadings $ownAnchor) -}}
+      {{- /* A Markdown footnote label (local) yields silently: its id
+             (fn-HASH-label) clashes with nothing. */ -}}
+      {{- $local := or (eq $e.local true) (eq $old.local true) -}}
+      {{- if not (or $bothHeadings $ownAnchor $local) -}}
         {{- $desc := $e.key -}}
         {{- range slice $old $e -}}
-          {{- if eq .kind "heading" }}{{ $desc = printf "%s (also the id of heading %q)" $desc (htmlUnescape .name) }}{{ end -}}
+          {{- if eq .kind "heading" }}{{ $desc = printf "%s (also the id of heading %q)" $desc (htmlUnescape (partial "tufte/plain-math.html" (dict "html" .name "math" "tex"))) }}{{ end -}}
         {{- end -}}
         {{- $dups = $dups | append (replaceRE `TUFTEXREF[0-9a-f]{16}END` "…" $desc) -}}
       {{- end -}}
@@ -488,6 +642,6 @@
   "eq" ($S.Get "order-eq" | default slice)
 -}}
 {{- $memoRes = dict "numbered" $num "entries" ($E.Get "e") "order" $order "tokens" ($S.Get "tokens") "occurrences" ($O.Get "occ") "duptokens" ($O.Get "dup") "renames" $renames "xrefs" ($X.Get "x") "chapter" $chap "page" $p -}}
-{{- if not hugo.IsServer }}{{ $p.Store.Set "tufteMemoLabels" (dict "v" $memoRes) }}{{ end -}}
+{{- $p.Store.Set "tufteMemoLabels" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $memoRes -}}

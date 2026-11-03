@@ -17,6 +17,8 @@
 */ -}}
 {{- $h := string . -}}
 {{- $h = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $h -}}
+{{- /* a lone toggle: footnotemark (its input is in the footnotetext) */ -}}
+{{- $h = replaceRE `<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label>` "" $h -}}
 {{- if findRE `<span class="(?:sidenote|marginnote|citation-block|tufte-fn)` $h 1 -}}
   {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<s[^p]|</[^s]|</s[^p])*` -}}
   {{- $h = replaceRE `<span class="(sidenote|marginnote|citation-block|tufte-fn)` `<tufnote class="$1` $h -}}

@@ -1,0 +1,20 @@
+{{- /*
+  makeindex's quote character in an index entry (\index{…}): a " before
+  !, @, | or " makes that character literal (the " itself is dropped);
+  \" stays as written (makeindex's escape). A " before any other
+  character is kept as it is.
+
+  Takes: a string. Returns: the string with each quoted character replaced
+  by a private-use placeholder (U+E000 "!", U+E001 "@", U+E002 "|",
+  U+E003 "\"", U+E004 "\\\""), so that splitting on ! @ | ignores it.
+  tufte/index/parse.html puts the characters back after the split.
+*/ -}}
+{{- $s := printf "%v" . -}}
+{{- if strings.Contains $s `"` -}}
+  {{- $s = replace $s `\"` "" -}}
+  {{- $s = replace $s `""` "" -}}
+  {{- $s = replace $s `"!` "" -}}
+  {{- $s = replace $s `"@` "" -}}
+  {{- $s = replace $s `"|` "" -}}
+{{- end -}}
+{{- return $s -}}

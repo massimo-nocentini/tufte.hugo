@@ -5,7 +5,8 @@
   1. :root custom properties for the marginalia, from the class options
      sidenote=, marginnote=, caption=, citation=, marginals= and the
      \set…font commands (tufte.sidenote.align, tufte.sidenote.font, …):
-       --tufte-X-align    justify | left | right
+       --tufte-X-align    justify | start | left | right  (auto is start:
+                          flush left, flush right under dir="rtl")
        --tufte-margin-hyphens:auto   when any of them is justified
        --tufte-X-family, --tufte-X-style, --tufte-X-size, --tufte-X-color
      for X in sidenote, marginnote, caption, citation. The size words
@@ -17,6 +18,7 @@
      variables used by the @media print rules of tufte-latex.css.
   3. Running heads (tufte.print.runningheads): @page margin boxes, as the
      fancyhdr heads of tufte-handout and tufte-book.
+  4. In a book's print.html, a second <style> (tufte/book/print-style.html).
 
   Every value written with safeCSS comes from a whitelist. Titles in the
   running heads are written by html/template inside quoted CSS strings, so
@@ -61,12 +63,12 @@
   {{- if not $a }}{{ $a = $marginals }}{{ end -}}
   {{- $css := "" -}}
   {{- if eq $a "auto" -}}
-    {{- $css = cond $justified "justify" "left" -}}
+    {{- $css = cond $justified "justify" "start" -}}
   {{- else if isset $alignMap $a -}}
     {{- $css = index $alignMap $a -}}
   {{- else -}}
     {{- warnidf "tufte-bad-option" "tufte.hugo: unknown alignment %q for tufte.%s.align / tufte.marginals (justified, raggedright, raggedleft, raggedouter or auto) in %s" $a $x $where -}}
-    {{- $css = cond $justified "justify" "left" -}}
+    {{- $css = cond $justified "justify" "start" -}}
   {{- end -}}
   {{- if eq $css "justify" }}{{ $hyphens = true }}{{ end -}}
   {{- $vars = $vars | append (printf "--tufte-%s-align:%s" $x $css) -}}
@@ -96,8 +98,8 @@
 
 {{- /* 2. Paper geometry (tufte-common.def, §7.1 of the spec). */ -}}
 {{- $papers := dict
-  "letter" (dict "size" "letter" "margin" "1.58in 0.86in 0.9in 1in" "pt" "65" "pm" "30" "h" "8.52in")
-  "a4" (dict "size" "A4" "margin" "42.2mm 20.6mm 13.4mm 24.8mm" "pt" "65" "pm" "30" "h" "241.4mm")
+  "letter" (dict "size" "letter" "margin" "1in 0.86in 1.48in 1in" "pt" "65" "pm" "30" "h" "8.52in")
+  "a4" (dict "size" "A4" "margin" "27.4mm 20.6mm 28.2mm 24.8mm" "pt" "65" "pm" "30" "h" "241.4mm")
   "b5" (dict "size" "176mm 250mm" "margin" "28.7mm 14.69mm 34.1mm 14.66mm" "pt" "70" "pm" "25" "h" "187.2mm")
 -}}
 {{- $paper := lower (printf "%v" (or (index $opt "print.paper") "letter")) -}}
@@ -123,6 +125,12 @@
     {{- else if $p.IsPage -}}
       {{- $mode = "chapter" -}}
       {{- $chapter = partial "tufte/plain-title.html" (dict "page" $p) -}}
+      {{- /* \frontmatter (tufte-book.cls): \fancyhf{} and
+             \fancyhead[LE,RO]{\thepage}, the folio alone in the outside
+             corner, no book or chapter title. */ -}}
+      {{- range partialCached "tufte/book/chapters.html" $bookRoot (or $bookRoot.RelPermalink $bookRoot.Path) -}}
+        {{- if and (eq .Page $p) (eq .Matter "front") }}{{ $mode = "frontchapter" }}{{ end -}}
+      {{- end -}}
     {{- end -}}
   {{- else if $p.IsPage -}}
     {{- /* tufte-handout is oneside: \fancyhead[RE,RO]{\plaintitle\quad
@@ -140,9 +148,10 @@
 {{- $ls := "0.05em" -}}
 {{- if not (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "letterspacing") $key "letterspacing")) }}{{ $ls = "normal" }}{{ end -}}
 {{- /* fancyhdr sets the head's baseline \headsep = 2\baselineskip (28pt)
-       above the text block, at the bottom of the top margin (§7.1: top =
-       geometry top + headheight + headsep); a top margin box is centred
-       vertically by default, so it is pushed down to that position. */ -}}
+       above the text block, inside the top margin (§7.1: geometry `top`
+       without includehead is the distance to the text block, so the head
+       sits in it); a top margin box is centred vertically by default, so
+       it is pushed down to that position. */ -}}
 {{- $box := printf "font-family:et-book,Palatino,\"Palatino Linotype\",Georgia,serif;font-size:8pt;font-style:normal;text-transform:uppercase;letter-spacing:%s;vertical-align:bottom;padding-bottom:28pt" $ls -}}
 {{- /* html/template treats a CSS string like a URL: an action right after
        the opening quote goes through its URL filter (a title with a colon
@@ -161,8 +170,19 @@
 @page :first{@top-left{content:none}@top-right{content:none}}
 @page :left{@top-left{content:counter(page) "\002003{{ $book }}";{{ $box | safeCSS }}}}
 @page :right{@top-right{content:"\00200B{{ $chapter }}\002003" counter(page);{{ $box | safeCSS }}}}
+{{- else if eq $mode "frontchapter" }}
+@page :first{@top-left{content:none}@top-right{content:none}}
+@page :left{@top-left{content:counter(page);{{ $box | safeCSS }}}}
+@page :right{@top-right{content:counter(page);{{ $box | safeCSS }}}}
 {{- else if eq $mode "printbook" }}
 @page :first{@top-left{content:none}@top-right{content:none}}
 @page :left{@top-left{content:counter(page) "\002003{{ $book }}";{{ $box | safeCSS }}}}
 {{- end -}}
 </style>
+{{- /* 4. A book's whole-book print document (list.print.html): its own
+       rules (part breaks, the per-chapter counter restart, the named
+       pages of the running heads), here in <head> rather than in the
+       body. */ -}}
+{{- if and $bookRoot (eq $bookRoot $p) ($p.OutputFormats.Get "print") ($p.AlternativeOutputFormats.Get "html") }}
+{{ partial "tufte/book/print-style.html" $p }}
+{{- end -}}

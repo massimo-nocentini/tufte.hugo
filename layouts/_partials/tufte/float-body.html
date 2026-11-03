@@ -12,9 +12,11 @@
     class  extra class of the float (listing style: ruled, boxed, plain)
 
   Shortcode params (named): caption, label, short, numbered, captionpos,
-  offset, cite, class, type (table only). Without caption, the first
-  paragraph of the inner text is the caption (a \caption inside the
-  environment) and is removed from the body.
+  offset, cite, class, type (table only). Without caption, a paragraph
+  of the inner text is the caption (a \caption inside the environment)
+  and is removed from the body: a first paragraph before the table or
+  code, else the first paragraph after it (where tufte-latex writes
+  \caption, after the tabular).
 */ -}}
 {{- $c := .ctx -}}
 {{- $p := $c.Page -}}
@@ -36,9 +38,30 @@
   {{- with findRESubmatch `(?s)^\s*<p>(.*?)</p>` $html 1 -}}
     {{- $capHTML = index . 0 1 -}}
     {{- $html = replace $html (index . 0 0) "" 1 -}}
+  {{- else -}}
+    {{- /* Else the first paragraph after the table or the code: tufte-latex
+           writes \caption after the tabular (sample-handout.tex,
+           sample-book.tex). The body is split at its last </table> (or
+           </pre>): a cell or the code cannot hold a <p>. */ -}}
+    {{- $end := cond (strings.Contains $html "</table>") "</table>" (cond (strings.Contains $html "</pre>") "</pre>" "") -}}
+    {{- with $end -}}
+      {{- $parts := split $html $end -}}
+      {{- $tail := index $parts (sub (len $parts) 1) -}}
+      {{- with findRESubmatch `(?s)<p>(.*?)</p>` $tail 1 -}}
+        {{- $capHTML = index . 0 1 -}}
+        {{- $tail = replace $tail (index . 0 0) "" 1 -}}
+        {{- $html = printf "%s%s%s" (delimit (first (sub (len $parts) 1) $parts) $end) $end $tail -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}
 {{- $html = strings.TrimSpace $html -}}
+{{- /* Nothing left (a self-closing call, an empty inner text, or one that
+       is only the caption paragraph): the float keeps its caption and
+       number, with an empty body (HasBody: never an image). */ -}}
+{{- if not $html -}}
+  {{- warnidf "tufte-empty" "%s shortcode: no %s inside; write it between {{< %s >}} and {{< /%s >}} (%s)" $c.Name (cond (eq $kind "listing") "code block" "table") $c.Name $c.Name $c.Position -}}
+{{- end -}}
 {{- /* A margin float (margintable) already sits in the margin: a sidenote
        or margin note in its cells cannot float there either, so it is
        shown inline (tufte/note-in-note.html, as for marginblock and the
@@ -59,6 +82,7 @@
 {{- return (partial "tufte/figure.html" (dict
   "Page" $p
   "Body" $html
+  "HasBody" true
   "Kind" $kind
   "Type" $type
   "Caption" $caption

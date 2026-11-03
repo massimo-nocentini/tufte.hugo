@@ -7,6 +7,8 @@
   Params (named):
     src       video file: page resource, assets/ resource, static path or URL (required)
     poster    image shown before playback (same resolution as src)
+              A data: URI is accepted for an image poster and a video or
+              audio src; other non-http(s) schemes become "#ZgotmplZ".
     caption   caption, inline Markdown: a margin note (main) or a
               figcaption (fullwidth)
     title     accessible label of the video (default: the caption as plain text)
@@ -66,15 +68,30 @@
   {{- $type = "main" -}}
 {{- end -}}
 
-{{- /* Caption: inline Markdown, never block elements (it may sit in a span). */ -}}
+{{- /* Caption: inline Markdown, never block elements (it may sit in a span).
+       As for the caption= of a figure (tufte/figure.html): shortcodes in it
+       run; a cite becomes part of one citation block after the caption, and
+       a sidenote or margin note stays inline text (tufte/note-in-note.html),
+       since the caption is itself a margin note. */ -}}
+{{- $where := printf "%s shortcode in %v" .Name .Position -}}
 {{- $caption := "" -}}
 {{- with .Get "caption" -}}
-  {{- $html := partial "tufte/render-inner.html" (dict "page" $p "text" (printf "%v" .)) -}}
-  {{- $caption = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" (printf "%v" .) "display" "inline" "shortcodes" "run" "where" $where) | string -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- if strings.Contains $html `class="margin-toggle` -}}
+    {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" "video caption" "where" $where) -}}
+  {{- end -}}
+  {{- with partial "tufte/cite-gather.html" (dict "page" $p "html" $html) -}}
+    {{- $html = printf "%s%s" (.html | strings.TrimSpace) .block -}}
+  {{- end -}}
+  {{- $caption = $html -}}
 {{- end -}}
+{{- /* The default accessible label: the caption's plain text, without its
+       notes, citations, toggles and KaTeX's MathML copy (as a figure's alt
+       text); cross-references are resolved by tufte/postprocess.html. */ -}}
 {{- $label := printf "%v" (.Get "title" | default "") -}}
 {{- if and (not $label) $caption -}}
-  {{- $label = $caption | plainify | htmlUnescape | strings.TrimSpace -}}
+  {{- $label = partial "tufte/plain-caption.html" $caption -}}
 {{- end -}}
 
 {{- $controls := not (in (slice "false" "0" "no") (printf "%v" (.Get "controls"))) -}}
@@ -95,11 +112,24 @@
 {{- /* Built as a string (attributes escaped as html/template would, script
        URLs refused) so that it goes through tufte/nest.html: nested in a
        theme shortcode (fullwidth, marginblock…) its HTML is kept, also
-       with markup.goldmark.renderer.unsafe = false. */ -}}
+       with markup.goldmark.renderer.unsafe = false.
+       A data: URI is kept when it holds media that is never executed: an
+       image for poster, a video or audio for src (whose MIME type then
+       becomes the <source> type); any other URL goes through
+       tufte/safe-url.html (http, https, mailto or no scheme). */ -}}
 {{- $safe := dict -}}
+{{- $dataSrc := false -}}
 {{- range $key := slice "src" "poster" -}}
-  {{- $u := printf "%v" (index $urls $key | default "") -}}
-  {{- if and (findRE `^[a-zA-Z][a-zA-Z0-9+.-]*:` $u 1) (not (findRE `(?i)^https?:` $u 1)) }}{{ $u = "#ZgotmplZ" }}{{ end -}}
+  {{- $raw := printf "%v" (index $urls $key | default "") | replaceRE `[\t\n\r]` "" | replaceRE `^[\x00-\x20]+|[\x00-\x20]+$` "" -}}
+  {{- $kinds := cond (eq $key "poster") "image" "video|audio" -}}
+  {{- $u := "" -}}
+  {{- with findRESubmatch (printf `^(?i:data):((?i:%s)/[a-zA-Z0-9!#$&^_.+-]+)[;,]` $kinds) $raw 1 -}}
+    {{- $u = $raw -}}
+    {{- if and (eq $key "src") (not $mime) }}{{ $mime = lower (index . 0 1) }}{{ end -}}
+    {{- if eq $key "src" }}{{ $dataSrc = true }}{{ end -}}
+  {{- else -}}
+    {{- $u = partial "tufte/safe-url.html" $raw -}}
+  {{- end -}}
   {{- $safe = merge $safe (dict $key $u) -}}
 {{- end -}}
 {{- $out := printf `<figure class="%s">` (htmlEscape $figClass) -}}
@@ -121,8 +151,10 @@
 {{- with $mime }}{{ $typeAttr = printf ` type="%s"` (htmlEscape .) }}{{ end -}}
 {{- /* The fallback link (browsers without <video>) has the class
        video-fallback: it is not text of the page (tufte/description.html
-       leaves it out of the meta description). */ -}}
-{{- $out = printf "%s<video preload=\"metadata\"%s>\n<source src=\"%s\"%s>\n<a class=\"video-fallback\" href=\"%s\">%s</a>\n</video>" $out $attrs $s $typeAttr $s (htmlEscape (path.Base (index $urls "src"))) -}}
+       leaves it out of the meta description). Its text is the file name,
+       or the MIME type for a data: URI. */ -}}
+{{- $linkText := cond $dataSrc $mime (path.Base (index $urls "src")) -}}
+{{- $out = printf "%s<video preload=\"metadata\"%s>\n<source src=\"%s\"%s>\n<a class=\"video-fallback\" href=\"%s\">%s</a>\n</video>" $out $attrs $s $typeAttr $s (htmlEscape $linkText) -}}
 {{- if and (eq $type "fullwidth") $caption -}}
   {{- $out = printf `%s<figcaption>%s</figcaption>` $out $caption -}}
 {{- end -}}

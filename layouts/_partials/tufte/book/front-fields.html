@@ -1,0 +1,93 @@
+{{- /*
+  The Markdown front matter of a book's front pages, processed with the
+  page content, as the front-matter abstract and the title-block notes are
+  (tufte/abstract.html, tufte/title-notes.html): the opening epigraphs
+  (`epigraphs`: quote, author, work), the frontispiece (`frontispiece`
+  caption), the title page's `publisher`, the copyright page
+  (`copyrightPage`) and the dedication (`dedication`, of the book root or
+  of a dedication chapter). Their texts are Markdown in which shortcodes
+  run (xref, cite, sidenote…) and may reference Markdown footnotes, so the
+  markers they leave (number tokens, xrefs, sn-end, cite and real-footnote
+  markers) must be resolved by tufte/postprocess.html, and their notes
+  counted and numbered with the page's.
+
+  1. mode "raw" (func/content-raw.html, full content only): each front
+     page is rendered by its partial in render mode
+     (tufte/book/epigraphs.html … with (dict "page" P "render" true)), and
+     wrapped as
+       <i class="tufte-ff" data-slot="SLOT" hidden></i>HTML<i class="tufte-ff-end" hidden></i>
+     Returns a dict of three strings, by where func/content-raw.html puts
+     them in the phase-1 HTML, so that notes are numbered in the order the
+     landing shows them (tufte/book/landing.html):
+       pre   epigraphs, frontispiece       before the title-block notes
+       mid   publisher (title page only)   after them, before the abstract
+       post  copyright page, dedication    after the abstract
+     func/content.html cuts every slot off the sections (and
+     tufte/abstract.html off the abstract); tufte/counts.html counts their
+     marks with the title-block ones ("thanks": a summary does not show
+     them).
+  2. mode "get" (the default; the partials above, called with the page):
+     the processed HTML of one slot, from the same processed HTML
+     (tufte/processed.html), "" when there is none.
+
+  Which slots a page has: a book root, all of them (publisher only with
+  a title page, book.titlepage); a chapter with `dedication`, the
+  dedication; other pages, none.
+
+  Takes: a dict with
+    page  the page
+    mode  "raw" or "get" (default)
+    slot  get: "epigraphs", "frontispiece", "publisher", "copyright" or
+          "dedication"
+  Returns: "raw": dict pre mid post (strings); "get": the HTML string.
+*/ -}}
+{{- $p := .page -}}
+{{- $mode := .mode | default "get" -}}
+{{- $key := or $p.RelPermalink $p.Path -}}
+{{- $open := `<i class="tufte-ff" data-slot="%s" hidden></i>` -}}
+{{- $end := `<i class="tufte-ff-end" hidden></i>` -}}
+{{- $result := "" -}}
+{{- if eq $mode "raw" -}}
+  {{- $res := dict "pre" "" "mid" "" "post" "" -}}
+  {{- $root := partialCached "tufte/book/root.html" $p $key -}}
+  {{- $wants := slice -}}
+  {{- if $root -}}
+    {{- if eq $root $p -}}
+      {{- $wants = slice "pre:epigraphs" "pre:frontispiece" -}}
+      {{- if partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.titlepage") $key "book.titlepage") -}}
+        {{- $wants = $wants | append "mid:publisher" -}}
+      {{- end -}}
+      {{- $wants = $wants | append "post:copyright" "post:dedication" -}}
+    {{- else if and $p.IsPage $p.Params.dedication -}}
+      {{- $wants = slice "post:dedication" -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $wants -}}
+    {{- $where := index (split . ":") 0 -}}
+    {{- $slot := index (split . ":") 1 -}}
+    {{- $h := "" -}}
+    {{- $args := dict "page" $p "render" true -}}
+    {{- if eq $slot "epigraphs" }}{{ $h = partial "tufte/book/epigraphs.html" $args | string -}}
+    {{- else if eq $slot "frontispiece" }}{{ $h = partial "tufte/book/frontispiece.html" $args | string -}}
+    {{- else if eq $slot "publisher" }}{{ $h = partial "tufte/book/titlepage.html" $args | string -}}
+    {{- else if eq $slot "copyright" }}{{ $h = partial "tufte/book/copyright.html" $args | string -}}
+    {{- else if eq $slot "dedication" }}{{ $h = partial "tufte/book/dedication.html" $args | string -}}
+    {{- end -}}
+    {{- with strings.TrimSpace $h -}}
+      {{- $res = merge $res (dict $where (printf "%s%s%s%s\n" (index $res $where) (printf $open $slot) . $end)) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $result = $res -}}
+{{- else -}}
+  {{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) $key false | string -}}
+  {{- $mark := printf $open .slot -}}
+  {{- if strings.Contains $raw $mark -}}
+    {{- $html := partial "tufte/processed.html" (dict "page" $p "summary" false) -}}
+    {{- with split $html $mark -}}
+      {{- if gt (len .) 1 -}}
+        {{- $result = index (split (index . 1) $end) 0 -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $result -}}

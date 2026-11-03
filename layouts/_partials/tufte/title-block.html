@@ -14,8 +14,9 @@
 
   THANKS: front matter `thanks` (a string or a list, \thanks): one numbered
   sidenote per entry inside the h1. Authors given as {name, thanks} get
-  their sidenote right after the name. These sidenotes precede the content,
-  so tufte/counts.html adds `len thanks` to the sidenote count.
+  their sidenote right after the name. Their texts are Markdown in which
+  shortcodes run; tufte/title-notes.html puts them first in the phase-1
+  content, so they are counted, numbered, cited and resolved with it.
   AUTHORS: front matter `author` (string, list of strings, list of
   {name, thanks}), else params.author.name; joined "A and B", "A, B and C".
   DATE: `dateText`, else the date in params.dateFormat; none when
@@ -44,19 +45,11 @@
 {{- end -}}
 {{- $key := (or $p.RelPermalink $p.Path) -}}
 
-{{- /* Sidenote markup for a \thanks text. */ -}}
-{{- $thanks := slice -}}
-{{- with $p.Params.thanks -}}
-  {{- if reflect.IsSlice . }}{{ $thanks = . }}{{ else }}{{ $thanks = slice . }}{{ end -}}
-{{- end -}}
-{{- $thanksHTML := "" -}}
-{{- range $thanks -}}
-  {{- with . -}}
-    {{- $id := partial "func/note-id.html" $p -}}
-    {{- $text := $p.RenderString (printf "%v" .) | string | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" -}}
-    {{- $thanksHTML = printf `%s<label for="sn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote">%s</span>` $thanksHTML $id $id $text -}}
-  {{- end -}}
-{{- end -}}
+{{- /* The \thanks sidenotes, rendered and processed with the content
+       (tufte/title-notes.html): shortcodes in them (cite, xref…) are
+       numbered and resolved like the body's, and adjacent marks get the
+       \multfootsep comma (postprocess rule 8). */ -}}
+{{- $thanksHTML := index (partial "tufte/title-notes.html" (dict "page" $p)) "title" | default "" -}}
 
 {{- /* The title, rendered when it holds Markdown. */ -}}
 {{- $title := $p.Title -}}
@@ -68,9 +61,9 @@
   {{- $num := "" -}}
   {{- if $chapter.Numbered -}}
     {{- if eq $chapter.Matter "appendix" -}}
-      {{- $num = printf "%s %v" (T "appendix") $chapter.Display -}}
+      {{- $num = printf "%s %v" (partial "func/t.html" "appendix") $chapter.Display -}}
     {{- else -}}
-      {{- $num = printf "%s %v" (T "chapter") $chapter.Display -}}
+      {{- $num = printf "%s %v" (partial "func/t.html" "chapter") $chapter.Display -}}
     {{- end -}}
   {{- end -}}
   {{- $out = `<header class="chapter-head title-block">` -}}

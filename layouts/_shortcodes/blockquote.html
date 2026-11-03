@@ -22,5 +22,5 @@
 {{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
 {{- $get := dict -}}
 {{- if .IsNamedParams }}{{ $get = .Params }}{{ end -}}
-{{- $out := partial "tufte/quote.html" (dict "page" $p "html" $html "author" (index $get "author" | default "") "cite" (index $get "cite" | default (index $get "work") | default "") "url" (index $get "url" | default "") "footer" (index $get "footer" | default "") "class" (index $get "class" | default "")) -}}
+{{- $out := partial "tufte/quote.html" (dict "page" $p "html" $html "author" (index $get "author" | default "") "cite" (index $get "cite" | default (index $get "work") | default "") "url" (index $get "url" | default "") "footer" (index $get "footer" | default "") "class" (index $get "class" | default "") "where" (printf "%s shortcode in %v" .Name .Position)) -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

@@ -28,11 +28,11 @@
     {{- $links = $links | append (dict "name" "ORCID" "url" (cond (hasPrefix . "http") . (printf "https://orcid.org/%s" .))) -}}
   {{- end -}}
   {{- with .email -}}
-    {{- $links = $links | append (dict "name" "Email" "url" (printf "mailto:%s" .)) -}}
+    {{- $links = $links | append (dict "name" (partial "func/t.html" "email" | default "Email") "url" (printf "mailto:%s" .)) -}}
   {{- end -}}
   {{- if isset . "rss" }}{{ $rss = .rss }}{{ end -}}
 {{- end -}}
-{{- if ne $rss false -}}
+{{- if partial "func/flag.html" (dict "value" $rss "default" true) -}}
   {{- with site.Home.OutputFormats.Get "rss" -}}
     {{- $links = $links | append (dict "name" "RSS" "url" .RelPermalink "type" "application/rss+xml") -}}
   {{- end -}}

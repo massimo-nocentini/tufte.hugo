@@ -2,9 +2,17 @@
   Whole-book print document: the map from the path of each chapter and
   part page of the book (RelPermalink without its trailing slash) to its
   anchor id in the document: "tufte-c<Index>" for chapters, "tufte-p<K>"
-  for parts (K from 1, in the order of tufte/book/print-parts.html). The
-  tufte- namespace keeps them apart from the landing's own ids. Built once per
-  book and shared by every tufte/book/print-links.html call.
+  for parts (K from 1, in the order of tufte/book/print-parts.html). Each
+  page is also keyed by "page:" + its .Path, so a page that is never
+  rendered (no RelPermalink, build.render = never) can be reached too:
+  tufte/resolve-refs.html writes such an xref with data-tufte-path. The
+  tufte- namespace keeps them apart from the landing's own ids. The book
+  root itself (the landing, whose body is in the document with its ids
+  unprefixed) maps to "tufte-landing", the id of its article in
+  list.print.html; it is keyed by its HTML permalink (path.Clean, so "/"
+  for a book at the home page), not .RelPermalink, which is …/print.html
+  while the print document renders. Built once per book and shared by
+  every tufte/book/print-links.html call.
 
   Takes: the book root.
   Returns: a map path → id.
@@ -13,12 +21,16 @@
 {{- $root := . -}}
 {{- $s := newScratch -}}
 {{- $s.Set "t" dict -}}
+{{- with $root.OutputFormats.Get "html" }}{{ $s.SetInMap "t" (path.Clean .RelPermalink) "tufte-landing" }}{{ end -}}
+{{- $s.SetInMap "t" (printf "page:%s" $root.Path) "tufte-landing" -}}
 {{- range partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
   {{- $id := printf "tufte-c%v" .Index -}}
   {{- with .Page.RelPermalink }}{{ $s.SetInMap "t" (strings.TrimSuffix "/" .) $id }}{{ end -}}
+  {{- $s.SetInMap "t" (printf "page:%s" .Page.Path) $id -}}
 {{- end -}}
 {{- range $i, $part := partialCached "tufte/book/print-parts.html" $root (or $root.RelPermalink $root.Path) -}}
   {{- $id := printf "tufte-p%d" (add $i 1) -}}
   {{- with $part.RelPermalink }}{{ $s.SetInMap "t" (strings.TrimSuffix "/" .) $id }}{{ end -}}
+  {{- $s.SetInMap "t" (printf "page:%s" $part.Path) $id -}}
 {{- end -}}
 {{- return ($s.Get "t") -}}

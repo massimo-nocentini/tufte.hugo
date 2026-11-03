@@ -1,0 +1,61 @@
+{{- /*
+  Per-chapter counters of a book with book.continuous = false (for
+  tufte/offsets.html), in one pass over the print order (the landing, then
+  tufte/book/sequence.html).
+
+  As in the LaTeX book classes, where the figure, table and equation
+  counters are reset only when the chapter counter steps: a numbered
+  chapter starts its floats and equations at 1 with the prefix "N."
+  (\thechapter.\arabic{figure}); a page that does not step the chapter
+  counter (a part page, \part; an unnumbered chapter, \chapter*; a
+  back-matter chapter) continues the counters of the last numbered chapter
+  before it, with that chapter's prefix ("1.2" after figure 1.1); the
+  landing and the front matter before the first numbered chapter share one
+  bare sequence (1, 2, …). So no two floats of the book get the same number.
+  A page whose book.numberChapters is off restarts at 1 with no prefix (the
+  chapters then carry no number to tell its floats apart).
+
+  Sidenotes are not concerned: with continuous = false every page restarts
+  them (the CSS counter).
+
+  Takes: the book root page.
+  Returns: map page key → dict figure table listing eq (ints) prefix
+           (string, "" or "N."); page key = printf "%s|%s" .Path
+           (or .RelPermalink "").
+  Callers: partialCached "tufte/book/local-offset-map.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- /* Memoized in the root's Store for the current build: see tufte/opts.html. */ -}}
+{{- $memoRes := dict -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoLocalOffsetMap") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $root := . -}}
+{{- $M := newScratch -}}
+{{- $M.Set "m" dict -}}
+{{- $c0 := partialCached "tufte/counts.html" $root (or $root.RelPermalink $root.Path) -}}
+{{- $pre := "" -}}
+{{- $fig := $c0.figure -}}{{- $tab := $c0.table -}}{{- $lst := $c0.listing -}}{{- $eq := $c0.eq -}}
+{{- range partialCached "tufte/book/sequence.html" $root (or $root.RelPermalink $root.Path) -}}
+  {{- $p := .Page -}}
+  {{- $k := printf "%s|%s" $p.Path (or $p.RelPermalink "") -}}
+  {{- $c := partialCached "tufte/counts.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- $numbered := false -}}
+  {{- with .Chapter }}{{ $numbered = .Numbered }}{{ end -}}
+  {{- if $numbered -}}
+    {{- $pre = printf "%s." .Chapter.Display -}}
+    {{- $fig = 0 -}}{{- $tab = 0 -}}{{- $lst = 0 -}}{{- $eq = 0 -}}
+  {{- end -}}
+  {{- if or $numbered (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.numberchapters") (or $p.RelPermalink $p.Path) "book.numberchapters")) -}}
+    {{- $M.SetInMap "m" $k (dict "figure" $fig "table" $tab "listing" $lst "eq" $eq "prefix" $pre) -}}
+    {{- $fig = add $fig $c.figure -}}
+    {{- $tab = add $tab $c.table -}}
+    {{- $lst = add $lst $c.listing -}}
+    {{- $eq = add $eq $c.eq -}}
+  {{- else -}}
+    {{- $M.SetInMap "m" $k (dict "figure" 0 "table" 0 "listing" 0 "eq" 0 "prefix" "") -}}
+  {{- end -}}
+{{- end -}}
+{{- $memoRes = $M.Get "m" -}}
+{{- $root.Store.Set "tufteMemoLocalOffsetMap" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
+{{- end -}}
+{{- return $memoRes -}}

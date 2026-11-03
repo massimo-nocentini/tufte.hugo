@@ -46,7 +46,7 @@
 {{- if isset . "heading" -}}
   {{- with .heading }}{{ $heading = printf "%v" . }}{{ $given = true }}{{ else }}{{ if eq (printf "%T" .heading) "string" }}{{ $given = true }}{{ end }}{{ end -}}
 {{- end -}}
-{{- if not $given }}{{ $heading = T $meta.i18n | default $meta.def }}{{ end -}}
+{{- if not $given }}{{ $heading = partial "func/t.html" $meta.i18n | default $meta.def }}{{ end -}}
 
 {{- /* scope */ -}}
 {{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
@@ -84,30 +84,49 @@
     {{- /* strip margin material (sidenotes, margin notes, citation
            blocks) with their nested spans: note spans are renamed
            <tufnote>, then innermost elements are resolved repeatedly
-           (finished spans become <xspan>, finished notes are removed). */ -}}
+           (finished spans become <xspan>, finished notes are replaced by
+           the cut sentinel <zcut>, which the $C class lets through). */ -}}
     {{- if findRE `<span class="(?:sidenote|marginnote|citation-block)` $text 1 -}}
       {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<s[^p]|</[^s]|</s[^p])*` -}}
       {{- $text = replaceRE `<span class="(sidenote|marginnote|citation-block)` `<tufnote class="$1` $text -}}
       {{- range seq 40 -}}
         {{- if not (or (strings.Contains $text "<span") (strings.Contains $text "<tufnote")) }}{{ break }}{{ end -}}
-        {{- $text = replaceRE (printf `<tufnote[^>]*>%s</span>(?:<i class="sn-end" hidden></i>)?` $C) "" $text -}}
+        {{- $text = replaceRE (printf `<tufnote[^>]*>%s</span>(?:<i class="sn-end" hidden></i>)?` $C) "<zcut>" $text -}}
         {{- $text = replaceRE (printf `<span([^>]*)>(%s)</span>` $C) "<xspan$1>$2</xspan>" $text -}}
       {{- end -}}
       {{- $text = replace (replace $text "<xspan" "<span") "</xspan>" "</span>" -}}
     {{- end -}}
-    {{- $text = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $text -}}
-    {{- $text = replaceRE `<span class="(?:index-anchor|tufte-anchor)"[^>]*></span>` "" $text -}}
-    {{- $text = replaceRE `<i class="(?:sn-end|cap-end)" hidden></i>` "" $text -}}
+    {{- $text = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "<zcut>" $text -}}
+    {{- /* a lone toggle: footnotemark (its input is in the footnotetext) */ -}}
+    {{- $text = replaceRE `<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label>` "<zcut>" $text -}}
+    {{- $text = replaceRE `<span class="(?:index-anchor|tufte-anchor)"[^>]*></span>` "<zcut>" $text -}}
+    {{- $text = replaceRE `<i class="(?:sn-end|cap-end)" hidden></i>` "<zcut>" $text -}}
     {{- $text = replaceRE `\s+id="[^"]*"` "" $text -}}
     {{- $text = replaceRE `</?a\b[^>]*>` "" $text -}}
-    {{- $text = trim (replaceRE `\s{2,}` " " (replaceRE `\s+([.,;:])` "$1" $text)) " \n" -}}
-    {{- $href := $c.RelPermalink -}}
-    {{- with $e.anchor }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
+    {{- /* Tidy only the gaps the cuts left (a \sidenote or \cite written
+           after a space): "word <cut>." -> "word.", "word <cut> more" ->
+           "word more". The author's own spacing is kept: a space before
+           . , ; : elsewhere (French "voir :", code "cd ..") is text, as in
+           tufte-latex's LoF, which copies the caption unchanged. */ -}}
+    {{- if strings.Contains $text "<zcut>" -}}
+      {{- $text = replaceRE `\s+((?:<zcut>)+[.,;:])` "$1" $text -}}
+      {{- $text = replaceRE `(\s)(?:<zcut>)+\s+` "$1" $text -}}
+      {{- $text = replace $text "<zcut>" "" -}}
+    {{- end -}}
+    {{- /* collapse runs of white space (Markdown soft breaks), but not
+           inside <code>, whose text is kept as written */ -}}
+    {{- if findRE `\s{2,}` $text 1 -}}
+      {{- $codes := findRE `(?s)<code[\s>].*?</code>` $text -}}
+      {{- range $i, $cd := $codes }}{{ $text = replace $text $cd (printf "<zcode-%d>" $i) 1 }}{{ end -}}
+      {{- $text = replaceRE `\s{2,}` " " $text -}}
+      {{- range $i, $cd := $codes }}{{ $text = replace $text (printf "<zcode-%d>" $i) $cd 1 }}{{ end -}}
+    {{- end -}}
+    {{- $text = trim $text " \n" -}}
     {{- $num := "" -}}
     {{- with $e.display }}{{ $num = printf `<span class="lof-num">%v</span> ` . }}{{ end -}}
     {{- $whereHTML := "" -}}
     {{- if $root }}{{ $whereHTML = printf `<span class="lof-where">%s</span>` (partial "tufte/plain-title.html" (dict "page" $c) | htmlEscape) }}{{ end -}}
-    {{- $lis = $lis | append (printf `<li><a href="%s">%s%s</a>%s</li>` (htmlEscape $href) $num $text $whereHTML) -}}
+    {{- $lis = $lis | append (printf `<li>%s%s</li>` (partial "tufte/page-link.html" (dict "page" $c "anchor" ($e.anchor | default "") "html" (printf "%s%s" $num $text) "book" $root)) $whereHTML) -}}
   {{- end -}}
 {{- end -}}
 

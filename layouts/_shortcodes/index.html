@@ -9,6 +9,8 @@
     {{< index "class options|seealso{options}" >}}
     {{< index "floats|(" >}} … {{< index "floats|)" >}}   page range
     {{< index term="fonts" see="typefaces" >}}       named form (term, see, seealso)
+    {{< index `Yahoo"!` >}}                          makeindex's quote: "! "@ "| "" are a
+                                                      literal ! @ | " (also in term=)
 
   The display text of each level is inline Markdown (`code`, *italic*).
   {{< printindex >}} prints the index of the book or page.
@@ -33,9 +35,23 @@
 {{- end -}}
 {{- /* makeindex allows three levels (a!b!c); the index folds deeper ones
        into the third (tufte/index/parse.html). */ -}}
-{{- $main := index (split $raw "|") 0 -}}
-{{- if gt (len (split $main "!")) 3 -}}
-  {{- warnidf "tufte-bad-option" "index shortcode: %q has more than 3 levels (a!b!c is the deepest, as in makeindex); the levels after the third are shown as part of it (%s)" $main .Position -}}
+{{- $q := partial "tufte/index/quote.html" $raw -}}
+{{- $main := index (split $q "|") 0 -}}
+{{- $levels := split $main "!" -}}
+{{- if gt (len $levels) 3 -}}
+  {{- warnidf "tufte-bad-option" "index shortcode: %q has more than 3 levels (a!b!c is the deepest, as in makeindex); the levels after the third are shown as part of it (%s)" $raw .Position -}}
+{{- end -}}
+{{- range $levels -}}
+  {{- if not (strings.TrimSpace .) -}}
+    {{- warnidf "tufte-bad-option" "index shortcode: %q has an empty level; for a literal !, @ or | write \"!, \"@ or \"| (makeindex's quote; in a quoted parameter: \\\"!) (%s)" $raw $.Position -}}
+    {{- break -}}
+  {{- end -}}
+{{- end -}}
+{{- with findRESubmatch `(?s)^[^|]*\|(.*)$` $q 1 -}}
+  {{- $encap := index (index . 0) 1 | strings.TrimSpace | strings.TrimPrefix "(" | strings.TrimPrefix ")" | strings.TrimSpace -}}
+  {{- if and $encap (not (findRE `^\\?(see|seealso)\s*\{` $encap 1)) -}}
+    {{- warnidf "tufte-bad-option" "index shortcode: %q: the page format |%s has no effect (only |see{…}, |seealso{…}, |( and |) are used); for a literal | write \"| (makeindex's quote) (%s)" $raw $encap $.Position -}}
+  {{- end -}}
 {{- end -}}
 {{- $id := partial "func/note-id.html" .Page -}}
 {{- $out := printf `<span class="index-anchor" id="idx-%s" data-index="%s"></span>` $id (htmlEscape $raw) -}}

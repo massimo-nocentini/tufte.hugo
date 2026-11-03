@@ -9,14 +9,26 @@
     Defaults: holder = the book author; publisher = publisherPlain (plain
     text), else publisher (Markdown, like copyrightPage.publisher); year = the year of the root's date (else the build year);
     printing = "First printing, MONTH YEAR" from the root's date (none
-    without a date; `printing: false` removes it). license is Markdown;
+    without a date; `printing: false` removes it). license is Markdown, rendered as blocks
+    (one <p> per paragraph);
     url is printed as given and linked when it has an http(s) scheme
     (<a class="url" href="URL">URL without scheme</a>: class url keeps
     the print stylesheet from repeating the address after it).
 
-  Takes: the book root page.
+  The page is made in phase 1 with the page content
+  (tufte/book/front-fields.html), so the notes, footnotes ([^x]),
+  citations and cross-references of its Markdown are numbered and
+  resolved with the landing's.
+
+  Takes: the book root page (the processed copyright page), or a dict
+  {page, render: true} (tufte/book/front-fields.html: the phase-1 HTML).
 */ -}}
 {{- $p := . -}}
+{{- $render := false -}}
+{{- if reflect.IsMap . }}{{ $p = .page }}{{ $render = eq .render true }}{{ end -}}
+{{- if not $render -}}
+  {{- partial "tufte/book/front-fields.html" (dict "page" $p "slot" "copyright") | safeHTML -}}
+{{- else -}}
 {{- with $p.Params.copyrightpage -}}
   {{- if reflect.IsMap . -}}
     {{- $m := . -}}
@@ -34,7 +46,7 @@
     {{- $holder := "" -}}
     {{- $n := len $names -}}
     {{- range $i, $a := $names -}}
-      {{- if eq $i 0 }}{{ $holder = $a }}{{ else if eq $i (sub $n 1) }}{{ $holder = printf "%s %s %s" $holder (T "and") $a }}{{ else }}{{ $holder = printf "%s, %s" $holder $a }}{{ end -}}
+      {{- if eq $i 0 }}{{ $holder = $a }}{{ else if eq $i (sub $n 1) }}{{ $holder = printf "%s %s %s" $holder (partial "func/t.html" "and") $a }}{{ else }}{{ $holder = printf "%s, %s" $holder $a }}{{ end -}}
     {{- end -}}
     {{- with $m.holder }}{{ $holder = printf "%v" . }}{{ end -}}
     {{- $year := now.Year -}}
@@ -55,19 +67,22 @@
       {{- end -}}
     {{- end -}}
     {{- with $pubMD -}}
-      {{- $publisher = $p.RenderString . | string | strings.TrimSpace -}}
+      {{- /* Inline Markdown, as on the title page: several paragraphs
+             become lines of one, and a text that starts like a block
+             ("1984. Press") stays text (tufte/render-inner.html). */ -}}
+      {{- $publisher = partial "tufte/render-inner.html" (dict "page" $p "inner" (partial "tufte/book/fn-local.html" (dict "text" . "tag" "cppub")) "display" "inline" "shortcodes" "run" "where" "front matter publisher") | string | strings.TrimSpace -}}
     {{- end -}}
     {{- $printing := "" -}}
     {{- if not $p.Date.IsZero -}}
-      {{- $printing = printf "%s, %s" (T "firstPrinting") (time.Format "January 2006" $p.Date) -}}
+      {{- $printing = printf "%s, %s" (partial "func/t.html" "firstPrinting") (time.Format "January 2006" $p.Date) -}}
     {{- end -}}
     {{- if isset $m "printing" -}}
       {{- if eq $m.printing false }}{{ $printing = "" }}{{ else }}{{ $printing = printf "%v" $m.printing }}{{ end -}}
     {{- end }}
 <section class="copyright-page">
-  <p>{{ T "copyright" }} &copy; {{ $year }}{{ with $holder }} {{ . }}{{ end }}</p>
+  <p>{{ partial "func/t.html" "copyright" }} &copy; {{ $year }}{{ with $holder }} {{ . }}{{ end }}</p>
   {{- with $publisher }}
-  <p class="smallcaps">{{ T "publishedBy" }} {{ . | safeHTML }}</p>
+  <p class="smallcaps">{{ partial "func/t.html" "publishedBy" }} {{ . | safeHTML }}</p>
   {{- end }}
   {{- with $m.url }}
   {{- $u := printf "%v" . }}
@@ -78,14 +93,15 @@
   {{- end }}
   {{- end }}
   {{- with $m.license }}
-  <p>{{ $p.RenderString (printf "%v" .) }}</p>
+  {{ partial "tufte/render-inner.html" (dict "page" $p "inner" (partial "tufte/book/fn-local.html" (dict "text" . "tag" "cplic")) "display" "block" "shortcodes" "run" "where" "front matter copyrightPage license") | string | strings.TrimSpace | safeHTML }}
   {{- end }}
   {{- with $printing }}
   <p><em>{{ . }}</em></p>
   {{- end }}
 </section>
   {{- else -}}
-    {{- $html := $p.RenderString (dict "display" "block") (printf "%v" .) | string | strings.TrimSpace }}
+    {{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" (partial "tufte/book/fn-local.html" (dict "text" . "tag" "cp")) "display" "block" "shortcodes" "run" "where" "front matter copyrightPage") | string | strings.TrimSpace }}
 <section class="copyright-page">{{ $html | safeHTML }}</section>
   {{- end -}}
+{{- end -}}
 {{- end -}}

@@ -56,34 +56,55 @@
 {{- else -}}
   {{- $safe = false -}}
 {{- end -}}
+{{- /* A shortcode (or a nest token) in the title: Hugo would put its HTML
+       inside the attribute. The title is deferred like an image's alt
+       text (tufte/attr-marks.html): a token in the attribute, the escaped
+       title after the </a>; its plain text becomes the tooltip and its
+       notes and citations follow the link once the shortcodes have run. */ -}}
+{{- /* The title as written, with its backslash escapes and entities
+       resolved like Goldmark would (tufte/md-title.html). */ -}}
+{{- $title := partial "tufte/md-title.html" .Title -}}
+{{- $titleMark := "" -}}
+{{- if and $title (findRE `HAHAHUGOSHORTCODE|TUFTENEST[0-9a-f]{16}END` $title 1) -}}
+  {{- $tkey := substr (md5 (printf "%s|%s|%s|%s" .Page.RelPermalink .Destination $title (string .Text))) 0 12 -}}
+  {{- $titleMark = printf `<i class="tufte-attr" data-key="%s" data-at="a" hidden></i>%s<i class="tufte-attr-end" hidden></i>` $tkey (htmlEscape $title) -}}
+  {{- $title = printf "TUFTEATTR%sEND" $tkey -}}
+{{- end -}}
 {{- $text := string .Text -}}
 {{- $img := "" -}}
 {{- if or (strings.Contains $text "<figure") (strings.Contains $text `<p class="margin-figure-anchor`) -}}
   {{- with findRE `<img [^>]*/>` $text 1 }}{{ $img = index . 0 }}{{ end -}}
 {{- end -}}
 {{- if $img -}}
-  {{- /* As html/template would: only http, https and mailto schemes. */ -}}
-  {{- $h := printf "%v" $href -}}
-  {{- if not $safe -}}
-    {{- with findRESubmatch `^\s*([a-zA-Z][a-zA-Z0-9+.-]*):` $h 1 -}}
-      {{- if not (in (slice "http" "https" "mailto") (lower (index . 0 1))) }}{{ $h = "#ZgotmplZ" }}{{ end -}}
-    {{- end -}}
-  {{- end -}}
-  {{- $a := printf `<a href="%s"%s>%s</a>` (htmlEscape $h) (cond (ne (printf "%v" (.Title | default "")) "") (printf ` title="%s"` (htmlEscape (printf "%v" .Title))) "") $img -}}
-  {{- printf `<i class="tufte-block" hidden></i>%s<i class="tufte-block-end" hidden></i>` (replace $text $img $a 1) | safeHTML -}}
+  {{- /* As html/template would: only http, https and mailto schemes, after
+         the browser's own normalisation (tufte/safe-url.html). A resolved
+         page or resource permalink passes unchanged. */ -}}
+  {{- $h := partial "tufte/safe-url.html" $href -}}
+  {{- $a := printf `<a href="%s"%s>%s</a>` (htmlEscape $h) (cond (ne $title "") (printf ` title="%s"` (htmlEscape $title)) "") $img -}}
+  {{- printf `<i class="tufte-block" hidden></i>%s%s<i class="tufte-block-end" hidden></i>` (replace $text $img $a 1) $titleMark | safeHTML -}}
 {{- else -}}
 {{- /* A link whose text is its own address (an autolink <https://…>, a
        linkified bare URL, [https://x](https://x/)) gets class "url", like
        \url: print then does not repeat the address after it. Compared
        without scheme, "www." and trailing slash, case-insensitively. */ -}}
 {{- $isURL := false -}}
+{{- /* An autolink (<https://…>, <a@b.c>, a linkified bare URL or www.
+       address): Hugo passes its label as raw source text, not HTML, which
+       must be escaped here ("?x=1&reg=2" would otherwise show "®=2").
+       Recognised by its text being its own destination (Goldmark adds
+       "mailto:" or "http(s)://" to a bare address). A written link whose
+       rendered text equals its destination holds no markup or entity, so
+       escaping it changes nothing. */ -}}
+{{- $raw := string .Text -}}
+{{- $dest := string .Destination -}}
+{{- $auto := and $raw (in (slice $raw (print "mailto:" $raw) (print "http://" $raw) (print "https://" $raw)) $dest) -}}
 {{- $scheme := `(?i)^(?:[a-z][a-z0-9+.-]*://|mailto:)?(?:www\.)?` -}}
 {{- $pt := htmlUnescape (strings.TrimSpace (string .PlainText)) | replaceRE $scheme "" | strings.TrimRight "/" | lower -}}
 {{- $dt := strings.TrimSpace (string .Destination) | replaceRE $scheme "" | strings.TrimRight "/" | lower -}}
-{{- if and $pt (eq $pt $dt) -}}
+{{- if or $auto (and $pt (eq $pt $dt)) -}}
   {{- $isURL = true -}}
 {{- end -}}
 {{- /* Dangerous schemes (javascript:, …) are left to html/template, which neutralises them. */ -}}
-<a href="{{ if $safe }}{{ $href | safeURL }}{{ else }}{{ $href }}{{ end }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $isURL }} class="url"{{ end }}>{{ .Text }}</a>
+<a href="{{ if $safe }}{{ $href | safeURL }}{{ else }}{{ $href }}{{ end }}"{{ with $title }} title="{{ . }}"{{ end }}{{ if $isURL }} class="url"{{ end }}>{{ if $auto }}{{ $raw }}{{ else }}{{ .Text }}{{ end }}</a>{{ with $titleMark }}{{ . | safeHTML }}{{ end }}
 {{- end -}}
 {{- /* no trailing newline */ -}}

@@ -57,6 +57,11 @@
       {{- $src = printf "%s%s" $src (replace . "<" "&lt;") -}}
     {{- end -}}
   {{- end -}}
+  {{- /* A title is one line of inline text, but RenderString parses it as
+         a Markdown document: tufte/block-escape.html joins its lines and
+         backslash-escapes a leading block marker ("1. ", "- ", "> ", "# ",
+         "***", "```", "[x]: y"), so it stays a paragraph. */ -}}
+  {{- $src = partial "tufte/block-escape.html" $src -}}
   {{- $out = $p.RenderString $src | string | strings.TrimSpace -}}
   {{- if not $heading -}}
     {{- $out = replaceRE `</?a\b[^>]*>` "" $out -}}

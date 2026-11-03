@@ -30,6 +30,13 @@
 
   The source is resolved as a page resource, then an assets/ resource,
   then a plain URL (paths starting with "/" are static/ paths).
+
+  The alt text is plain text: Markdown in it is dropped, math kept as its
+  TeX source ($x^2$). A shortcode, a nest token or a footnote reference
+  [^x] in it cannot be written into the attribute (a shortcode is still
+  Hugo's placeholder here, and its HTML would land inside alt="…"): the
+  alt is deferred (tufte/attr-marks.html), and its notes, citations and
+  footnotes follow the img once the shortcodes have run.
 */ -}}
 {{- $attrs := dict -}}
 {{- $classes := slice -}}
@@ -51,6 +58,22 @@
     {{- $attrs = merge $attrs (dict $k $v) -}}
   {{- end -}}
 {{- end -}}
+{{- /* Alt text (see above). */ -}}
+{{- $alt := .PlainText -}}
+{{- $altText := string .Text -}}
+{{- $altKey := "" -}}
+{{- $tokRE := `HAHAHUGOSHORTCODE|TUFTENEST[0-9a-f]{16}END` -}}
+{{- if or (strings.Contains $altText "<") (findRE $tokRE $altText 1) -}}
+  {{- $defer := or (findRE $tokRE $altText 1) (strings.Contains $altText "footnote-ref") -}}
+  {{- if not $defer -}}
+    {{- $tip := partial "tufte/img-tip.html" $altText -}}
+    {{- if $tip.notes }}{{ $defer = true }}{{ else }}{{ $alt = htmlUnescape $tip.title }}{{ end -}}
+  {{- end -}}
+  {{- if $defer -}}
+    {{- $altKey = substr (md5 (printf "%s|%d|%s|%s" .Page.RelPermalink .Ordinal .Destination $altText)) 0 12 -}}
+    {{- $alt = printf "TUFTEATTR%sEND" $altKey -}}
+  {{- end -}}
+{{- end -}}
 {{- if .IsBlock -}}
   {{- $type := "main" -}}
   {{- $rest := slice -}}
@@ -67,7 +90,7 @@
     "Page" .Page
     "ResPage" .PageInner
     "Src" .Destination
-    "Alt" .PlainText
+    "Alt" $alt
     "Caption" .Title
     "Type" $type
     "Width" $width
@@ -81,10 +104,38 @@
     "Offset" (index $latex "offset" | default "")
     "Cite" (index $latex "cite" | default "")
   ) -}}
+  {{- with $altKey -}}
+    {{- $out = printf `%s<i class="tufte-attr" data-key="%s" data-at="img"%s hidden></i>%s<i class="tufte-attr-end" hidden></i>` $out . (cond (eq $type "margin") ` data-in="note"` "") $altText -}}
+  {{- end -}}
   {{- $out | safeHTML -}}
 {{- else -}}
-  {{- with .Title -}}
-    {{- $attrs = merge $attrs (dict "title" .) -}}
+  {{- /* A shortcode in the title is still Hugo's placeholder here, which
+         Hugo would replace with the shortcode's HTML inside the attribute:
+         the title is marked after the img instead, and
+         func/content-raw.html makes it the tooltip once the shortcode has
+         run (its notes and citations follow the img: tufte/img-tips.html).
+         Inside a theme shortcode's inner text a nested shortcode is a nest
+         token instead, which tufte/render-inner.html would swap for the
+         shortcode's HTML inside the attribute: the same marks, with the
+         token kept as TUFTENESTTIP…END, which render-inner swaps and
+         resolves once the HTML is known (or the subfigures shortcode
+         renders as a subcaption, Markdown and all). */ -}}
+  {{- $tip := "" -}}
+  {{- /* The title as written, with its backslash escapes and entities
+         resolved like Goldmark would (tufte/md-title.html); a block
+         image's title is a caption, rendered as Markdown instead, and so
+         is the title of an image in the subfigures shortcode (it becomes a
+         subcaption): that shortcode sets tufteRawImgTitles around its
+         rendering of the images, which keeps the title as written. */ -}}
+  {{- $title := .Title -}}
+  {{- if not (.Page.Store.Get "tufteRawImgTitles") }}{{ $title = partial "tufte/md-title.html" .Title }}{{ end -}}
+  {{- with $title -}}
+    {{- if or (strings.Contains . "HAHAHUGOSHORTCODE") (findRE `TUFTENEST[0-9a-f]{16}END` . 1) -}}
+      {{- $t := htmlEscape . | replaceRE `TUFTENEST([0-9a-f]{16}END)` "TUFTENESTTIP$1" -}}
+      {{- $tip = printf `<i class="tufte-tip" hidden></i>%s<i class="tufte-tip-end" hidden></i>` $t -}}
+    {{- else -}}
+      {{- $attrs = merge $attrs (dict "title" .) -}}
+    {{- end -}}
   {{- end -}}
   {{- /* An id on an inline image stays on the img. */ -}}
   {{- with index $latex "id" -}}
@@ -94,12 +145,15 @@
     "Page" .Page
     "ResPage" .PageInner
     "Src" .Destination
-    "Alt" .PlainText
+    "Alt" $alt
     "Type" "inline"
     "Width" $width
     "Height" $height
     "Class" (delimit $classes " ")
     "Attrs" $attrs
   ) -}}
-  {{- $out | safeHTML -}}
+  {{- with $altKey -}}
+    {{- $tip = printf `%s<i class="tufte-attr" data-key="%s" data-at="img" hidden></i>%s<i class="tufte-attr-end" hidden></i>` $tip . $altText -}}
+  {{- end -}}
+  {{- printf "%s%s" $out $tip | safeHTML -}}
 {{- end -}}

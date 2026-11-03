@@ -32,7 +32,7 @@ The Tufte-LaTeX classes will emit an error if you try to use
 {{< newthought >}}In his later books{{< /newthought >}},{{< cite "tufte2006" >}} Tufte
 starts each section with a bit of vertical space, a non-indented paragraph,
 and sets the first few words of the sentence in {{< sc >}}small caps{{< /sc >}}. To
-accomplish this using this style, use the `newthought` shortcode:{{< index "newthought command@`newthought` command" >}}{{< label "cmd:newthought" >}}
+accomplish this using this style, use the `newthought` shortcode:{{< index "newthought command@`\newthought`" >}}{{< label "cmd:newthought" >}}
 
 ```text
 {{</* newthought */>}}In his later books{{</* /newthought */>}}, Tufte starts…
@@ -42,7 +42,7 @@ accomplish this using this style, use the `newthought` shortcode:{{< index "newt
 
 One of the most prominent and distinctive features of this style is the
 extensive use of sidenotes. There is a wide margin to provide ample room
-for sidenotes and small figures. Any footnotes{{< index "footnote command@`footnote` command" >}} will automatically
+for sidenotes and small figures. Any footnotes{{< index "footnote command@`\footnote`" >}} will automatically
 be converted to sidenotes.[^footnote] If you'd like to place ancillary
 information in the margin without the sidenote mark (the superscript
 number), you can use the `marginnote` shortcode.{{< marginnote >}}This is a
@@ -51,7 +51,7 @@ there is no number in the main text where this note was written.{{< /marginnote 
 
 [^footnote]: This is a sidenote that was entered using a Markdown footnote, the equivalent of the `\footnote` command.
 
-The specification of the `sidenote` shortcode{{< index "sidenote command@`sidenote` command" >}}{{< label "cmd:sidenote" >}} is:
+The specification of the `sidenote` shortcode{{< index "sidenote command@`\sidenote`" >}}{{< label "cmd:sidenote" >}} is:
 
 ```text
 {{</* sidenote number="number" offset="offset" */>}}Sidenote text.{{</* /sidenote */>}}
@@ -92,7 +92,7 @@ completely omit the *offset* argument:
 {{</* sidenote number="number" */>}}Sidenote text.{{</* /sidenote */>}}
 ```
 
-The `marginnote` shortcode{{< index "marginnote command@`marginnote` command" >}} has a similar *offset* argument:
+The `marginnote` shortcode{{< index "marginnote command@`\marginnote`" >}} has a similar *offset* argument:
 
 ```text
 {{</* marginnote offset="offset" */>}}Margin note text.{{</* /marginnote */>}}
@@ -102,13 +102,13 @@ The `marginnote` shortcode{{< index "marginnote command@`marginnote` command" >}
 
 References are placed alongside their citations as sidenotes,
 as well. This can be accomplished using the `cite`
-shortcode.{{< index "cite command@`cite` command" >}}{{< sidenote >}}The first paragraph of this document includes a citation.{{< /sidenote >}}
+shortcode.{{< index "cite command@`\cite`" >}}{{< sidenote >}}The first paragraph of this document includes a citation.{{< /sidenote >}}
 
 The complete list of references may also be printed automatically by using
-the `bibliography` shortcode.{{< index "bibliography command@`bibliography` command" >}} (See the end of this document for an
+the `bibliography` shortcode.{{< index "bibliography command@`\bibliography`" >}} (See the end of this document for an
 example.) If you do not want to print a bibliography at the end of your
 document, set `tufte.bibliography.list = false`, the equivalent of the
-`\nobibliography` command.{{< index "nobibliography command@`nobibliography` command" >}}
+`\nobibliography` command.{{< index "nobibliography command@`\nobibliography`" >}}
 
 To enter multiple citations at one location,{{< cite keys="tufte2006,tufte1990" offset="-3bl" >}} you can
 provide a list of keys separated by commas and the same optional vertical
@@ -160,7 +160,7 @@ and figure&nbsp;{{< xref "fig:textfig" >}} is an example of the normal
 {{< fig src="/images/latex/hilbertcurves.svg" alt="Hilbert curves of degrees 1 to 5" label="fig:textfig" short="Hilbert curves of various degrees $n$." offset="6pt" >}}Hilbert curves of various degrees $n$. *Notice that this figure only takes up the main textblock width.*{{< /fig >}}
 
 As with sidenotes and marginnotes, a caption may sometimes require vertical
-adjustment. The caption{{< index "caption command@`caption` command" >}} now takes a second optional
+adjustment. The caption{{< index "caption command@`\caption`" >}} now takes a second optional
 argument that enables you to do this by providing a dimension *offset*.
 You may specify the caption in any one of the following forms:
 
@@ -208,7 +208,7 @@ figures, tables, etc.), LaTeX may run out of “slots” to keep track of them
 and will generate the above error.
 
 LaTeX initially allocates 18 slots for storing floats. To work around this
-limitation, the Tufte-LaTeX document classes provide a `\morefloats`{{< index "morefloats command@`morefloats` command" >}} command
+limitation, the Tufte-LaTeX document classes provide a `\morefloats`{{< index "morefloats command@`\morefloats`" >}} command
 that will reserve more slots.
 
 The first time `\morefloats` is called, it allocates an additional 34
@@ -223,13 +223,13 @@ If, after using the `\morefloats` command twice, you continue to get the
 `Too many unprocessed floats` error, there are a couple things you can
 do.
 
-The `\FloatBarrier`{{< index "FloatBarrier command@`FloatBarrier` command" >}} command will immediately process all the floats
+The `\FloatBarrier`{{< index "FloatBarrier command@`\FloatBarrier`" >}} command will immediately process all the floats
 before typesetting more material. Since `\FloatBarrier` will start a new
 paragraph, you should place this command at the beginning or end of a
 paragraph. Its web counterpart is the `clearmargin` shortcode, which pushes
 what follows below everything already in the margin.
 
-The `\clearpage`{{< index "clearpage command@`clearpage` command" >}} command will also process the floats before
+The `\clearpage`{{< index "clearpage command@`\clearpage`" >}} command will also process the floats before
 continuing, but instead of starting a new paragraph, it will start a new page.
 The `clearpage` shortcode starts a new page when printing.
 
@@ -250,7 +250,7 @@ override the caption position.
 #### Vertical alignment
 
 To override the vertical alignment, use the
-`\setfloatalignment`{{< index "setfloatalignment command@`setfloatalignment` command" >}} command inside the float environment, or the `captionpos`
+`\setfloatalignment`{{< index "setfloatalignment command@`\setfloatalignment`" >}} command inside the float environment, or the `captionpos`
 parameter of the figure shortcodes. For example:
 
 {{< fullwidth >}}
@@ -282,7 +282,7 @@ captions, or `t` for top-aligned captions (`captionpos="bottom"` or `"top"`).
 #### Horizontal alignment {#par:overriding-horizontal}
 
 To override the horizontal alignment, use either the `\forceversofloat`
-or the `\forcerectofloat`{{< index "forcerectofloat command@`forcerectofloat` command" >}} command inside of the float environment. For
+or the `\forcerectofloat`{{< index "forcerectofloat command@`\forcerectofloat`" >}} command inside of the float environment. For
 example:
 
 {{< fullwidth >}}
@@ -296,7 +296,7 @@ example:
 ```
 {{< /fullwidth >}}
 
-The `\forceversofloat`{{< index "forceversofloat command@`forceversofloat` command" >}} command causes the algorithm to assume the
+The `\forceversofloat`{{< index "forceversofloat command@`\forceversofloat`" >}} command causes the algorithm to assume the
 float has been placed on a verso page—that is, a page on the left side of a
 two-page spread. Conversely, the `\forcerectofloat` command causes
 the algorithm to assume the float has been placed on a recto page—that is, a
@@ -335,13 +335,13 @@ existing commands for letterspacing.
 
 When setting strings of {{< allcaps >}}ALL CAPS{{< /allcaps >}} or {{< smallcaps >}}small caps{{< /smallcaps >}}, the
 letter­spacing—that is, the spacing between the letters—should be
-increased slightly.{{< cite "bringhurst2005" >}} The `allcaps` shortcode{{< index "allcaps command@`allcaps` command" >}} has proper letterspacing for
-strings of {{< allcaps >}}FULL CAPITAL LETTERS{{< /allcaps >}}, and the `smallcaps` shortcode{{< index "smallcaps command@`smallcaps` command" >}}
+increased slightly.{{< cite "bringhurst2005" >}} The `allcaps` shortcode{{< index "allcaps command@`\allcaps`" >}} has proper letterspacing for
+strings of {{< allcaps >}}FULL CAPITAL LETTERS{{< /allcaps >}}, and the `smallcaps` shortcode{{< index "smallcaps command@`\smallcaps`" >}}
 has letterspacing for {{< smallcaps >}}small capital letters{{< /smallcaps >}}. These commands
 will also automatically convert the case of the text to upper- or
 lowercase, respectively.
 
-The `sc` shortcode (LaTeX's redefined `\textsc`{{< index "textsc command@`textsc` command" >}}) also includes
+The `sc` shortcode (LaTeX's redefined `\textsc`{{< index "textsc command@`\textsc`" >}}) also includes
 letterspacing. The case of its argument is left as is,
 however. This allows one to use both uppercase and lowercase letters:
 {{< sc >}}The Initial Letters Of The Words In This Sentence Are Capitalized.{{< /sc >}}
@@ -355,62 +355,62 @@ options. There are a few options that are specific to the
 `[params.tufte]` (or of the `tufte:` front matter); the table at the end
 of this section lists them.
 
-The `a4paper`{{< index "class options!a4paper@`a4paper`" >}} option will set the paper size to {{< smallcaps >}}A4{{< /smallcaps >}} instead of
+The `a4paper`{{< index "a4paper class option@`a4paper` class option" >}}{{< index "class options!a4paper@`a4paper`" >}} option will set the paper size to {{< smallcaps >}}A4{{< /smallcaps >}} instead of
 the default {{< smallcaps >}}US{{< /smallcaps >}} letter size.
 
-The `sfsidenotes`{{< index "class options!sfsidenotes@`sfsidenotes`" >}} option will set the sidenotes and title block in a
+The `sfsidenotes`{{< index "sfsidenotes class option@`sfsidenotes` class option" >}}{{< index "class options!sfsidenotes@`sfsidenotes`" >}} option will set the sidenotes and title block in a
 {{< sans >}}sans serif{{< /sans >}} typeface instead of the default roman.
 
-The `twoside`{{< index "class options!twoside@`twoside`" >}} option will modify the running heads so that the page
+The `twoside`{{< index "twoside class option@`twoside` class option" >}}{{< index "class options!twoside@`twoside`" >}} option will modify the running heads so that the page
 number is printed on the outside edge (as opposed to always printing the page
-number on the right-side edge in `oneside`{{< index "class options!oneside@`oneside`" >}} mode).
+number on the right-side edge in `oneside`{{< index "oneside class option@`oneside` class option" >}}{{< index "class options!oneside@`oneside`" >}} mode).
 
-The `symmetric`{{< index "class options!symmetric@`symmetric`" >}}{{< label "clsopt:symmetric" >}} option typesets the sidenotes on the outside edge of
+The `symmetric`{{< index "symmetric class option@`symmetric` class option" >}}{{< index "class options!symmetric@`symmetric`" >}}{{< label "clsopt:symmetric" >}} option typesets the sidenotes on the outside edge of
 the page. This is how books are traditionally printed, but is contrary to
 Tufte's book design which sets the sidenotes on the right side of the page.
 This option implicitly sets the `twoside` option.
 
-The `justified`{{< index "class options!justified@`justified`" >}} option sets all the text fully justified (flush left
+The `justified`{{< index "justified class option@`justified` class option" >}}{{< index "class options!justified@`justified`" >}} option sets all the text fully justified (flush left
 and right). The default is to set the text ragged right.
 The body text of Tufte's books are set ragged right. This prevents
 needless hyphenation and makes it easier to read the text in the slightly
 narrower column.
 
-The `bidi`{{< index "class options!bidi@`bidi`" >}} option loads the `bidi` package which is used with
-XeLaTeX to typeset bi-directional text. Since the `bidi`
+The `bidi`{{< index "bidi class option@`bidi` class option" >}}{{< index "class options!bidi@`bidi`" >}} option loads the `bidi`{{< index "bidi package@`bidi` package" >}}{{< index "packages!bidi@`bidi`" >}} package which is used with
+XeLaTeX{{< index "XeLaTeX" >}} to typeset bi-directional text. Since the `bidi`
 package needs to be loaded before the sidenotes and cite commands are defined,
 it can't be loaded in the document preamble.
 
-The `debug`{{< index "class options!debug@`debug`" >}} option causes the Tufte-LaTeX classes to output debug
+The `debug`{{< index "debug class option@`debug` class option" >}}{{< index "class options!debug@`debug`" >}} option causes the Tufte-LaTeX classes to output debug
 information to the log file which is useful in troubleshooting bugs. It will
 also cause the graphics to be replaced by outlines.
 
-The `nofonts`{{< index "class options!nofonts@`nofonts`" >}} option prevents the Tufte-LaTeX classes from
+The `nofonts`{{< index "nofonts class option@`nofonts` class option" >}}{{< index "class options!nofonts@`nofonts`" >}} option prevents the Tufte-LaTeX classes from
 automatically loading the Palatino and Helvetica typefaces. You should use
-this option if you wish to load your own fonts. If you're using XeLaTeX, this
+this option if you wish to load your own fonts. If you're using XeLaTeX{{< index "XeLaTeX" >}}, this
 option is implied (i.e., the Palatino and Helvetica fonts aren't loaded if you
 use XeLaTeX).
 
-The `nols`{{< index "class options!nols@`nols`" >}} option inhibits the letterspacing code. The Tufte-LaTeX
+The `nols`{{< index "nols class option@`nols` class option" >}}{{< index "class options!nols@`nols`" >}} option inhibits the letterspacing code. The Tufte-LaTeX
 classes try to load the appropriate letterspacing package (either pdfTeX's
-`letterspace` package or the `soul` package). If you're using
-XeLaTeX with `fontenc`, however, you should configure your own
+`letterspace`{{< index "letterspace package@`letterspace` package" >}}{{< index "packages!letterspace@`letterspace`" >}} package or the `soul`{{< index "soul package@`soul` package" >}}{{< index "packages!soul@`soul`" >}} package). If you're using
+XeLaTeX{{< index "XeLaTeX" >}} with `fontenc`{{< index "fontenc package@`fontenc` package" >}}{{< index "packages!fontenc@`fontenc`" >}}, however, you should configure your own
 letterspacing.
 
-The `notitlepage`{{< index "class options!notitlepage@`notitlepage`" >}} option causes `\maketitle` to generate a title
+The `notitlepage`{{< index "notitlepage class option@`notitlepage` class option" >}}{{< index "class options!notitlepage@`notitlepage`" >}} option causes `\maketitle`{{< index "maketitle command@`\maketitle`" >}} to generate a title
 block instead of a title page. The `book` class defaults to a title
 page and the `handout` class defaults to the title block. There is an
-analogous `titlepage`{{< index "class options!titlepage@`titlepage`" >}} option that forces `\maketitle` to
+analogous `titlepage`{{< index "titlepage class option@`titlepage` class option" >}}{{< index "class options!titlepage@`titlepage`" >}} option that forces `\maketitle` to
 generate a full title page instead of the title block.
 
-The `notoc`{{< index "class options!notoc@`notoc`" >}} option suppresses Tufte-LaTeX's custom table of contents
+The `notoc`{{< index "notoc class option@`notoc` class option" >}}{{< index "class options!notoc@`notoc`" >}} option suppresses Tufte-LaTeX's custom table of contents
 ({{< sc >}}toc{{< /sc >}}) design. The current {{< sc >}}toc{{< /sc >}} design only shows unnumbered
 chapter titles; it doesn't show sections or subsections. The `notoc`
 option will revert to LaTeX's {{< sc >}}toc{{< /sc >}} design.
 
-The `nohyper`{{< index "class options!nohyper@`nohyper`" >}} option prevents the `hyperref` package from
+The `nohyper`{{< index "nohyper class option@`nohyper` class option" >}}{{< index "class options!nohyper@`nohyper`" >}} option prevents the `hyperref`{{< index "hyperref package@`hyperref` package" >}}{{< index "packages!hyperref@`hyperref`" >}} package from
 being loaded. The default is to load the `hyperref` package and use the
-`\title` and `\author` contents as metadata for the generated
+`\title`{{< index "title command@`\title`" >}} and `\author`{{< index "author command@`\author`" >}} contents as metadata for the generated
 {{< sc >}}pdf{{< /sc >}}.{{< index "class options|)" >}}
 
 {{< table label="tab:class-options" numbered="false" caption="Class options and their counterparts in this theme (not in `sample-book.tex`, so it has no number)." short="Class options in tufte.hugo." >}}
@@ -418,7 +418,7 @@ being loaded. The default is to load the `hyperref` package and use the
 |:--------------------------|:-------------------------------------------------------------------|
 | `a4paper`, `b5paper`      | `print.paper = "a4"` or `"b5"` (default `"letter"`)                |
 | `sfsidenotes`             | `sfsidenotes = true`                                               |
-| `twoside`, `oneside`      | `print.runningHeads = true`: a book alternates book and chapter titles; a handout prints its title and the page number on every page |
+| `twoside`, `oneside`      | `print.runningHeads = true`: a book alternates book and chapter titles; a handout prints its title and the page number at the top right of every page but the first (as `oneside`) |
 | `symmetric`               | not available: a screen has no spreads                             |
 | `justified`               | `justified = true`; `marginals`, `sidenote.align`…                 |
 | `bidi`                    | the site language's `direction`                                    |
@@ -426,6 +426,6 @@ being loaded. The default is to load the `hyperref` package and use the
 | `nofonts`                 | `etBook = false` (a base parameter)                                |
 | `nols`                    | `letterspacing = false`                                            |
 | `notitlepage`, `titlepage`| `book.titlepage` (default `true`) in a book; a handout has no full title page: `titleBlock = "latex"` gives the `notitlepage` title block |
-| `notoc`                   | `book.toc = false`                                                 |
+| `notoc`                   | no direct counterpart: the contents keep the theme's design; `book.tocDepth = 1` also lists the sections, the closest to LaTeX's standard {{< sc >}}toc{{< /sc >}} (`book.toc = false` leaves the contents out, like omitting `\tableofcontents`) |
 | `nohyper`                 | not needed: links are native in HTML                               |
 {{< /table >}}

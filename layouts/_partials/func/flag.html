@@ -1,0 +1,22 @@
+{{- /*
+  A boolean setting of the site or of a page (etBook, showReadingTime,
+  toc, …), also when it comes as a string: a HUGO_PARAMS_* environment
+  variable for a key that the site's own config does not set reaches the
+  templates as the string "false" or "true", which is neither the bool
+  false nor falsy.
+
+  nil and "" give the default; anything else goes through
+  tufte/truthy.html (true, "true", "yes", "1", "on" and 1 are true; false,
+  "false", "no", "0", "off" and 0 are false).
+
+  Takes: a dict with
+    value    the setting (site.Params.X, .Param "X", …)
+    default  the value when the setting is absent (bool)
+  Returns: bool.
+*/ -}}
+{{- $v := .value -}}
+{{- $r := eq .default true -}}
+{{- if and (ne $v nil) (ne (printf "%v" $v) "") -}}
+  {{- $r = partial "tufte/truthy.html" $v -}}
+{{- end -}}
+{{- return $r -}}

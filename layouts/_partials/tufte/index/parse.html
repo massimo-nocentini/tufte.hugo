@@ -15,11 +15,14 @@
     seealso  string
     range    "open" | "close" | ""
     fmt      the encap word when it is none of the above ("" if none)
-  Quoting with " (makeindex's quote character) is not supported. Levels
-  beyond the third are folded into the third, joined by ", " (makeindex
-  allows three; the index shortcode warns).
+  makeindex's quote character works: "! "@ "| "" are a literal ! @ | "
+  (tufte/index/quote.html), \" stays as written. Levels beyond the third
+  are folded into the third, joined by ", " (makeindex allows three; the
+  index shortcode warns).
 */ -}}
 {{- $raw := trim (printf "%v" .) " \t\n" -}}
+{{- $quoted := strings.Contains $raw `"` -}}
+{{- if $quoted }}{{ $raw = partial "tufte/index/quote.html" $raw }}{{ end -}}
 {{- $main := $raw -}}
 {{- $encap := "" -}}
 {{- with findRESubmatch `(?s)^([^|]*)\|(.*)$` $raw 1 -}}
@@ -58,6 +61,15 @@
   {{- end -}}
   {{- if not $display }}{{ $display = $sort }}{{ end -}}
   {{- if not $sort }}{{ $sort = $display }}{{ end -}}
+  {{- if $quoted -}}
+    {{- $sort = $sort | replaceRE "\ue000" "!" | replaceRE "\ue001" "@" | replaceRE "\ue002" "|" | replaceRE "\ue003" `"` | replaceRE "\ue004" `\"` -}}
+    {{- $display = $display | replaceRE "\ue000" "!" | replaceRE "\ue001" "@" | replaceRE "\ue002" "|" | replaceRE "\ue003" `"` | replaceRE "\ue004" `\"` -}}
+  {{- end -}}
   {{- $levels = $levels | append (dict "sort" (lower (replaceRE `\s+` " " $sort)) "display" $display) -}}
+{{- end -}}
+{{- if $quoted -}}
+  {{- $see = $see | replaceRE "\ue000" "!" | replaceRE "\ue001" "@" | replaceRE "\ue002" "|" | replaceRE "\ue003" `"` | replaceRE "\ue004" `\"` -}}
+  {{- $seealso = $seealso | replaceRE "\ue000" "!" | replaceRE "\ue001" "@" | replaceRE "\ue002" "|" | replaceRE "\ue003" `"` | replaceRE "\ue004" `\"` -}}
+  {{- $fmt = $fmt | replaceRE "\ue000" "!" | replaceRE "\ue001" "@" | replaceRE "\ue002" "|" | replaceRE "\ue003" `"` | replaceRE "\ue004" `\"` -}}
 {{- end -}}
 {{- return (dict "levels" $levels "see" $see "seealso" $seealso "range" $range "fmt" $fmt) -}}

@@ -1,6 +1,5 @@
 ---
 title: "An Example of the Usage of the Tufte-Handout Style"
-linkTitle: "A Tufte-Handout Example"
 thanks: "Inspired by Edward R. Tufte!"
 author: "The Tufte-LaTeX Developers"
 date: 2026-10-20

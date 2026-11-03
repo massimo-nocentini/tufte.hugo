@@ -1,0 +1,95 @@
+{{- /*
+  Markdown footnote labels in the order Goldmark numbers them (pure).
+
+  Goldmark (extension/footnote.go) numbers a footnote at its first
+  reference while it parses inlines in tree order, and its footnote list
+  (every definition, in definition order) sits in the tree at the place
+  of the FIRST definition. So the order is: the references in the text
+  before the first definition, then those inside the definitions (in
+  definition order, also inside definitions that are never referenced),
+  then those in the text after the first definition. A label is any text
+  up to "]" on one line (spaces included) and matches its definition by
+  exact text; a definition may sit in a blockquote ("> [^q]: …") or a
+  list item (indented).
+
+  A definition's extent: its line, then lazy continuation lines (up to a
+  blank line, a heading or the next definition), then, after blank lines,
+  lines indented 4 columns more than the definition (in the same or a
+  deeper blockquote). An approximation of Goldmark's blocks: callers check
+  the result against the rendered notes (func/footnotes.html).
+
+  Takes: the Markdown, with code, comments and the text Goldmark does not
+  parse as Markdown already removed by the caller (code spans included).
+  Returns: dict
+    labels  slice: the defined labels referenced, by Goldmark number - 1
+    defs    slice: the labels of the definitions, in source order
+  Callers: func/footnotes.html, tufte/render-inner.html
+*/ -}}
+{{- $md := replace (string .) "\r" "" -}}
+{{- $defRE := `^[ \t]*\[\^([^\]\n]+)\]:(.*)$` -}}
+{{- $pre := slice -}}
+{{- $post := slice -}}
+{{- $bodies := slice -}}
+{{- $defs := slice -}}
+{{- $cur := "" -}}
+{{- $in := false -}}
+{{- $seen := false -}}
+{{- $dq := 0 -}}
+{{- $dind := 0 -}}
+{{- $prevBlank := false -}}
+{{- range $line := split $md "\n" -}}
+  {{- $prefix := replaceRE `^((?:[ ]{0,3}>[ ]?)*).*$` "$1" $line -}}
+  {{- $q := len (findRE `>` $prefix) -}}
+  {{- $rest := strings.TrimPrefix $prefix $line -}}
+  {{- $ind := len (replace (replaceRE `^([ \t]*).*$` "$1" $rest) "\t" "    ") -}}
+  {{- $blank := not (strings.TrimSpace $rest) -}}
+  {{- $label := "" -}}
+  {{- $after := "" -}}
+  {{- with findRESubmatch $defRE $rest 1 -}}
+    {{- if strings.TrimSpace (index (index . 0) 1) -}}
+      {{- $label = index (index . 0) 1 -}}
+      {{- $after = index (index . 0) 2 -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $done := false -}}
+  {{- if $label -}}
+    {{- if $in }}{{ $bodies = $bodies | append $cur }}{{ end -}}
+    {{- $in = true -}}
+    {{- $seen = true -}}
+    {{- $cur = $after -}}
+    {{- $dq = $q -}}
+    {{- $dind = $ind -}}
+    {{- $defs = $defs | append $label -}}
+    {{- $done = true -}}
+  {{- else if $in -}}
+    {{- $belongs := true -}}
+    {{- if not $blank -}}
+      {{- if $prevBlank -}}
+        {{- $belongs = and (ge $q $dq) (ge $ind (add $dind 4)) -}}
+      {{- else if findRE `^[ \t]{0,3}#{1,6}(?:[ \t]|$)` $rest 1 -}}
+        {{- $belongs = false -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if $belongs -}}
+      {{- $cur = printf "%s\n%s" $cur $rest -}}
+      {{- $done = true -}}
+    {{- else -}}
+      {{- $bodies = $bodies | append $cur -}}
+      {{- $in = false -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $done -}}
+    {{- if $seen }}{{ $post = $post | append $line }}{{ else }}{{ $pre = $pre | append $line }}{{ end -}}
+  {{- end -}}
+  {{- $prevBlank = $blank -}}
+{{- end -}}
+{{- if $in }}{{ $bodies = $bodies | append $cur }}{{ end -}}
+{{- $scan := printf "%s\n%s\n%s" (delimit $pre "\n") (delimit $bodies "\n") (delimit $post "\n") -}}
+{{- $labels := slice -}}
+{{- range findRESubmatch `\[\^([^\]\n]+)\]` $scan -}}
+  {{- $l := index . 1 -}}
+  {{- if and (in $defs $l) (not (in $labels $l)) -}}
+    {{- $labels = $labels | append $l -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "labels" $labels "defs" $defs) -}}

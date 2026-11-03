@@ -4,13 +4,13 @@
 
   Front matter `author`: a string, a list of strings, or a list of
   {name, thanks} maps; else params.author.name. Names are joined
-  "A", "A and B", "A, B and C" (i18n "and").
+  "A", "A and B", "A, B and C" (partial "func/t.html" "and").
 
   Takes: a dict with
     page   the page
     notes  optional bool: true writes each author's `thanks` as a numbered
-           sidenote right after the name (ids from func/note-id.html; call
-           it once per rendered title block, never for summaries)
+           sidenote right after the name (tufte/title-notes.html: rendered
+           and processed with the content, so shortcodes in it work)
   Returns: a dict
     html   the joined names, HTML-escaped, with the sidenotes when asked
     plain  the names joined with ", " (for <meta name="author">)
@@ -28,16 +28,16 @@
 {{- $names := slice -}}
 {{- $plain := slice -}}
 {{- $count := 0 -}}
-{{- range $authors -}}
+{{- range $i, $a := $authors -}}
   {{- $name := "" }}{{ $note := "" -}}
   {{- if reflect.IsMap . -}}
     {{- $name = printf "%v" (.name | default "") -}}
-    {{- with .thanks -}}
+    {{- if and $name .thanks -}}
       {{- $count = add $count 1 -}}
       {{- if $withNotes -}}
-        {{- $id := partial "func/note-id.html" $p -}}
-        {{- $text := $p.RenderString (printf "%v" .) | string | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" -}}
-        {{- $note = printf `<label for="sn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote">%s</span>` $id $id $text -}}
+        {{- /* Rendered and processed with the content
+               (tufte/title-notes.html, slot "a<index>"). */ -}}
+        {{- $note = index (partialCached "tufte/title-notes.html" (dict "page" $p) (or $p.RelPermalink $p.Path) "get") (printf "a%d" $i) | default "" -}}
       {{- end -}}
     {{- end -}}
   {{- else -}}
@@ -54,7 +54,7 @@
   {{- if eq $i 0 -}}
     {{- $html = $a -}}
   {{- else if eq $i (sub $n 1) -}}
-    {{- $html = printf "%s %s %s" $html (T "and") $a -}}
+    {{- $html = printf "%s %s %s" $html (partial "func/t.html" "and") $a -}}
   {{- else -}}
     {{- $html = printf "%s, %s" $html $a -}}
   {{- end -}}

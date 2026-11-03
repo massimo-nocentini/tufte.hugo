@@ -41,7 +41,7 @@
     {{- /* i18n keys alertNote, alertTip, alertImportant, alertWarning,
            alertCaution; other alert types use their capitalised name. */ -}}
     {{- if in (slice "note" "tip" "important" "warning" "caution") $type -}}
-      {{- $title = i18n (printf "alert%s" (title $type)) -}}
+      {{- $title = partial "func/t.html" (printf "alert%s" (title $type)) -}}
     {{- end -}}
     {{- $title = $title | default (title $type) -}}
   {{- end -}}
@@ -50,15 +50,18 @@
 {{ .Text }}
 </blockquote>
 {{- else -}}
+  {{- /* author, cite and footer: inline Markdown, rendered like a
+         caption= parameter (a footnote [^x] becomes a real footnote). */ -}}
+  {{- $where := "blockquote attributes" -}}
   {{- $footer := "" -}}
   {{- with $footerRaw -}}
-    {{- $footer = $p.RenderString . | string -}}
+    {{- $footer = partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "shortcodes" "run" "where" $where) | string -}}
   {{- else -}}
     {{- with $author -}}
-      {{- $footer = $p.RenderString . | string -}}
+      {{- $footer = partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "shortcodes" "run" "where" $where) | string -}}
     {{- end -}}
     {{- with $cite -}}
-      {{- $c := printf "<cite>%s</cite>" ($p.RenderString .) -}}
+      {{- $c := printf "<cite>%s</cite>" (partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "shortcodes" "run" "where" $where) | string) -}}
       {{- if $footer -}}
         {{- $footer = printf "%s, %s" $footer $c -}}
       {{- else -}}

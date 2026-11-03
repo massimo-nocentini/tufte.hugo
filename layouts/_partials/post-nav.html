@@ -24,13 +24,13 @@
   {{- if $q.RelPermalink }}{{ $next = $q }}{{ break }}{{ end -}}
   {{- $q = $q.NextInSection -}}
 {{- end -}}
-{{- if and .Section (ne (.Param "showPostNav") false) (or $prev $next) }}
-<nav class="post-nav" aria-label="{{ T "previousPost" }} / {{ T "nextPost" }}">
+{{- if and .Section (partial "func/flag.html" (dict "value" (.Param "showPostNav") "default" true)) (or $prev $next) }}
+<nav class="post-nav" aria-label="{{ partial "func/t.html" "previousPost" }} / {{ partial "func/t.html" "nextPost" }}">
   {{- with $prev }}
-  <a class="prev" href="{{ .RelPermalink }}" rel="prev"><span class="sans">&larr;&nbsp;{{ T "previousPost" }}</span> {{ partial "tufte/plain-title.html" (dict "page" .) }}</a>
+  <a class="prev" href="{{ .RelPermalink }}" rel="prev"><span class="sans">&larr;&nbsp;{{ partial "func/t.html" "previousPost" }}</span> {{ partial "tufte/plain-title.html" (dict "page" .) }}</a>
   {{- end }}
   {{- with $next }}
-  <a class="next" href="{{ .RelPermalink }}" rel="next"><span class="sans">{{ T "nextPost" }}&nbsp;&rarr;</span> {{ partial "tufte/plain-title.html" (dict "page" .) }}</a>
+  <a class="next" href="{{ .RelPermalink }}" rel="next"><span class="sans">{{ partial "func/t.html" "nextPost" }}&nbsp;&rarr;</span> {{ partial "tufte/plain-title.html" (dict "page" .) }}</a>
   {{- end }}
 </nav>
 {{- end -}}

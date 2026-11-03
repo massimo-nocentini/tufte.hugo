@@ -19,7 +19,9 @@
   - real footnote references <sup class="footnote-ref">…</sup>;
   - nobib citations [<a class="citation-ref" …>n</a>, …] (they link to
     the bibliography);
-  - whitespace just before the first moved mark goes with it.
+  - whitespace just before the first moved mark goes with it;
+  - a margin figure moves with its <p class="margin-figure-anchor">
+    (a block: tufte/unnest-blocks.html then splits the paragraph).
   Any other <a> still nested in the link (an xref, a link in link text)
   is unlinked: it becomes a <span> with its class, so the page has no <a>
   inside an <a>.
@@ -83,6 +85,18 @@
                       {{- $piece = printf "%s%s" $piece . -}}
                       {{- $after = strings.TrimPrefix . $after -}}
                     {{- end -}}
+                  {{- end -}}
+                {{- end -}}
+                {{- /* A margin figure keeps its anchor paragraph: the whole
+                       <p class="margin-figure-anchor"> leaves the link
+                       (tufte/unnest-blocks.html then splits the paragraph
+                       around it), so no empty <p> stays inside the <a>. */ -}}
+                {{- with findRE `<p class="margin-figure-anchor[^"]*"[^>]*>$` $before 1 -}}
+                  {{- $pa := index . 0 -}}
+                  {{- if strings.HasPrefix $after "</p>" -}}
+                    {{- $piece = printf "%s%s</p>" $pa $piece -}}
+                    {{- $before = strings.TrimSuffix $pa $before -}}
+                    {{- $after = strings.TrimPrefix "</p>" $after -}}
                   {{- end -}}
                 {{- end -}}
                 {{- /* The space before the first mark leaves the link with it. */ -}}

@@ -10,7 +10,9 @@
     over harbor and city
     {{< /verse >}}
 
-  Each line is inline Markdown.
+  Each line is inline Markdown, and literal text: a line that starts like
+  a block ("- said she", "1914. The war", "* * *", "> ") keeps its marker
+  (tufte/render-inner.html, `literal`).
 
   Output: <div class="verse"><p><span class="verse-line">…</span>…</p>…</div>
 */ -}}
@@ -18,13 +20,15 @@
 {{- $where := printf "%s shortcode in %v" .Name .Position -}}
 {{- $text := replace (strings.TrimSpace .Inner) "\r\n" "\n" -}}
 {{- $stanzas := "" -}}
-{{- range split $text "\n\n" -}}
+{{- /* A blank line may hold spaces or tabs (an editor that keeps the
+       indentation): it still separates stanzas. */ -}}
+{{- range split (replaceRE `\n[ \t]*\n` "\n\n" $text) "\n\n" -}}
   {{- $st := strings.TrimSpace . -}}
   {{- if $st -}}
     {{- $lines := "" -}}
     {{- range split $st "\n" -}}
       {{- with strings.TrimSpace . -}}
-        {{- $l := partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "where" $where) | string -}}
+        {{- $l := partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "literal" true "where" $where) | string -}}
         {{- $lines = printf `%s<span class="verse-line">%s</span>` $lines $l -}}
       {{- end -}}
     {{- end -}}

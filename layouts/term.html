@@ -7,7 +7,7 @@
   <p class="subtitle">{{ . }}</p>
   {{- end }}
   {{- with .Parent }}
-  <p class="sans"><a href="{{ .RelPermalink }}">&larr;&nbsp;{{ .LinkTitle }}</a></p>
+  <p class="sans"><a href="{{ .RelPermalink }}">{{ cond (eq (partial "func/lang.html" site.Language).dir "rtl") "&rarr;" "&larr;" | safeHTML }}&nbsp;{{ if eq .Kind "taxonomy" }}{{ partial "tufte/page-title.html" . }}{{ else }}{{ .LinkTitle }}{{ end }}</a></p>
   {{- end }}
   {{ partial "tufte/abstract.html" . }}
   {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}

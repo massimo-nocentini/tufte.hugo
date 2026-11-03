@@ -7,8 +7,9 @@
   <article class="chapter" id="tufte-cN" style="page: cN"> whose ids are
   prefixed with tufte-cN- (the tufte- namespace: the landing's own ids
   keep their names and cannot collide with them) and whose links to other chapters are in-document
-  anchors (tufte/book/chapter-body.html). A print stylesheet adds the
-  named pages that carry the chapter running heads
+  anchors (tufte/book/chapter-body.html). Its stylesheet
+  (tufte/book/print-style.html, in <head> through tufte/head-style.html)
+  adds the named pages that carry the chapter running heads
   (tufte.print.runningHeads) and, with tufte.book.continuous = false, the
   per-chapter (and per-part) restart of the sidenote counter. With
   continuous numbering the counter runs from the landing (the title
@@ -24,8 +25,10 @@
   {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
 </article>
 {{- else -}}
-{{- $chapters := partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
 {{- $landing := partial "tufte/book/landing.html" $root | string -}}
+{{- /* id tufte-landing: the target of links to the book root
+       (tufte/book/print-targets.html). */ -}}
+{{- $landing = replace $landing `<article class="book-landing">` `<article class="book-landing" id="tufte-landing">` -}}
 {{- $landing = partial "tufte/book/print-links.html" (dict "html" $landing "page" $root "root" $root) }}
 {{ $landing | safeHTML }}
 {{- /* Chapters in reading order; a part page (\part) before the first
@@ -48,34 +51,12 @@
 {{- $body = replaceRE `href="#([^"])` (printf `href="#tufte-p%d-$1` $k) $body }}
 {{- $body = partial "tufte/book/print-links.html" (dict "html" $body "page" $part "root" $root) }}
 <article class="part" id="tufte-p{{ $k }}">
-  <header class="part-head">{{ with $num }}<p class="part-number">{{ T "part" }} {{ . }}</p>{{ end }}<h1 class="part-title">{{ partial "tufte/title-html.html" (dict "page" $part "title" $part.Title "heading" true) }}</h1></header>
+  <header class="part-head">{{ with $num }}<p class="part-number">{{ partial "func/t.html" "part" }} {{ . }}</p>{{ end }}<h1 class="part-title">{{ partial "tufte/title-html.html" (dict "page" $part "title" $part.Title "heading" true) }}</h1></header>
   {{ $body | safeHTML }}
 </article>
 {{- else }}
 {{ partial "tufte/book/chapter-body.html" (dict "page" .Page "root" $root "chapter" .Chapter "prefix" (printf "tufte-c%v" .Chapter.Index) "print" true) }}
 {{- end }}
 {{- end }}
-{{- $key := (or $root.RelPermalink $root.Path) -}}
-{{- $continuous := partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $root "key" "book.continuous") $key "book.continuous") -}}
-{{- $heads := partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $root "key" "print.runningheads") $key "print.runningheads") -}}
-{{- /* Running-head font and position: as in tufte/head-style.html
-       (\smallcapsspacing, none under nols; baseline \headsep = 28pt above
-       the text). */ -}}
-{{- $ls := "0.05em" -}}
-{{- if not (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $root "key" "letterspacing") $key "letterspacing")) }}{{ $ls = "normal" }}{{ end -}}
-{{- $box := printf "font-family:et-book,Palatino,\"Palatino Linotype\",Georgia,serif;font-size:8pt;font-style:normal;text-transform:uppercase;letter-spacing:%s;vertical-align:bottom;padding-bottom:28pt" $ls }}
-<style media="print">
-article.part{break-before:page;break-after:page}
-{{- if not $continuous }}
-article.chapter,article.part{counter-reset:sidenote-counter}
-{{- end }}
-{{- if $heads }}
-{{- range $chapters }}
-{{- $name := printf "c%v" .Index }}
-{{- /* \00200B: see tufte/head-style.html (html/template and CSS strings; six-digit escapes). */}}
-@page {{ $name | safeCSS }}:right{@top-right{content:"\00200B{{ partial "tufte/plain-title.html" (dict "page" .Page) }}\002003" counter(page);{{ $box | safeCSS }}}}
-{{- end }}
-{{- end }}
-</style>
 {{- end }}
 {{ end }}

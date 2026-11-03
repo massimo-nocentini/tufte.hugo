@@ -23,7 +23,7 @@
     root     the book root
     depth    optional: 0 chapters only, 1 chapters and sections
              (default: tufte.book.tocDepth of the root)
-    heading  optional: the h2 text (default i18n "contents"); "" = no h2
+    heading  optional: the h2 text (default partial "func/t.html" "contents"); "" = no h2
   Returns: template.HTML ("" when the book has neither chapters nor parts).
 */ -}}
 {{- $root := .root -}}
@@ -51,7 +51,7 @@
     {{- warnidf "tufte-bad-option" "tufte.hugo: %s must be a whole number (0 = chapters only, 1 = with sections), not %q, in the book %s; read as 0" $from $v $at -}}
   {{- end -}}
 {{- end -}}
-{{- $heading := T "contents" -}}
+{{- $heading := partial "func/t.html" "contents" -}}
 {{- if isset . "heading" }}{{ $heading = .heading | default "" }}{{ end -}}
 {{- $parts := partialCached "tufte/book/parts.html" $root (or $root.RelPermalink $root.Path) -}}
 {{- $chapters := partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
@@ -59,20 +59,19 @@
 {{- /* Parts without chapters are listed too (LaTeX writes the \part line
        to the contents whatever follows it), at the place their weight
        gives them among the chapters (same key as tufte/book/chapters.html). */ -}}
-{{- /* Titles that need RenderString: Markdown characters, and the
-       quotes, -- and ... that the typographer turns into curly quotes,
-       dashes and an ellipsis (as tufte/title-html.html does), so a title
-       reads the same here as in its h1 and in xref names. */ -}}
-{{- $mdRE := "[`*_~$\\\\\\['\"]|--|\\.\\.\\." -}}
+{{- /* Titles go through tufte/title-html.html (heading mode, links
+       unwrapped: the entry is a link), so a title reads the same here as
+       in its h1 and in xref names. */ -}}
 {{- $used := slice -}}
 {{- range $chapters }}{{ with .Part }}{{ if not (in $used .) }}{{ $used = $used | append . }}{{ end }}{{ end }}{{ end -}}
+{{- $nameRanks := partialCached "tufte/book/name-ranks.html" $root (or $root.RelPermalink $root.Path) -}}
 {{- $lonely := slice -}}
 {{- range $parts -}}
   {{- if not (in $used .Page) -}}
     {{- $gw := partial "tufte/book/weight-key.html" .Page.Weight -}}
     {{- $gname := .Page.Title -}}
-    {{- with .Page.File }}{{ $gname = .Dir }}{{ end -}}
-    {{- $lonely = $lonely | append (dict "Page" .Page "Display" .Display "key" (printf "1|%s|%s|" $gw $gname)) -}}
+    {{- with .Page.File }}{{ $gname = .ContentBaseName }}{{ end -}}
+    {{- $lonely = $lonely | append (dict "Page" .Page "Display" .Display "key" (printf "1|%s|%s|" $gw (index $nameRanks $gname | default "999999"))) -}}
   {{- end -}}
 {{- end -}}
 
@@ -86,10 +85,9 @@
     {{- if and (not (in $done .Page)) (lt .key $ck) -}}
       {{- if $curPart }}{{ $items = printf "%s</ol></li>" $items }}{{ $curPart = false }}{{ end -}}
       {{- $pt := .Page.LinkTitle -}}
-      {{- $ptHTML := htmlEscape $pt -}}
-      {{- if findRE $mdRE $pt 1 }}{{ $ptHTML = $root.RenderString $pt | string | replaceRE `</?a\b[^>]*>` "" | strings.TrimSpace }}{{ end -}}
-      {{- $label := htmlEscape (printf "%s %s" (T "part") .Display | strings.TrimSpace) -}}
-      {{- $ptEntry := printf "%s&emsp;%s" $label $ptHTML -}}{{ with .Page.RelPermalink }}{{ $ptEntry = printf `<a href="%s">%s</a>` . $ptEntry }}{{ end -}}
+      {{- $ptHTML := partial "tufte/title-html.html" (dict "page" $root "title" $pt "heading" true) | string | replaceRE `</?a\b[^>]*>` "" -}}
+      {{- $label := htmlEscape (printf "%s %s" (partial "func/t.html" "part") .Display | strings.TrimSpace) -}}
+      {{- $ptEntry := printf "%s&emsp;%s" $label $ptHTML -}}{{ $ptEntry = partial "tufte/page-link.html" (dict "page" .Page "html" $ptEntry "book" true) -}}
       {{- $items = printf `%s<li class="toc-part"><span class="toc-part-title">%s</span></li>` $items $ptEntry -}}
       {{- $done = $done | append .Page -}}
     {{- end -}}
@@ -106,18 +104,16 @@
       {{- if $part -}}
         {{- $roman := partial "tufte/book/part-number.html" (dict "root" $root "part" $part) -}}
         {{- $pt := $part.LinkTitle -}}
-        {{- $ptHTML := htmlEscape $pt -}}
-        {{- if findRE $mdRE $pt 1 }}{{ $ptHTML = $root.RenderString $pt | string | replaceRE `</?a\b[^>]*>` "" | strings.TrimSpace }}{{ end -}}
-        {{- $label := htmlEscape (printf "%s %s" (T "part") $roman | strings.TrimSpace) -}}
-        {{- $ptEntry := printf "%s&emsp;%s" $label $ptHTML -}}{{ with $part.RelPermalink }}{{ $ptEntry = printf `<a href="%s">%s</a>` . $ptEntry }}{{ end -}}
+        {{- $ptHTML := partial "tufte/title-html.html" (dict "page" $root "title" $pt "heading" true) | string | replaceRE `</?a\b[^>]*>` "" -}}
+        {{- $label := htmlEscape (printf "%s %s" (partial "func/t.html" "part") $roman | strings.TrimSpace) -}}
+        {{- $ptEntry := printf "%s&emsp;%s" $label $ptHTML -}}{{ $ptEntry = partial "tufte/page-link.html" (dict "page" $part "html" $ptEntry "book" true) -}}
         {{- $items = printf `%s<li class="toc-part"><span class="toc-part-title">%s</span><ol>` $items $ptEntry -}}
       {{- end -}}
       {{- $curPart = $part -}}
     {{- end -}}
     {{- /* The chapter. */ -}}
     {{- $t := $c.LinkTitle -}}
-    {{- $tHTML := htmlEscape $t -}}
-    {{- if findRE $mdRE $t 1 }}{{ $tHTML = $root.RenderString $t | string | replaceRE `</?a\b[^>]*>` "" | strings.TrimSpace }}{{ end -}}
+    {{- $tHTML := partial "tufte/title-html.html" (dict "page" $root "title" $t "heading" true) | string | replaceRE `</?a\b[^>]*>` "" -}}
     {{- $num := "" -}}
     {{- if .Numbered }}{{ $num = printf `<span class="toc-num">%s</span>` (htmlEscape (printf "%v" .Display)) }}{{ end -}}
     {{- $sections := "" -}}
@@ -125,9 +121,9 @@
       {{- $sections = partial "tufte/book/toc-headings.html" (dict "page" $c "headings" $c.Fragments.Headings) | string -}}
     {{- end -}}
     {{- /* A chapter that is not rendered (build.render = never) is listed
-           without a link. */ -}}
-    {{- $entry := printf "%s%s" $num $tHTML -}}
-    {{- with $c.RelPermalink }}{{ $entry = printf `<a href="%s">%s</a>` . $entry }}{{ end -}}
+           without a link (a placeholder link that the print document,
+           where it is printed, resolves: tufte/page-link.html). */ -}}
+    {{- $entry := partial "tufte/page-link.html" (dict "page" $c "html" (printf "%s%s" $num $tHTML) "book" true) -}}
     {{- $items = printf `%s<li class="toc-chapter matter-%s">%s%s</li>` $items (htmlEscape (.Matter | default "main")) $entry $sections -}}
   {{- end -}}
 {{- end -}}
@@ -135,17 +131,16 @@
 {{- range $lonely -}}
   {{- if not (in $done .Page) -}}
     {{- $pt := .Page.LinkTitle -}}
-    {{- $ptHTML := htmlEscape $pt -}}
-    {{- if findRE $mdRE $pt 1 }}{{ $ptHTML = $root.RenderString $pt | string | replaceRE `</?a\b[^>]*>` "" | strings.TrimSpace }}{{ end -}}
-    {{- $label := htmlEscape (printf "%s %s" (T "part") .Display | strings.TrimSpace) -}}
-    {{- $ptEntry := printf "%s&emsp;%s" $label $ptHTML -}}{{ with .Page.RelPermalink }}{{ $ptEntry = printf `<a href="%s">%s</a>` . $ptEntry }}{{ end -}}
+    {{- $ptHTML := partial "tufte/title-html.html" (dict "page" $root "title" $pt "heading" true) | string | replaceRE `</?a\b[^>]*>` "" -}}
+    {{- $label := htmlEscape (printf "%s %s" (partial "func/t.html" "part") .Display | strings.TrimSpace) -}}
+    {{- $ptEntry := printf "%s&emsp;%s" $label $ptHTML -}}{{ $ptEntry = partial "tufte/page-link.html" (dict "page" .Page "html" $ptEntry "book" true) -}}
     {{- $items = printf `%s<li class="toc-part"><span class="toc-part-title">%s</span></li>` $items $ptEntry -}}
   {{- end -}}
 {{- end -}}
 {{- /* An empty book (no chapters, no parts): no contents at all. */ -}}
 {{- $out := "" -}}
 {{- if $items -}}
-  {{- $out = printf `<nav class="book-toc" aria-label="%s">` (htmlEscape (T "contents")) -}}
+  {{- $out = printf `<nav class="book-toc" aria-label="%s">` (htmlEscape (partial "func/t.html" "contents")) -}}
   {{- with $heading }}{{ $out = printf `%s<h2>%s</h2>` $out (htmlEscape .) }}{{ end -}}
   {{- $out = printf "%s<ol>%s</ol></nav>" $out $items -}}
 {{- end -}}

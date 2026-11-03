@@ -2,7 +2,13 @@
   Normalises a label key (SPEC-LATEX §3.0.2).
 
   "fig:x", "Fig:X", " fig-x " all become "fig-x": trim spaces, lowercase,
-  ":" → "-", then anchorize. Used for every label=, {#…} id coming from
+  ":" and every other punctuation mark or symbol except "_" and "-" (".",
+  "+", "/", "(", "'"…) → "-", then anchorize (which keeps letters, digits,
+  "_" and "-", and turns spaces into "-"). So "eq:1.2" is "eq-1-2", not
+  "eq-12": LaTeX labels that differ only in such a character (eq:1.2 and
+  eq:12, fig:a.b and fig:ab) stay distinct (eq:1.2 and eq:1-2 are the
+  same, as fig:x and fig-x are). A key with no letter or digit ("!!!",
+  "-") is "". Used for every label=, {#…} id coming from
   images/tables/equations, xref/eqref refs, the label shortcode, front
   matter label and the #key part of path#key. Idempotent.
 
@@ -10,8 +16,9 @@
   Returns: the normalised key string ("" for empty input).
 */ -}}
 {{- $s := lower (trim (printf "%v" .) " \t\n") -}}
-{{- $s = replace $s ":" "-" -}}
-{{- with $s -}}
-  {{- $s = anchorize . -}}
+{{- if findRE `[\p{L}\p{N}]` $s 1 -}}
+  {{- $s = replaceRE `[^\p{L}\p{N}\p{M}_\s-]` "-" $s | anchorize -}}
+{{- else -}}
+  {{- $s = "" -}}
 {{- end -}}
 {{- return $s -}}

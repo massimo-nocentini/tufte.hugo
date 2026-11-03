@@ -33,9 +33,9 @@ The `figure` shortcode replaces Hugo's built-in one and accepts a `type`: `main`
 
 Keep margin figures small and simple: the margin is about a third as wide as the text column.
 
-A Markdown image can go to the margin too, with a class attribute on the line after it: `{.margin}`, or its aliases `{.marginfigure}` and `{.marginnote}`. LaTeX-like attributes work on any block image: `offset` moves the caption (here one baseline down, `1bl`), `captionpos="bottom"` aligns it with the bottom of the image, `cite` appends references, `short` and an `{#fig:id}` label it for the lists of figures, and `numbered=false` turns its number off.
+A Markdown image can go to the margin too, with a class attribute on the line after it: `{.margin}`, or its aliases `{.marginfigure}` and `{.marginnote}`. LaTeX-like attributes work on block images too: `offset` moves the caption of a main or full-width image and, like LaTeX's `marginfigure[offset]`, the whole figure of a margin image (here one baseline down, `1bl`); `captionpos="bottom"` aligns the caption with the bottom of a main or full-width image (a margin image keeps its caption below it, and `captionpos` on it prints a warning); `cite` appends references, `short` and an `{#fig:id}` label it for the lists of figures, and `numbered=false` turns its number off.
 
-![A table of figures from Beautiful Evidence](images/table-example-be-page-159.png "A Markdown image in the margin, its caption moved down one baseline.")
+![A table of figures from Beautiful Evidence](images/table-example-be-page-159.png "A Markdown image in the margin, moved down one baseline.")
 {.marginfigure offset="1bl"}
 
 Like the `marginfigure` shortcode without `inline`, a Markdown margin image stands between two paragraphs and floats into the margin beside the one that follows it, this one.

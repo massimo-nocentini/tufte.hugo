@@ -5,36 +5,84 @@
   must live inside sections.
 
   Content before the first <h2> gets a section of its own; empty sections are
-  never produced. Split points are every "<h2" tag, wherever it sits on a
-  line (block render hooks trim their trailing newline, so a heading can
-  directly follow "</div>" or "</table>"), that is not nested in an open
-  container element: an <h2> inside a blockquote, list, div, table, figure,
-  nav, section, header or footer (for example "> ## Heading", or the
-  <h2>Contents</h2> of the book contents that tufte/postprocess.html puts
-  in place of a tableofcontents placeholder) does not start a
-  section.
+  never produced. Split points are every "<h2" tag (any case), wherever it
+  sits on a line (block render hooks trim their trailing newline, so a
+  heading can directly follow "</div>" or "</table>"), that is not nested
+  in an open element: an <h2> inside a blockquote, list, definition list,
+  div, table, figure, details, section… (for example "> ## Heading", a
+  "Term\n: ## Heading" definition, or the <h2>Contents</h2> of the book
+  contents that tufte/postprocess.html puts in place of a tableofcontents
+  placeholder), or in any element of raw HTML (unsafe = true: a form, a
+  block link, a noscript, a fieldset, a pre…) does not start a section.
+
+  Nesting is tracked with a stack of open elements, as an HTML parser
+  does: tag names are case-insensitive; void elements and "/>" tags open
+  nothing; an end tag closes its element and every element opened inside
+  it (so an <li> or <p> whose optional end tag is missing is closed by its
+  parent's end tag); an end tag with no open element is ignored; and the
+  start tags that imply an end tag close it: a block start tag (h2
+  included) closes an open <p>, an <li> closes the previous <li> of its
+  list, a <dt> or <dd> the previous <dt> or <dd>.
 
   Takes: the HTML (string or template.HTML).
   Returns: template.HTML.
 */ -}}
-{{- $html := string . -}}
+{{- /* Comments and script/style/textarea contents (raw HTML) are text:
+       a "<h2" or "<div" in them neither splits nor nests (func/raw-mask.html). */ -}}
+{{- $mask := partial "func/raw-mask.html" (dict "html" (string .)) -}}
+{{- $html := $mask.html -}}
 {{- $marker := "<!--tufte-hugo:section-->" -}}
-{{- $openRE := `<(blockquote|div|ul|ol|li|table|figure|details|aside|nav|section|header|footer)[\s>]` -}}
-{{- $closeRE := `</(blockquote|div|ul|ol|li|table|figure|details|aside|nav|section|header|footer)>` -}}
+{{- $tagRE := `<(/?)([a-zA-Z][a-zA-Z0-9-]*)[^>]*>` -}}
+{{- $void := slice "area" "base" "br" "col" "embed" "hr" "img" "input" "keygen" "link" "meta" "param" "source" "track" "wbr" -}}
+{{- /* Start tags that close a <p> in button scope (HTML parsing). */ -}}
+{{- $closesP := slice "address" "article" "aside" "blockquote" "center" "details" "dialog" "dir" "div" "dl" "fieldset" "figcaption" "figure" "footer" "form" "header" "hgroup" "main" "menu" "nav" "ol" "p" "search" "section" "summary" "ul" "h1" "h2" "h3" "h4" "h5" "h6" "pre" "listing" "li" "dd" "dt" "table" "hr" "xmp" "plaintext" -}}
+{{- $scope := slice "button" "table" "td" "th" "caption" "object" "template" "applet" "marquee" "html" -}}
+{{- $pRule := dict "t" (slice "p") "s" $scope -}}
+{{- $implied := dict
+      "li" (dict "t" (slice "li") "s" (slice "ul" "ol" "menu" "button" "table" "td" "th" "caption" "object" "template" "applet" "marquee" "html"))
+      "dt" (dict "t" (slice "dt" "dd") "s" (slice "dl" "button" "table" "td" "th" "caption" "object" "template" "applet" "marquee" "html"))
+      "dd" (dict "t" (slice "dt" "dd") "s" (slice "dl" "button" "table" "td" "th" "caption" "object" "template" "applet" "marquee" "html")) -}}
 {{- /* A literal "<h2" cannot occur in text or code (Goldmark escapes "<"). */ -}}
-{{- $html = replaceRE `<h2([\s>])` (printf "%s<h2$1" $marker) $html -}}
+{{- $html = replaceRE `(?i)(<h2[\s>])` (printf "%s${1}" $marker) $html -}}
 {{- $sections := slice -}}
 {{- $current := "" -}}
+{{- $stack := slice -}}
 {{- range $i, $part := split $html $marker -}}
   {{- if eq $i 0 -}}
     {{- $current = $part -}}
-  {{- else if eq (len (findRE $openRE $current)) (len (findRE $closeRE $current)) -}}
-    {{- /* Every container opened so far is closed: start a new section. */ -}}
-    {{- $sections = $sections | append $current -}}
-    {{- $current = $part -}}
   {{- else -}}
-    {{- /* Nested heading: keep it in the current section. */ -}}
-    {{- $current = printf "%s%s" $current $part -}}
+    {{- /* The <h2> closes an open <p> first. */ -}}
+    {{- $hit := -1 }}{{ $stop := -1 -}}
+    {{- range $j, $e := $stack }}{{ if eq $e "p" }}{{ $hit = $j }}{{ else if in $scope $e }}{{ $stop = $j }}{{ end }}{{ end -}}
+    {{- if gt $hit $stop }}{{ $stack = first $hit $stack }}{{ end -}}
+    {{- if not $stack -}}
+      {{- /* Every element opened so far is closed: start a new section. */ -}}
+      {{- $sections = $sections | append $current -}}
+      {{- $current = $part -}}
+    {{- else -}}
+      {{- /* Nested heading: keep it in the current section. */ -}}
+      {{- $current = printf "%s%s" $current $part -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range findRESubmatch $tagRE $part -}}
+    {{- $name := lower (index . 2) -}}
+    {{- if eq (index . 1) "/" -}}
+      {{- $at := -1 -}}
+      {{- range $j, $e := $stack }}{{ if eq $e $name }}{{ $at = $j }}{{ end }}{{ end -}}
+      {{- if ge $at 0 }}{{ $stack = first $at $stack }}{{ end -}}
+    {{- else -}}
+      {{- $rules := slice -}}
+      {{- if in $closesP $name }}{{ $rules = $rules | append $pRule }}{{ end -}}
+      {{- with index $implied $name }}{{ $rules = $rules | append . }}{{ end -}}
+      {{- range $r := $rules -}}
+        {{- $hit := -1 }}{{ $stop := -1 -}}
+        {{- range $j, $e := $stack }}{{ if in $r.t $e }}{{ $hit = $j }}{{ else if in $r.s $e }}{{ $stop = $j }}{{ end }}{{ end -}}
+        {{- if gt $hit $stop }}{{ $stack = first $hit $stack }}{{ end -}}
+      {{- end -}}
+      {{- if not (or (in $void $name) (strings.HasSuffix (index . 0) "/>")) -}}
+        {{- $stack = $stack | append $name -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}
 {{- $sections = $sections | append $current -}}
@@ -45,5 +93,6 @@
     {{- $out = printf "%s<section>\n%s\n</section>\n" $out $s -}}
   {{- end -}}
 {{- end -}}
+{{- with $mask.raw }}{{ $out = (partial "func/raw-mask.html" (dict "html" $out "raw" .)).html }}{{ end -}}
 {{- $out = $out | safeHTML -}}
 {{- return $out -}}

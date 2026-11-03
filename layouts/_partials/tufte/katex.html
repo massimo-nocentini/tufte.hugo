@@ -126,7 +126,7 @@
         {{- end -}}
       {{- end -}}
     {{- end }}
-{{ partial "tufte/vendor.html" (dict "url" $url "integrity" $integrity "defer" $it.defer "dir" ($e.dir | default "katex")) }}
+{{ partial "tufte/vendor.html" (dict "url" $url "kind" (cond (eq $it.name "css") "css" "js") "integrity" $integrity "defer" $it.defer "dir" ($e.dir | default "katex")) }}
   {{- else -}}
     {{- errorf "tufte.hugo: the KaTeX %v entry of data/tufte/vendor.toml has no %q file" $e.version $it.name -}}
   {{- end -}}

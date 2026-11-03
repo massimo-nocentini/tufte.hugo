@@ -15,7 +15,8 @@
 
   Callers: the sidenote, marginnote, footnotetext and marginblock
   shortcodes (on their rendered inner text, before cite-gather) and
-  tufte/figure.html (on the caption).
+  tufte/figure.html (on the caption), video.html (caption), subfigures.html
+  (each subcaption).
 
   Takes a dict:
     page    the page                                   required
@@ -32,7 +33,7 @@
   {{- $toggleRE := `<label for="[^"]*" class="margin-toggle[^"]*"[^>]*>[^<]*</label><input type="checkbox" id="[^"]*" class="margin-toggle"/>|<input type="checkbox" id="[^"]*" class="margin-toggle"/>` -}}
   {{- if findRE $toggleRE $t 1 -}}
     {{- $t = replaceRE $toggleRE "" $t -}}
-    {{- $t = replaceRE `<(span|div) class="(?:sidenote|marginnote)\b[^"]*"[^>]*>` `<$1 class="note-in-note">` $t -}}
+    {{- $t = replaceRE `<(span|div)( data-sn="[a-z0-9]+")? class="(?:sidenote|marginnote)\b[^"]*"[^>]*>` `<$1$2 class="note-in-note">` $t -}}
     {{- $t = replace $t `<i class="sn-end" hidden></i>` "" -}}
     {{- /* A margin figure's wrapper paragraph or footnotetext's cannot sit
            in a span either. */ -}}

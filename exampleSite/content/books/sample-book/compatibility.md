@@ -9,9 +9,9 @@ document class, a few changes to the document may have to be made.
 
 ## Converting from `article` to `tufte-handout`
 
-The following `article` class options are unsupported: `10pt`{{< index "class options!10pt@`10pt`" >}}, `11pt`, `12pt`, `a5paper`, `b5paper`, `executivepaper`, `legalpaper`, `landscape`, `onecolumn`, and `twocolumn`.
+The following `article` class options are unsupported: `10pt`{{< index "10pt class option@`10pt` class option" >}}{{< index "class options!10pt@`10pt`" >}}, `11pt`{{< index "11pt class option@`11pt` class option" >}}{{< index "class options!11pt@`11pt`" >}}, `12pt`{{< index "12pt class option@`12pt` class option" >}}{{< index "class options!12pt@`12pt`" >}}, `a5paper`{{< index "a5paper class option@`a5paper` class option" >}}{{< index "class options!a5paper@`a5paper`" >}}, `b5paper`{{< index "b5paper class option@`b5paper` class option" >}}{{< index "class options!b5paper@`b5paper`" >}}, `executivepaper`{{< index "executivepaper class option@`executivepaper` class option" >}}{{< index "class options!executivepaper@`executivepaper`" >}}, `legalpaper`{{< index "legalpaper class option@`legalpaper` class option" >}}{{< index "class options!legalpaper@`legalpaper`" >}}, `landscape`{{< index "landscape class option@`landscape` class option" >}}{{< index "class options!landscape@`landscape`" >}}, `onecolumn`{{< index "onecolumn class option@`onecolumn` class option" >}}{{< index "class options!onecolumn@`onecolumn`" >}}, and `twocolumn`.
 
-The following headings are not supported: `\subsubsection`{{< index "subsubsection command@`subsubsection` command" >}} and `\subparagraph`{{< index "subparagraph command@`subparagraph` command" >}}.
+The following headings are not supported: `\subsubsection`{{< index "subsubsection command@`\subsubsection`" >}} and `\subparagraph`{{< index "subparagraph command@`\subparagraph`" >}}.
 
 ## Converting from `book` to `tufte-book`
 

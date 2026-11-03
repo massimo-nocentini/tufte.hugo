@@ -8,9 +8,10 @@
   Each summary restarts the sidenote counter (theme.css resets it on
   div.post-summary) at the number its first body note has on the page
   itself: the book offset (tufte/offsets.html, chapters of a continuous
-  book) plus the title-block \thanks notes the summary does not show
-  (tufte/counts.html .thanks), the same start tufte/labels.html uses, so a
-  summary's notes and the xrefs to them show the page's numbers.
+  book) plus the notes before the content that the summary does not show
+  (the title-block \thanks notes and the abstract's: tufte/counts.html
+  .thanks), so a summary's notes and the xrefs to them show the page's
+  numbers.
   Takes: the listed page.
 */ -}}
 {{- $snStart := 0 -}}
@@ -27,8 +28,8 @@
     {{- end }}
     {{ partial "post-meta.html" . }}
     {{ partialCached "func/content.html" (dict "page" . "summary" true) (or .RelPermalink .Path) true }}
-    {{- if and .Truncated .RelPermalink (ne site.Params.readMore false) }}
-    <p class="read-more"><a href="{{ .RelPermalink }}">{{ T "readMore" }}&nbsp;&rarr;</a></p>
+    {{- if and .Truncated .RelPermalink (partial "func/flag.html" (dict "value" site.Params.readMore "default" true)) }}
+    <p class="read-more"><a href="{{ .RelPermalink }}">{{ partial "func/t.html" "readMore" }}&nbsp;{{ cond (eq (partial "func/lang.html" site.Language).dir "rtl") "&larr;" "&rarr;" | safeHTML }}</a></p>
     {{- end }}
   </section>
 </div>

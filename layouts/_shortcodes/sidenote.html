@@ -42,7 +42,10 @@
 {{- end -}}
 {{- $html := "" -}}
 {{- with $text -}}
-  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- /* A text= or positional text was not run by Hugo: its shortcodes run
+         now ("shortcodes" "run"); in .Inner they already ran, and only
+         escaped ones are left. */ -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.Inner) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
   {{- /* A sidenote or margin note nested in it cannot float. */ -}}
   {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $.Name) "where" $.Position) -}}
   {{- /* A span cannot hold paragraphs: turn paragraph breaks into <br>. */ -}}

@@ -30,19 +30,19 @@ The status column says how complete the counterpart is: **must** and
 names such as `tufte.justified` are keys of `[params.tufte]` in the site
 configuration, or of the `tufte:` map in a page's front matter.
 
-{{< marginnote >}}**Placement rule.** *Inline* shortcodes (`sidenote`, `marginnote`, `cite`, `xref`, `eqref`, `label`, `index`, `footnotemark`, `allcaps`, `smallcaps`, `sc`, `textls`, `nohyphens`, `paragraph`, `bibentry`, `nocite`) are written inside a paragraph. *Block* shortcodes (`figure`, `fig`, `table`, `marginblock`, `equation`, `footnotetext`, `bibliography`, `printindex`…) stand alone, with blank lines around them.{{< /marginnote >}}
+{{< marginnote >}}**Placement rule.** *Inline* shortcodes (`sidenote`, `marginnote`, `footnote`, `cite`, `xref`, `eqref`, `label`, `index`, `footnotemark`, `newthought`, `sans`, `allcaps`, `smallcaps`, `sc`, `textls`, `nohyphens`, `paragraph`, `bibentry`, `nocite`, and `marginfigure` with `inline="true"`) are written inside a paragraph. *Block* shortcodes (`figure`, `fig`, `table`, `marginblock`, `equation`, `footnotetext`, `bibliography`, `printindex`…) stand alone, with blank lines around them.{{< /marginnote >}}
 
 | # | tufte-latex | tufte.hugo | Status | Notes |
 |--:|:--|:--|:--|:--|
 | 1 | `\documentclass{tufte-handout}` | any page outside a book | must | body class `tufte-handout` |
-| 2 | `\documentclass{tufte-book}` | a section whose `_index.md` sets `book: true` | must | its pages are the chapters; see [Books](https://github.com/massimo-nocentini/tufte.hugo#books) |
+| 2 | `\documentclass{tufte-book}` | a section whose `_index.md` (or `content/_index.md`, for a whole-site book) sets `book: true` | must | its pages are the chapters; see [Books](https://github.com/massimo-nocentini/tufte.hugo#books) |
 | 3 | class options (`justified`, `sfsidenotes`, `nols`, `marginals`…) | `[params.tufte]` in the site config; `tufte:` in front matter | must | resolved key by key: page → part → book → site → style preset |
 | 4 | “looks like tufte-handout” | `tufte.style = "latex"` | should | preset: LaTeX title block, hyphenation, indented paragraphs, old-style figures, plainnat, running heads |
 | 5 | `\sidenote{}`, `\footnote{}` | `{{</* sidenote */>}}…{{</* /sidenote */>}}`, Markdown `[^1]` | must | tufte-latex's `\footnote` is a sidenote; footnote ids are deterministic |
 | 5a | a classic footnote (`\footnote` of the `article` class) | `{{</* footnote */>}}…{{</* /footnote */>}}`, Markdown `[^fn-x]` (any `[^x]` with `footnotes = "endnotes"`) | must | listed below the text, numbered apart from the sidenotes; see [Footnotes and sidenotes](https://github.com/massimo-nocentini/tufte.hugo#footnotes-and-sidenotes) |
 | 6 | `\sidenote[num][offset]{}` | `{{</* sidenote number="*" offset="-2bl" */>}}…{{</* /sidenote */>}}` | must | a custom number does not step the counter |
 | 7 | `\marginnote[offset]{}`, `\marginpar{}` | `{{</* marginnote offset="1bl" */>}}…{{</* /marginnote */>}}` | must |  |
-| 8 | multiple marks (`\multfootsep`) | automatic | could | adjacent marks are separated by a comma |
+| 8 | multiple marks (`\multfootsep`) | automatic | could | adjacent marks (sidenotes and real footnotes) are separated by a comma |
 | 9 | `\footnotemark` + `\footnotetext[offset]{}` | `{{</* footnotemark "row3" */>}}` + standalone `{{</* footnotetext name="row3" offset="-7bl" */>}}…{{</* /footnotetext */>}}` | should | no other numbered note between mark and text |
 | 10 | `\label` on a sidenote (“see note 7”) | `{{</* sidenote label="sn:x" */>}}…{{</* /sidenote */>}}` | should | `{{</* xref "sn:x" */>}}` prints its number |
 | 11 | block content in the margin | `{{</* marginblock */>}}…{{</* /marginblock */>}}` | should | paragraphs, lists, tables; toggled on mobile |
@@ -103,7 +103,7 @@ configuration, or of the `tufte:` map in a page's front matter.
 | 66 | `\printindex` | `{{</* printindex */>}}` (standalone) | should | three columns |
 | 67 | the index as a site taxonomy | — | **wont** | `/index/` clashes with Hugo's index files; use the shortcode |
 | 68 | counters continuous across a book | `tufte.book.continuous = true` (default) | should |  |
-| 69 | `\section`, `\subsection` (italic, unnumbered) | `##`, `###` | must |  |
+| 69 | `\section`, `\subsection` (italic, unnumbered) | `##`, `###` | must | in `\Large` and `\large` (1.68rem, 1.54rem) with `style = "latex"` or `titleBlock = "latex"`, below the title; tufte.css's sizes otherwise |
 | 70 | `\paragraph{}` (run-in) | `#### Title`, or `{{</* paragraph */>}}Title{{</* /paragraph */>}}` | should |  |
 | 71 | no `\subsubsection` | a warning on `#####`/`######`; `tufte.headings.strict = true` makes it an error | should | Bringhurst §4.2.2 |
 | 72 | `secnumdepth` | `tufte.headings.number = 0`, `1` or `2`; `{.unnumbered}` | could |  |
@@ -190,7 +190,7 @@ can be moved like any other.{{< cite keys="tufte2006,bringhurst2005" offset="-1b
 In the natbib style, {{< cite keys="tufte1990" mode="text" >}} prints the author
 and year in the text, and {{< cite keys="tufte2001" mode="paren" page="92" >}}
 puts them in parentheses. The full entry can also be written inline:
-{{< bibentry "bringhurst2005" >}} The book by Mittelbach and Goossens is in the
+{{< bibentry "bringhurst2005" >}}. The book by Mittelbach and Goossens is in the
 bibliography below without being cited, thanks to `nocite`.{{< nocite "mittelbach2004" >}}
 
 ## Floats {#sec:floats}
@@ -225,8 +225,8 @@ whole page, like `table*`:
 {{< fullwidthtable caption="A full-width table: the paper geometry of the print stylesheet." label="tab:demo-full" >}}
 | Paper  | Page size     | Margins (top right bottom left) | Text column | Margin column |
 |:-------|:--------------|:--------------------------------|------------:|--------------:|
-| letter | 8.5 × 11 in   | 1.58in 0.86in 0.9in 1in         | 65%         | 30%           |
-| a4     | 210 × 297 mm  | 42.2mm 20.6mm 13.4mm 24.8mm     | 65%         | 30%           |
+| letter | 8.5 × 11 in   | 1in 0.86in 1.48in 1in           | 65%         | 30%           |
+| a4     | 210 × 297 mm  | 27.4mm 20.6mm 28.2mm 24.8mm     | 65%         | 30%           |
 | b5     | 176 × 250 mm  | 28.7mm 14.69mm 34.1mm 14.66mm   | 70%         | 25%           |
 {{< /fullwidthtable >}}
 
@@ -241,6 +241,13 @@ func main() {
 {{< subfigures cols=2 caption="Two title pages side by side, as a grid of sub-figures." label="fig:demo-grid" >}}
 ![Title page of Envisioning Information](/images/latex/ei-title.svg)
 ![Title page of Beautiful Evidence](/images/latex/be-title.svg)
+{{< /subfigures >}}
+
+With `type="margin"` the grid is a margin figure, its caption below it:
+
+{{< subfigures cols=2 type="margin" caption="The same title pages as a grid in the margin." >}}
+![Title page of Envisioning Information](/images/latex/ei-title.svg "*Envisioning Information*")
+![Title page of Beautiful Evidence](/images/latex/be-title.svg "*Beautiful Evidence*")
 {{< /subfigures >}}
 
 The lists of figures and tables of this page:
@@ -329,6 +336,8 @@ when printing.{{< index "typography!clearing floats" >}}
 Index entries use the syntax of `makeindex`: levels separated by `!`,{{< index "index!levels" >}}
 a sort key before `@`,{{< index "index!sort key@sort key" >}} cross-references with
 `|see{…}`{{< index "makeindex|see{index}" >}} and page ranges with `|(` and `|)`.
+The quote character `"` makes the next `!`, `@`, `|` or `"` literal: ``{{</* index `index!quote "!` */>}}``
+lists “quote !” under “index”.{{< index `index!quote "!` >}}
 The index of this page:
 
 {{< printindex >}}

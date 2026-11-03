@@ -23,8 +23,7 @@
     {{- if isset $c.Params "intoc" }}{{ $intoc = partial "tufte/truthy.html" $c.Params.intoc }}{{ end -}}
     {{- if $intoc -}}
       {{- $t := $c.LinkTitle -}}
-      {{- $tHTML := htmlEscape $t -}}
-      {{- if findRE "[`*_~$\\\\\\['\"]|--|\\.\\.\\." $t 1 }}{{ $tHTML = $p.RenderString $t | string | replaceRE `</?a\b[^>]*>` "" | strings.TrimSpace }}{{ end -}}
+      {{- $tHTML := partial "tufte/title-html.html" (dict "page" $p "title" $t "heading" true) | string | replaceRE `</?a\b[^>]*>` "" -}}
       {{- $n := "" -}}
       {{- if .Numbered }}{{ $n = printf `<span class="toc-num">%s</span>` (htmlEscape (printf "%v" .Display)) }}{{ end -}}
       {{- /* Not rendered (build.render = never): no link. */ -}}
@@ -42,7 +41,7 @@
 {{- if gt $n 0 }}{{ $style = printf "counter-reset: sidenote-counter %d" $n }}{{ end }}
 <article class="part"{{ with $style }} style="{{ . | safeCSS }}"{{ end }}>
   <header class="part-head">
-    {{- with $num }}<p class="part-number">{{ T "part" }} {{ . }}</p>{{ end -}}
+    {{- with $num }}<p class="part-number">{{ partial "func/t.html" "part" }} {{ . }}</p>{{ end -}}
     <h1 class="part-title">{{ $titleHTML | safeHTML }}</h1>
   </header>
   {{ partial "tufte/abstract.html" $p }}

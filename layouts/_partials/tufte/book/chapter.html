@@ -34,7 +34,9 @@
   {{- $n := int ($off.sidenote | default 0) -}}
   {{- if gt $n 0 }}{{ $style = printf "counter-reset: sidenote-counter %d" $n }}{{ end -}}
 {{- end }}
-<article class="chapter matter-{{ $matter }}" id="tufte-chapter"{{ with $style }} style="{{ . | safeCSS }}"{{ end }}>
+{{- /* tufte-chapter, or tufte-chapter-2 when the content uses that id
+       ("## Tufte chapter"): tufte/gen-id.html. */}}
+<article class="chapter matter-{{ $matter }}" id="{{ partial "tufte/gen-id.html" (dict "page" $p "base" "tufte-chapter") }}"{{ with $style }} style="{{ . | safeCSS }}"{{ end }}>
   {{ partial "tufte/book/chapter-body.html" (dict "page" $p "root" $root "chapter" $ch) }}
   {{ partial "tufte/book/nav.html" (dict "page" $p "root" $root) }}
 </article>

@@ -6,18 +6,30 @@
   Returns: a dict with plain-text string fields (not HTML-escaped; braces
   removed outside math), where math ($…$, \(…\)) and \url{…} /
   \nolinkurl{…} are kept as written and a literal dollar is \$
-  (tufte/bib/tex-split.html; format.html renders them):
-    key type authors editors title container publisher place year month
-    volume issue number pages edition series institution school
-    organization howpublished note isbn doi url chapter sortkey
-  where `authors`/`editors` are slices of dict {given family literal} and
-  `month` is a string "1".."12" (or the original text when unrecognised).
+  (tufte/bib/tex-split.html; format.html renders them); CSL rich text
+  (<i>, <b>, <sup>, <sub>, small caps) is kept as the private markers
+  \x11–\x19, \x1b in the text fields (see below; format.html turns them
+  into tags, plain-text users such as cite-label.html strip them):
+    key type authors editors authorsEtal editorsEtal title container
+    publisher place year month volume issue number pages edition series
+    genre institution school organization howpublished note isbn issn doi
+    url chapter sortkey
+  where `authors`/`editors` are slices of dict {given family suffix
+  literal}, `authorsEtal`/`editorsEtal` are true when the list ended with
+  BibTeX's `and others` (dropped from the names; format.html prints
+  "et al.") and `month` is a string "1".."12" (or the original text when
+  unrecognised). `genre` is the BibTeX field `type` (bibtex.html) or CSL
+  `genre`: the thesis or report kind, or the word replacing "chapter".
 
-  Names: a string is split on " and " (BibTeX); "Last, First" is split at
-  the comma, otherwise the last word is the family name; a fully braced
-  name ({Barnes and Noble}) is literal. Lists may hold strings or maps
-  {family, given} / {literal} (CSL; particles are kept with the family).
-  CSL types map to BibTeX ones (§5.1).
+  Names: a string is split on " and " (BibTeX); "Last, Jr, First" and
+  "Last, First" are split at the commas, otherwise the last word is the
+  family name; a fully braced name ({Barnes and Noble}) is literal. Lists
+  may hold strings or maps {family, given, suffix} / {literal} (CSL;
+  particles are kept with the family). The suffix (Jr.) stays out of the
+  family name, as natbib's labels use "{vv~}{ll}" only.
+  CSL types map to BibTeX ones (§5.1). `inbook` stays itself (its title is
+  the book's) unless it has a booktitle (biblatex-style data), which makes
+  it an incollection.
 */ -}}
 {{- $e := .entry | default dict -}}
 {{- $key := .key | default "" -}}
@@ -32,16 +44,18 @@
   "place" (slice "address" "place" "location" "publisher-place" "publisher_place")
   "volume" (slice "volume")
   "issue" (slice "number" "issue")
-  "number" (slice "number" "issue")
+  "number" (slice "number" "collection-number" "collection_number" "issue")
   "pages" (slice "pages" "page")
   "edition" (slice "edition")
-  "series" (slice "series" "collection-title")
+  "series" (slice "series" "collection-title" "collection_title")
+  "genre" (slice "genre")
   "institution" (slice "institution")
   "school" (slice "school")
   "organization" (slice "organization")
   "howpublished" (slice "howpublished")
   "note" (slice "note" "addendum")
   "isbn" (slice "isbn" "ISBN")
+  "issn" (slice "issn" "ISSN")
   "doi" (slice "doi" "DOI")
   "url" (slice "url" "URL")
   "chapter" (slice "chapter")
@@ -59,9 +73,37 @@
       {{- end -}}
     {{- end -}}
   {{- end -}}
+  {{- /* CSL rich text (citeproc's HTML-like markup, as pandoc writes it:
+         <span class="nocase">DNA</span> for a braced {DNA}): <i>, <b>,
+         <sup>, <sub> and the small-caps span become the private markers
+         \x11–\x19, \x1b, which format.html turns into tags after escaping
+         the text; the nocase span is dropped (no case is changed here).
+         Innermost pairs first, so nested markup pairs correctly; an
+         unmatched or unknown tag stays literal text. Then the HTML
+         entities (&amp;, &#38;, &lt;…) are decoded. Only the fields that
+         format.html renders as text keep the markers; the others (volume,
+         pages, …) and the identifiers lose them. */ -}}
+  {{- if and $isCSL (or (strings.Contains $val "<") (strings.Contains $val "&")) -}}
+    {{- $val = replaceRE `[\x11-\x19\x1b]` "" $val -}}
+    {{- range seq 8 -}}
+      {{- if not (strings.Contains $val "<") }}{{ break }}{{ end -}}
+      {{- $before := $val -}}
+      {{- $val = replaceRE `(?i)<i>([^<]*)</i>` "\x11${1}\x12" $val -}}
+      {{- $val = replaceRE `(?i)<b>([^<]*)</b>` "\x13${1}\x14" $val -}}
+      {{- $val = replaceRE `(?i)<sup>([^<]*)</sup>` "\x15${1}\x16" $val -}}
+      {{- $val = replaceRE `(?i)<sub>([^<]*)</sub>` "\x17${1}\x18" $val -}}
+      {{- $val = replaceRE `(?i)<span\s+style\s*=\s*["']\s*font-variant\s*:\s*small-caps\s*;?\s*["']\s*>([^<]*)</span>` "\x19${1}\x1b" $val -}}
+      {{- $val = replaceRE `(?i)<span\s+class\s*=\s*["']nocase["']\s*>([^<]*)</span>` "${1}" $val -}}
+      {{- if eq $val $before }}{{ break }}{{ end -}}
+    {{- end -}}
+    {{- if strings.Contains $val "&" }}{{ $val = htmlUnescape $val }}{{ end -}}
+    {{- if not (in (slice "title" "container" "publisher" "place" "series" "genre" "institution" "school" "organization" "howpublished" "note") $name) -}}
+      {{- $val = replaceRE `[\x11-\x19\x1b]` "" $val -}}
+    {{- end -}}
+  {{- end -}}
   {{- /* light LaTeX clean-up for hand-written data (.bib files are
          converted fully by bibtex.html) */ -}}
-  {{- if in (slice "url" "doi" "isbn") $name -}}
+  {{- if in (slice "url" "doi" "isbn" "issn") $name -}}
     {{- if strings.Contains $val "\\" -}}
       {{- $val = replaceRE `\\(?:url|nolinkurl|doi)\s*\{([^{}]*)\}` "$1" $val -}}
       {{- $val = replaceRE `\\([%$_#&])` "$1" $val -}}
@@ -110,12 +152,15 @@
 {{- $type = replace $type "conference" "inproceedings" -}}
 {{- if eq $type "www" }}{{ $type = "online" }}{{ end -}}
 {{- if eq $type "electronic" }}{{ $type = "online" }}{{ end -}}
-{{- if eq $type "inbook" }}{{ $type = "incollection" }}{{ end -}}
+{{- /* An @inbook's title is the book's own title (plainnat's inbook);
+       with a booktitle (biblatex-style data) it is a part of that book. */ -}}
+{{- if and (eq $type "inbook") (index $e "booktitle") }}{{ $type = "incollection" }}{{ end -}}
 
 {{- /* names */ -}}
 {{- $N := newScratch -}}
 {{- range $role := slice "author" "editor" -}}
   {{- $N.Set $role slice -}}
+  {{- $N.Set (printf "%sEtal" $role) false -}}
   {{- $raw := index $e $role -}}
   {{- $list := slice -}}
   {{- if reflect.IsSlice $raw -}}
@@ -130,37 +175,59 @@
       {{- $list = $list | append . -}}
     {{- end -}}
   {{- end -}}
+  {{- /* BibTeX's "and others" (the bare lowercase word, as BibTeX
+         compares it; "Others" and "{others}" are names): not a person,
+         but "et al." after the names. */ -}}
+  {{- if gt (len $list) 1 -}}
+    {{- $lastName := index $list (sub (len $list) 1) -}}
+    {{- if and (not (reflect.IsMap $lastName)) (eq (trim (printf "%v" $lastName) " \t\n") "others") -}}
+      {{- $list = first (sub (len $list) 1) $list -}}
+      {{- $N.Set (printf "%sEtal" $role) true -}}
+    {{- end -}}
+  {{- end -}}
   {{- range $list -}}
-    {{- $n := dict "given" "" "family" "" "literal" "" -}}
+    {{- $n := dict "given" "" "family" "" "suffix" "" "literal" "" -}}
     {{- if reflect.IsMap . -}}
       {{- $fam := printf "%v" (or (index . "family") (index . "last") "") -}}
       {{- with or (index . "non-dropping-particle") (index . "non_dropping_particle") }}{{ $fam = printf "%v %s" . $fam }}{{ end -}}
       {{- $giv := printf "%v" (or (index . "given") (index . "first") "") -}}
       {{- with or (index . "dropping-particle") (index . "dropping_particle") }}{{ $giv = printf "%s %v" $giv . }}{{ end -}}
-      {{- with index . "suffix" }}{{ $fam = printf "%s, %v" $fam . }}{{ end -}}
+      {{- $suf := printf "%v" (or (index . "suffix") (index . "jr") "") -}}
       {{- $lit := printf "%v" (or (index . "literal") (index . "name") "") -}}
-      {{- $n = dict "given" (trim $giv " ") "family" (trim $fam " ") "literal" (trim $lit " ") -}}
+      {{- $n = dict "given" (trim $giv " ") "family" (trim $fam " ") "suffix" (trim $suf " ") "literal" (trim $lit " ") -}}
     {{- else -}}
       {{- $s := trim (printf "%v" .) " \t\n" -}}
       {{- if findRE `^\{[^{}]*\}$` $s 1 -}}
-        {{- $n = dict "given" "" "family" "" "literal" $s -}}
+        {{- $n = dict "given" "" "family" "" "suffix" "" "literal" $s -}}
       {{- else if strings.Contains $s "," -}}
+        {{- /* "Last, First" or "Last, Jr, First" (BibTeX) */ -}}
         {{- $parts := split $s "," -}}
         {{- $fam := trim (index $parts 0) " " -}}
         {{- $giv := trim (index $parts (sub (len $parts) 1)) " " -}}
-        {{- if gt (len $parts) 2 }}{{ $fam = printf "%s, %s" $fam (trim (index $parts 1) " ") }}{{ end -}}
-        {{- $n = dict "given" $giv "family" $fam "literal" "" -}}
+        {{- $suf := "" -}}
+        {{- if gt (len $parts) 2 }}{{ $suf = trim (index $parts 1) " " }}{{ end -}}
+        {{- $n = dict "given" $giv "family" $fam "suffix" $suf "literal" "" -}}
       {{- else -}}
+        {{- /* "First von Last" (BibTeX): the family name starts at the
+               first lowercase-initial word before the last word, so
+               "John von Neumann" and "von Neumann, John" are one name
+               (family "von Neumann"), as are "Jean de la Fontaine" and
+               "de la Fontaine, Jean". Else the last word is the family. */ -}}
         {{- $words := split (replaceRE `\s+` " " $s) " " -}}
-        {{- $fam := index $words (sub (len $words) 1) -}}
-        {{- $giv := delimit (first (sub (len $words) 1) $words) " " -}}
-        {{- $n = dict "given" $giv "family" $fam "literal" "" -}}
+        {{- $k := sub (len $words) 1 -}}
+        {{- range $i, $w := first $k $words -}}
+          {{- if findRE `^\p{Ll}` $w 1 }}{{ $k = $i }}{{ break }}{{ end -}}
+        {{- end -}}
+        {{- $fam := delimit (after $k $words) " " -}}
+        {{- $giv := delimit (first $k $words) " " -}}
+        {{- $n = dict "given" $giv "family" $fam "suffix" "" "literal" "" -}}
       {{- end -}}
     {{- end -}}
     {{- /* restore protected spaces, drop braces */ -}}
     {{- $clean := dict
       "given" (trim (replaceRE `[{}]` "" (replace $n.given "\x1e" " ")) " ")
       "family" (trim (replaceRE `[{}]` "" (replace $n.family "\x1e" " ")) " ")
+      "suffix" (trim (replaceRE `[{}]` "" (replace $n.suffix "\x1e" " ")) " ")
       "literal" (trim (replaceRE `[{}]` "" (replace $n.literal "\x1e" " ")) " ") -}}
     {{- if or $clean.given $clean.family $clean.literal -}}
       {{- $N.Add $role (slice $clean) -}}
@@ -238,15 +305,18 @@
 {{- range (cond (gt (len $authors) 0) $authors $editors) -}}
   {{- $fams = $fams | append (or .family .literal) -}}
 {{- end -}}
+{{- if $N.Get (cond (gt (len $authors) 0) "authorEtal" "editorEtal") }}{{ $fams = $fams | append "et al" }}{{ end -}}
 {{- $first = delimit $fams " " -}}
 {{- $title := $F.Get "title" -}}
-{{- $sortkey := lower (printf "%s|%s|%s" (or $first $title) $year $title) -}}
+{{- $sortkey := lower (replaceRE `[\x11-\x19\x1b]` "" (printf "%s|%s|%s" (or $first $title) $year $title)) -}}
 
 {{- return (dict
   "key" $key
   "type" $type
   "authors" $authors
   "editors" $editors
+  "authorsEtal" (and (gt (len $authors) 0) ($N.Get "authorEtal"))
+  "editorsEtal" (and (gt (len $editors) 0) ($N.Get "editorEtal"))
   "title" $title
   "container" ($F.Get "container")
   "publisher" ($F.Get "publisher")
@@ -259,12 +329,14 @@
   "pages" $pages
   "edition" ($F.Get "edition")
   "series" ($F.Get "series")
+  "genre" ($F.Get "genre")
   "institution" ($F.Get "institution")
   "school" ($F.Get "school")
   "organization" ($F.Get "organization")
   "howpublished" ($F.Get "howpublished")
   "note" ($F.Get "note")
   "isbn" ($F.Get "isbn")
+  "issn" ($F.Get "issn")
   "doi" $doi
   "url" ($F.Get "url")
   "chapter" ($F.Get "chapter")

@@ -18,12 +18,14 @@
 
   Output: a placeholder, replaced at render time (tufte/postprocess.html):
     <div class="tufte-placeholder" data-what="bibliography"[ data-opts="k=v;k=v"]></div>
+  (in each value, % ; = are written %25 %3B %3D; tufte/postprocess.html
+  decodes them)
 */ -}}
 {{- $opts := slice -}}
 {{- if .IsNamedParams -}}
   {{- range $k := slice "all" "heading" -}}
     {{- if isset $.Params $k -}}
-      {{- $v := printf "%v" (index $.Params $k) | replaceRE `[;=]` "" | strings.TrimSpace -}}
+      {{- $v := printf "%v" (index $.Params $k) | strings.TrimSpace | replaceRE "%" "%25" | replaceRE ";" "%3B" | replaceRE "=" "%3D" -}}
       {{- $opts = $opts | append (printf "%s=%s" $k $v) -}}
     {{- end -}}
   {{- end -}}

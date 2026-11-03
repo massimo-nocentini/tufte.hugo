@@ -1,0 +1,22 @@
+{{- /*
+  A value memoized in a page's .Store by the current build, or false.
+
+  The theme keeps its cross-page results (options, labels, counts,
+  offsets, the chapters of a book, phase-1 and processed content) in
+  .Store, because partialCached's bounded cache evicts them on large
+  books. .Store survives the rebuilds of `hugo server` and `hugo --watch`,
+  so each memo is stored with the build it was computed in:
+
+    .Store.Set KEY (dict "v" VALUE "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp"))
+
+  and is valid only in that build (an edit shows on the next rebuild). If
+  the stamp is ever evicted, it changes, and the memos are computed again.
+
+  Takes: a dict with page and key.
+  Returns: the stored map ({v, b}) when it is from this build, else false.
+*/ -}}
+{{- $res := false -}}
+{{- with .page.Store.Get .key -}}
+  {{- if eq (index . "b") (partialCached "tufte/build-stamp.html" "stamp" "stamp") }}{{ $res = . }}{{ end -}}
+{{- end -}}
+{{- return $res -}}

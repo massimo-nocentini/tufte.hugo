@@ -8,7 +8,8 @@
 
   Params:
     id     video id (required; or the first positional param)
-    title  accessible title of the iframe (default "YouTube video")
+    title  accessible title of the iframe (default: the translated
+           "YouTube video", i18n key youtubeVideo)
     start  start time in seconds
     end    end time in seconds
     class  extra classes for the figure
@@ -38,5 +39,5 @@
 {{- /* Built as a string so that it goes through tufte/nest.html (kept
        when nested in fullwidth, marginblock…, also with unsafe = false). */ -}}
 {{- $out := printf `<figure class="iframe-wrapper%s">` (cond (ne (printf "%v" $class) "") (printf " %s" (htmlEscape (printf "%v" $class))) "") -}}
-{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" frameborder=\"0\" loading=\"lazy\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen></iframe>\n</figure>" $out (htmlEscape $src) (htmlEscape (printf "%v" ($title | default "YouTube video"))) -}}
+{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" frameborder=\"0\" loading=\"lazy\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen></iframe>\n</figure>" $out (htmlEscape $src) (htmlEscape (printf "%v" ($title | default (partial "func/t.html" "youtubeVideo") | default "YouTube video"))) -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

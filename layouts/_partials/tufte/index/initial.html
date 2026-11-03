@@ -1,0 +1,47 @@
+{{- /*
+  The letter group of an index entry (tufte/index/render.html: the class
+  index-gap marks a new group at level 1).
+
+  Takes: a string, the lowercased sort key of a level-1 entry.
+  Returns: a string, its group letter:
+    - the first rune, when it is ASCII (a–z, digits, symbols);
+    - else its base letter (é → e, ä → a, ß → s, æ → a, ά → α…), but only
+      when the language collator that `sort` uses (the one that ordered the
+      entries) puts the rune at the base letter's primary level, i.e. sorts
+      it before BASE+"zzzz". So é joins e in every language, while a letter
+      the language treats as its own (Spanish ñ, Swedish å ä ö, Danish
+      æ ø å, which sort after n or z) keeps its own group;
+    - else the rune itself (ł where it sorts after l, non-Latin scripts).
+*/ -}}
+{{- $init := substr . 0 1 -}}
+{{- if and $init (not (findRE `^[\x00-\x7f]` $init)) -}}
+  {{- $fold := dict
+    "à" "a" "á" "a" "â" "a" "ã" "a" "ä" "a" "å" "a" "ā" "a" "ă" "a" "ą" "a" "ǎ" "a" "æ" "a"
+    "ç" "c" "ć" "c" "ĉ" "c" "ċ" "c" "č" "c"
+    "ď" "d" "đ" "d" "ð" "d"
+    "è" "e" "é" "e" "ê" "e" "ë" "e" "ē" "e" "ĕ" "e" "ė" "e" "ę" "e" "ě" "e"
+    "ĝ" "g" "ğ" "g" "ġ" "g" "ģ" "g"
+    "ĥ" "h" "ħ" "h"
+    "ì" "i" "í" "i" "î" "i" "ï" "i" "ĩ" "i" "ī" "i" "ĭ" "i" "į" "i" "ǐ" "i" "ĳ" "i" "ı" "i"
+    "ĵ" "j"
+    "ķ" "k"
+    "ĺ" "l" "ļ" "l" "ľ" "l" "ŀ" "l" "ł" "l"
+    "ñ" "n" "ń" "n" "ņ" "n" "ň" "n"
+    "ò" "o" "ó" "o" "ô" "o" "õ" "o" "ö" "o" "ø" "o" "ō" "o" "ŏ" "o" "ő" "o" "ǒ" "o" "œ" "o"
+    "ŕ" "r" "ŗ" "r" "ř" "r"
+    "ß" "s" "ś" "s" "ŝ" "s" "ş" "s" "š" "s" "ș" "s"
+    "ţ" "t" "ť" "t" "ŧ" "t" "ț" "t" "þ" "t"
+    "ù" "u" "ú" "u" "û" "u" "ü" "u" "ũ" "u" "ū" "u" "ŭ" "u" "ů" "u" "ű" "u" "ų" "u" "ǔ" "u"
+    "ŵ" "w"
+    "ý" "y" "ÿ" "y" "ŷ" "y"
+    "ź" "z" "ż" "z" "ž" "z"
+    "ά" "α" "έ" "ε" "ή" "η" "ί" "ι" "ϊ" "ι" "ΐ" "ι" "ό" "ο" "ύ" "υ" "ϋ" "υ" "ΰ" "υ" "ώ" "ω"
+    "ё" "е" "й" "и"
+  -}}
+  {{- with index $fold $init -}}
+    {{- if eq (index (sort (slice $init (printf "%szzzz" .))) 0) $init -}}
+      {{- $init = . -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $init -}}

@@ -61,7 +61,7 @@
 {{- if $multi -}}
   {{- $out = printf "<div class=\"%s\">\n%s\n</div>" (htmlEscape $divClass) $html -}}
 {{- else -}}
-  {{- $bq := partial "tufte/quote.html" (dict "page" $p "html" $html "author" $author "cite" $cite "url" $url "footer" $footerRaw "class" "") -}}
+  {{- $bq := partial "tufte/quote.html" (dict "page" $p "html" $html "author" $author "cite" $cite "url" $url "footer" $footerRaw "class" "" "where" (printf "%s shortcode in %v" .Name .Position)) -}}
   {{- $out = printf "<div class=\"%s\">%s</div>" (htmlEscape $divClass) $bq -}}
 {{- end -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

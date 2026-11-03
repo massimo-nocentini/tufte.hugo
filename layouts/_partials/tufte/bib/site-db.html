@@ -21,9 +21,20 @@
       file per database, CSL-YAML `references: [...]`, and mixes.
   Data that exists but yields no entry is reported with warnidf
   "tufte-bib-format". Missing data is not an error.
+  Keys are case-insensitive, as in BibTeX: a key found twice (a repeated
+  CSL id, Tufte01 and tufte01, or one key in two files of a data
+  directory) keeps the first entry found (list order; map keys in sorted
+  order, files by name) and the later one is reported with warnidf
+  "tufte-duplicate-cite".
+  An optional dict form passes a label for warnings:
+    dict "data" DATA "where" "content/posts/x.md: refs.yaml"
 */ -}}
 {{- $data := . -}}
 {{- $label := "" -}}
+{{- if and (reflect.IsMap $data) (eq (len $data) 2) (eq (printf "%T" (index $data "where")) "string") (isset $data "data") -}}
+  {{- $label = printf "%v" $data.where -}}
+  {{- $data = $data.data -}}
+{{- end -}}
 {{- if not (or (reflect.IsMap $data) (reflect.IsSlice $data)) -}}
   {{- $dk := "" -}}
   {{- if eq (printf "%T" $data) "string" -}}
@@ -51,6 +62,7 @@
 
 {{- $S := newScratch -}}
 {{- $S.Set "db" dict -}}
+{{- $S.Set "keys" dict -}}
 {{- if or (reflect.IsMap $data) (reflect.IsSlice $data) -}}
   {{- $frontier := slice (dict "v" $data) -}}
   {{- range seq 4 -}}
@@ -62,7 +74,13 @@
           {{- if reflect.IsMap . -}}
             {{- $id := index . "id" -}}
             {{- if $id -}}
-              {{- $S.SetInMap "db" (lower (printf "%v" $id)) . -}}
+              {{- $lk := lower (printf "%v" $id) -}}
+              {{- with index ($S.Get "keys") $lk -}}
+                {{- warnidf "tufte-duplicate-cite" "tufte.hugo: %s: repeated bibliography entry %q (keys are case-insensitive); the first entry, %q, is kept" ($label | default "bibliography data") (printf "%v" $id) . -}}
+              {{- else -}}
+                {{- $S.SetInMap "keys" $lk (printf "%v" $id) -}}
+                {{- $S.SetInMap "db" $lk . -}}
+              {{- end -}}
             {{- else -}}
               {{- $next = $next | append (dict "v" .) -}}
             {{- end -}}
@@ -74,7 +92,13 @@
             {{- $t := index $e "title" -}}
             {{- $ty := index $e "type" -}}
             {{- if or (eq (printf "%T" $t) "string") (eq (printf "%T" $ty) "string") -}}
-              {{- $S.SetInMap "db" (lower (printf "%v" $k)) $e -}}
+              {{- $lk := lower (printf "%v" $k) -}}
+              {{- with index ($S.Get "keys") $lk -}}
+                {{- warnidf "tufte-duplicate-cite" "tufte.hugo: %s: repeated bibliography entry %q (keys are case-insensitive); the first entry, %q, is kept" ($label | default "bibliography data") (printf "%v" $k) . -}}
+              {{- else -}}
+                {{- $S.SetInMap "keys" $lk (printf "%v" $k) -}}
+                {{- $S.SetInMap "db" $lk $e -}}
+              {{- end -}}
             {{- else -}}
               {{- $next = $next | append (dict "v" $e) -}}
             {{- end -}}

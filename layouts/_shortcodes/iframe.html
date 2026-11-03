@@ -7,7 +7,8 @@
 
   Params:
     src    URL of the embedded page (required; or the first positional param)
-    title  accessible title of the iframe (default "Embedded content")
+    title  accessible title of the iframe (default: the translated
+           "Embedded content", i18n key embeddedContent)
     ratio  aspect ratio "W:H" (also "W/H" or "WxH"); default 16:9. Emitted
            as style="--iframe-ratio: W / H;", read by theme.css (aspect-ratio)
     allow  value of the iframe allow attribute
@@ -48,8 +49,7 @@
        URLs refused) so that it goes through tufte/nest.html: nested in a
        theme shortcode (fullwidth, marginblock, epigraph…) its HTML is
        kept, also with markup.goldmark.renderer.unsafe = false. */ -}}
-{{- $url := printf "%v" $src | strings.TrimSpace -}}
-{{- if and (findRE `^[a-zA-Z][a-zA-Z0-9+.-]*:` $url 1) (not (findRE `(?i)^https?:` $url 1)) }}{{ $url = "#ZgotmplZ" }}{{ end -}}
+{{- $url := partial "tufte/safe-url.html" $src -}}
 {{- $out := printf `<figure class="iframe-wrapper%s"%s>` (cond (ne (printf "%v" $class) "") (printf " %s" (htmlEscape (printf "%v" $class))) "") (cond (ne $style "") (printf ` style="%s"` (htmlEscape $style)) "") -}}
-{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" frameborder=\"0\" loading=\"lazy\"%s allowfullscreen></iframe>\n</figure>" $out (htmlEscape $url) (htmlEscape (printf "%v" ($title | default "Embedded content"))) (cond (ne (printf "%v" $allow) "") (printf ` allow="%s"` (htmlEscape (printf "%v" $allow))) "") -}}
+{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" frameborder=\"0\" loading=\"lazy\"%s allowfullscreen></iframe>\n</figure>" $out (htmlEscape $url) (htmlEscape (printf "%v" ($title | default (partial "func/t.html" "embeddedContent") | default "Embedded content"))) (cond (ne (printf "%v" $allow) "") (printf ` allow="%s"` (htmlEscape (printf "%v" $allow))) "") -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

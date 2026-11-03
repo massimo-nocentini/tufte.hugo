@@ -1,7 +1,12 @@
 {{- /*
-  Formats a date with the site "dateFormat" param (default "January 2, 2006").
-  Any Go time layout or Hugo localized token (":date_long", ":date_medium")
-  works; month and day names follow the site language.
+  Formats a date with the site "dateFormat" param. Empty (the theme
+  default): the language's i18n key dateFormat, which is ":date_long" in
+  all five theme files: Hugo's localized long date ("March 5, 2024",
+  "5 marzo 2024", "5. März 2024", "5 de marzo de 2024", "2024年3月5日"), so
+  the order of day and month follows the language. A language without
+  the key (no theme or site i18n file) gets the English value through
+  func/t.html, ":date_long" too; with no value at all, ":date_long". Any Go time layout or Hugo localized token (":date_long",
+  ":date_medium") works; month and day names follow the site language.
 
   Takes: a time.Time value, or a dict with
     "date"   - the time.Time value,
@@ -9,7 +14,7 @@
   Returns: the formatted string, or "" for a zero or missing date.
 */ -}}
 {{- $date := . -}}
-{{- $format := site.Params.dateFormat | default "January 2, 2006" -}}
+{{- $format := site.Params.dateFormat | default (partial "func/t.html" "dateFormat") | default ":date_long" -}}
 {{- if reflect.IsMap . -}}
   {{- $date = .date -}}
   {{- with .format }}{{ $format = . }}{{ end -}}

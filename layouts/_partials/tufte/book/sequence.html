@@ -17,13 +17,14 @@
 {{- $chapters := partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
 {{- $used := slice -}}
 {{- range $chapters }}{{ with .Part }}{{ if not (in $used .) }}{{ $used = $used | append . }}{{ end }}{{ end }}{{ end -}}
+{{- $nameRanks := partialCached "tufte/book/name-ranks.html" $root (or $root.RelPermalink $root.Path) -}}
 {{- $lonely := slice -}}
 {{- range $parts -}}
   {{- if not (in $used .Page) -}}
     {{- $gw := partial "tufte/book/weight-key.html" .Page.Weight -}}
     {{- $gname := .Page.Title -}}
-    {{- with .Page.File }}{{ $gname = .Dir }}{{ end -}}
-    {{- $lonely = $lonely | append (dict "Page" .Page "key" (printf "1|%s|%s|" $gw $gname)) -}}
+    {{- with .Page.File }}{{ $gname = .ContentBaseName }}{{ end -}}
+    {{- $lonely = $lonely | append (dict "Page" .Page "key" (printf "1|%s|%s|" $gw (index $nameRanks $gname | default "999999"))) -}}
   {{- end -}}
 {{- end -}}
 {{- $seq := slice -}}

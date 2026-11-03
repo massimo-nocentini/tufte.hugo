@@ -11,7 +11,8 @@
     2. sidenote and margin note spans,
     3. index anchors, label anchors and number tokens,
     4. Hugo's shortcode placeholders (HAHAHUGOSHORTCODE…HBHB) left in the
-       texts and links of headings that hold a shortcode,
+       texts and links of headings that hold a shortcode (such an entry
+       takes its text from the rendered heading, tufte/toc-text.html),
     5. links inside the heading texts (Hugo 0.146), and raw or dropped
        math replaced by the heading's typeset formula (tufte/toc-text.html),
     6. empty items and lists (an h2 whose only subheading is a run-in h4).
@@ -28,15 +29,20 @@
 {{- if findRE `<li>` $toc 1 -}}
   {{- $toc = replaceRE `</?nav[^>]*>` "" $toc -}}
   {{- $toc = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $toc -}}
+  {{- /* a lone toggle: footnotemark (its input is in the footnotetext) */ -}}
+  {{- $toc = replaceRE `<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label>` "" $toc -}}
   {{- $toc = replaceRE `(?s)<span class="(?:sidenote|marginnote)[^"]*"[^>]*>.*?</span><i class="sn-end" hidden></i>` "" $toc -}}
   {{- $toc = replaceRE `<span class="(?:sidenote|marginnote)[^"]*"[^>]*>[^<]*</span>` "" $toc -}}
   {{- $toc = replaceRE `<span class="(?:index-anchor|tufte-anchor|tufte-num)[^>]*></span>` "" $toc -}}
   {{- $toc = replaceRE `<i class="(?:sn-end|cap-end)" hidden></i>` "" $toc -}}
   {{- /* Hugo's shortcode placeholders: Hugo builds the TOC from the heading
          text before shortcodes run. Links lose them as render-heading.html
-         ids do (tufte/heading-id.html), texts lose them with the space before. */ -}}
-  {{- $toc = replaceRE `\s*HAHAHUGOSHORTCODE[0-9A-Za-z]*?HBHB` "" $toc -}}
-  {{- range findRE `href="#[^"]*hahahugoshortcode[^"]*"` $toc -}}
+         ids do (tufte/heading-id.html); in texts they become a marker, so
+         that the entry takes its text from the rendered heading
+         (tufte/toc-text.html, shortcode = true). */ -}}
+  {{- $sc := `<i class="tufte-toc-sc" hidden></i>` -}}
+  {{- $toc = replaceRE `\s*HAHAHUGOSHORTCODE[0-9A-Za-z]*?HBHB` $sc $toc -}}
+  {{- range findRE `href="#[^"]*(?:hahahugoshortcode|tuftenest)[^"]*"` $toc -}}
     {{- $id := replaceRE `^href="#(.*)"$` "$1" . -}}
     {{- $toc = replace $toc . (printf `href="#%s"` (partial "tufte/heading-id.html" $id)) -}}
   {{- end -}}
@@ -46,18 +52,32 @@
          (Hugo leaves raw TeX, or drops it on 0.146). An entry ends at the
          </a> followed by its sublist or </li>, so inner links are part of
          its text. */ -}}
+  {{- /* Each entry is rewritten once, in order (replace … 1), and the
+         nth entry with a given id reads the nth heading with that id. */ -}}
+  {{- $seen := slice -}}
+  {{- $done := "" -}}
   {{- range findRESubmatch `(?s)<li><a href="#([^"]*)">(.*?)</a>(\s*(?:<ul>|<ol>|</li>))` $toc -}}
     {{- $m := index . 0 -}}
-    {{- $text := partial "tufte/toc-text.html" (dict "page" $ "id" (htmlUnescape (index . 1)) "text" (index . 2)) -}}
-    {{- $toc = replace $toc $m (printf `<li><a href="#%s">%s</a>%s` (index . 1) $text (index . 3)) -}}
+    {{- $id := htmlUnescape (index . 1) -}}
+    {{- $nth := 1 -}}
+    {{- range $seen }}{{ if eq . $id }}{{ $nth = add $nth 1 }}{{ end }}{{ end -}}
+    {{- $seen = $seen | append $id -}}
+    {{- $raw := index . 2 -}}
+    {{- $hasSC := strings.Contains $raw $sc -}}
+    {{- $text := partial "tufte/toc-text.html" (dict "page" $ "id" $id "text" (strings.TrimSpace (replace $raw $sc "")) "shortcode" $hasSC "nth" $nth) -}}
+    {{- $cut := split $toc $m -}}
+    {{- $done = printf "%s%s<li><a href=\"#%s\">%s</a>%s" $done (index $cut 0) (index . 1) $text (index . 3) -}}
+    {{- $toc = delimit (after 1 $cut) $m -}}
   {{- end -}}
+  {{- $toc = printf "%s%s" $done $toc -}}
+  {{- $toc = replace $toc $sc "" -}}
   {{- /* Empty items: a level with no entry of its own, e.g. an h2 whose
          only subheading is a run-in h4 (#### Title) below the TOC levels. */ -}}
   {{- range seq 3 -}}
     {{- $toc = replaceRE `<li>\s*</li>` "" $toc -}}
     {{- $toc = replaceRE `<(ul|ol)>\s*</(ul|ol)>` "" $toc -}}
   {{- end -}}
-  {{- $label := T "tableOfContents" -}}
+  {{- $label := partial "func/t.html" "tableOfContents" -}}
   {{- if findRE `<li>` $toc 1 }}{{ $out = printf "<nav class=\"toc\" aria-label=\"%s\">\n  <p class=\"sans\">%s</p>\n  %s\n</nav>" (htmlEscape $label) (htmlEscape $label) (strings.TrimSpace $toc) }}{{ end -}}
 {{- end -}}
 {{- return ($out | safeHTML) -}}

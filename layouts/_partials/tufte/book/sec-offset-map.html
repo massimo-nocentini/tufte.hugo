@@ -1,0 +1,55 @@
+{{- /*
+  Section-number context of the pages of a book (for tufte/labels.html,
+  headings.number), in one pass over the print order (the landing, then
+  tufte/book/sequence.html).
+
+  As in the LaTeX book classes, where \section is reset only when the
+  chapter counter steps: a numbered chapter (main matter, appendix) numbers
+  its sections N.1, N.2…; a page that does not step the chapter counter
+  (the landing, a part page, an unnumbered chapter, the front or back
+  matter) continues the sections of the last numbered chapter before it,
+  with that chapter's prefix ("1.3" after section 1.2), or "0." before the
+  first one (front matter: 0.1, 0.2). So no two sections of the book get
+  the same number. A page whose book.numberChapters is off numbers its
+  sections 1, 2… with no prefix and is not counted (as the floats of
+  tufte/book/local-offset-map.html).
+
+  Takes: the book root page.
+  Returns: map page key → dict prefix (string: "N.", "0." or "") h2 (int:
+           the numbered h2 sections before the page's first one in its
+           sequence); page key = printf "%s|%s" .Path (or .RelPermalink "").
+  Callers: partialCached "tufte/book/sec-offset-map.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- /* Memoized in the root's Store for the current build: see tufte/opts.html. */ -}}
+{{- $memoRes := dict -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoSecOffsetMap") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $root := . -}}
+{{- $M := newScratch -}}
+{{- $M.Set "m" dict -}}
+{{- $pre := "0." -}}
+{{- $h := 0 -}}
+{{- $pages := slice (dict "Page" $root "Chapter" false) -}}
+{{- range partialCached "tufte/book/sequence.html" $root (or $root.RelPermalink $root.Path) }}{{ $pages = $pages | append . }}{{ end -}}
+{{- range $pages -}}
+  {{- $p := .Page -}}
+  {{- $k := printf "%s|%s" $p.Path (or $p.RelPermalink "") -}}
+  {{- $c := partialCached "tufte/counts.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- $numbered := false -}}
+  {{- with .Chapter }}{{ $numbered = .Numbered }}{{ end -}}
+  {{- if $numbered -}}
+    {{- $pre = printf "%s." .Chapter.Display -}}
+    {{- $h = 0 -}}
+  {{- end -}}
+  {{- if or $numbered (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.numberchapters") (or $p.RelPermalink $p.Path) "book.numberchapters")) -}}
+    {{- $M.SetInMap "m" $k (dict "prefix" $pre "h2" $h) -}}
+    {{- $h = add $h ($c.sec2 | default 0) -}}
+  {{- else -}}
+    {{- $M.SetInMap "m" $k (dict "prefix" "" "h2" 0) -}}
+  {{- end -}}
+{{- end -}}
+{{- $memoRes = $M.Get "m" -}}
+{{- $root.Store.Set "tufteMemoSecOffsetMap" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
+{{- end -}}
+{{- return $memoRes -}}

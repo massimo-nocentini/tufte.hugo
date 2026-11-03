@@ -1,0 +1,59 @@
+{{- /*
+  The plain text of a rendered caption, for an attribute that names the
+  float: a figure's alt text (tufte/figure.html), a video's aria-label
+  (the video shortcode).
+
+  Math: server KaTeX output reads as its TeX ($x^2$, the TeX annotation of
+  its MathML copy). The rest of the MathML copy and the visual HTML
+  (span.katex-html, whose text is in layout order: \frac{a}{b} would read
+  "ba") are left out. Also left out, as not part of the caption's
+  wording: the toggles (label/input, "⊕") and the nested sidenotes, margin notes,
+  notes in notes, citation blocks and real-footnote markers (span.tufte-fn)
+  (spans balanced, so their own nested spans do not end them early).
+  Cross-reference markers are kept as they are: the caller escapes them
+  into the attribute and tufte/postprocess.html replaces the escaped
+  marker with the resolved text ("Table 1"), as in the visible caption.
+  So are nobib citation numbers (cite-num spans, "[2]"): postprocess fills
+  the escaped span as it fills the visible one. A shortcode placeholder
+  still in the caption (a shortcode in a Markdown image title, see
+  tufte/figure.html) is dropped: it must not reach the attribute, where
+  Hugo would put the shortcode's HTML.
+
+  Takes: the caption HTML (string or template.HTML).
+  Returns: the plain text (string; not escaped, the markers above raw).
+*/ -}}
+{{- $buf := "" -}}
+{{- $depth := 0 -}}
+{{- $skip := 0 -}}
+{{- $inLabel := false -}}
+{{- $inTex := false -}}
+{{- $skipMath := false -}}
+{{- range $t := findRE `(?s)<a class="xref"[^>]*>[^<]*</a>|<span class="cite-num"[^>]*></span>|<[^>]*>|[^<]+` (string .) -}}
+  {{- if eq $t `<annotation encoding="application/x-tex">` -}}
+    {{- /* only the formula's own (not one in a skipped note or label) */ -}}
+    {{- $inTex = and $skipMath (not $inLabel) -}}
+  {{- else if and $inTex (not (strings.HasPrefix $t "<")) -}}
+    {{- $buf = printf "%s$%s$" $buf (strings.TrimSpace (htmlUnescape $t)) -}}
+  {{- else if eq $t "</annotation>" -}}
+    {{- $inTex = false -}}
+  {{- else if strings.HasPrefix $t `<span class="cite-num"` -}}
+    {{- if not (or (gt $skip 0) $inLabel) }}{{ $buf = printf "%s%s" $buf $t }}{{ end -}}
+  {{- else if strings.HasPrefix $t "<span" -}}
+    {{- $depth = add $depth 1 -}}
+    {{- if and (eq $skip 0) (findRE `^<span class="(?:sidenote|marginnote|note-in-note|katex-mathml|katex-html|citation-block|tufte-fn)[" ]` $t 1) }}{{ $skip = $depth }}{{ $skipMath = strings.HasPrefix $t `<span class="katex-mathml"` }}{{ end -}}
+  {{- else if eq $t "</span>" -}}
+    {{- if eq $skip $depth }}{{ $skip = 0 }}{{ end -}}
+    {{- $depth = sub $depth 1 -}}
+  {{- else if strings.HasPrefix $t "<label" -}}
+    {{- $inLabel = true -}}
+  {{- else if eq $t "</label>" -}}
+    {{- $inLabel = false -}}
+  {{- else if or (gt $skip 0) $inLabel -}}
+  {{- else if strings.HasPrefix $t `<a class="xref"` -}}
+    {{- $buf = printf "%s%s" $buf $t -}}
+  {{- else if not (strings.HasPrefix $t "<") -}}
+    {{- $buf = printf "%s%s" $buf (htmlUnescape $t) -}}
+  {{- end -}}
+{{- end -}}
+{{- $buf = $buf | replaceRE `HAHAHUGOSHORTCODE\w*?HBHB` "" | replaceRE `\s+` " " | strings.TrimSpace -}}
+{{- return $buf -}}

@@ -7,8 +7,12 @@
   root is the page itself when it is such a section (or that home page),
   else the nearest ancestor that is. Taxonomy and term pages (tags,
   categories) are never in a book: their ancestor is the home page, but
-  they are not chapters. Nested books are unsupported (the nearest one
-  wins).
+  they are not chapters. A book inside a book is not a book of its own:
+  the outermost `book: true` wins, so the inner section is a part of the
+  outer book (its numbers, contents, navigation and print.html agree),
+  and tufte/book/chapters.html warns (tufte-book-structure). A page with
+  `build: {list: never}` is in no page collection, hence in no book: it
+  renders as an ordinary page.
 
   Takes: a page.
   Returns: the book root page, or false.
@@ -19,12 +23,26 @@
 {{- if in (slice "home" "section" "page") $p.Kind -}}
   {{- if and (or $p.IsSection $p.IsHome) (partial "tufte/truthy.html" (index $p.Params "book")) -}}
     {{- $root = $p -}}
-  {{- else -}}
-    {{- range $p.Ancestors -}}
-      {{- if and (not $root) (or .IsSection .IsHome) (partial "tufte/truthy.html" (index .Params "book")) -}}
-        {{- $root = . -}}
-      {{- end -}}
+  {{- end -}}
+  {{- /* Ancestors run from the parent up to the home page: the last
+         match is the outermost book. */ -}}
+  {{- range $p.Ancestors -}}
+    {{- if and (or .IsSection .IsHome) (partial "tufte/truthy.html" (index .Params "book")) -}}
+      {{- $root = . -}}
     {{- end -}}
+  {{- end -}}
+  {{- /* A page that is not in the book's reading order is not a chapter:
+         one with `build: {list: never}` is in no page collection, so
+         tufte/book/chapters.html (the root's RegularPages and each part's
+         RegularPagesRecursive) cannot number it, give it labels or link it
+         from the navigation; it is an ordinary page. The same collections
+         as there (a part is the ancestor that is a child of the root). */ -}}
+  {{- if and $root (eq $p.Kind "page") -}}
+    {{- $coll := $root.RegularPages -}}
+    {{- if ne $p.Parent $root -}}
+      {{- range $p.Ancestors }}{{ if eq .Parent $root }}{{ $coll = .RegularPagesRecursive }}{{ end }}{{ end -}}
+    {{- end -}}
+    {{- if not (in $coll $p) }}{{ $root = false }}{{ end -}}
   {{- end -}}
 {{- end -}}
 {{- return $root -}}

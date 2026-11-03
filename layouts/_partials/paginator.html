@@ -5,13 +5,13 @@
 */ -}}
 {{- $pag := partial "func/paginate.html" . -}}
 {{- if gt $pag.TotalPages 1 }}
-<nav class="pagination" aria-label="{{ T "page" }}">
+<nav class="pagination" aria-label="{{ partial "func/t.html" "page" }}">
   {{- with $pag.Prev }}
-  <a class="pagination-prev" href="{{ .URL }}" rel="prev">&larr;&nbsp;{{ T "newerPosts" }}</a>
+  <a class="pagination-prev" href="{{ .URL }}" rel="prev">&larr;&nbsp;{{ partial "func/t.html" "newerPosts" }}</a>
   {{- end }}
-  <span class="pagination-current">{{ T "page" }} {{ $pag.PageNumber }} {{ T "of" }} {{ $pag.TotalPages }}</span>
+  <span class="pagination-current">{{ partial "func/t.html" "page" }} {{ $pag.PageNumber }} {{ partial "func/t.html" "of" }} {{ $pag.TotalPages }}</span>
   {{- with $pag.Next }}
-  <a class="pagination-next" href="{{ .URL }}" rel="next">{{ T "olderPosts" }}&nbsp;&rarr;</a>
+  <a class="pagination-next" href="{{ .URL }}" rel="next">{{ partial "func/t.html" "olderPosts" }}&nbsp;&rarr;</a>
   {{- end }}
 </nav>
 {{- end -}}

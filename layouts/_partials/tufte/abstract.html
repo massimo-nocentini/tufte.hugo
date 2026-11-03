@@ -31,6 +31,14 @@
   {{- if strings.Contains (string $raw) $end -}}
     {{- /* The same processed HTML as func/content.html's. */ -}}
     {{- $html := partial "tufte/processed.html" (dict "page" $p "summary" false "print" $print) -}}
+    {{- /* Not a book's front pages (tufte/book/front-fields.html) nor
+           the title-block notes before it (tufte/title-notes.html). */ -}}
+    {{- if strings.Contains $html `<i class="tufte-ff-end" hidden></i>` -}}
+      {{- $html = replaceRE `(?s)<i class="tufte-ff" data-slot="[a-z]+" hidden></i>.*?<i class="tufte-ff-end" hidden></i>\n?` "" $html -}}
+    {{- end -}}
+    {{- if strings.Contains $html `<i class="tufte-tn-end" hidden></i>` -}}
+      {{- $html = replaceRE `(?s)^.*?<i class="tufte-tn-end" hidden></i>\n?` "" $html -}}
+    {{- end -}}
     {{- with findRE (printf `(?s)^.*?%s` $end) $html 1 -}}
       {{- $out = index . 0 | strings.TrimSuffix $end | strings.TrimSpace -}}
     {{- end -}}

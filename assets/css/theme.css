@@ -513,7 +513,7 @@ nav.toc,
 
 .toc ul ul,
 .toc ol ol {
-    padding-left: 1.1rem;
+    padding-inline-start: 1.1rem;
 }
 
 .toc li:not(:first-child) {
@@ -769,6 +769,30 @@ blockquote:not(.alert) > .math-display {
     max-width: 100%;
 }
 
+/* Display math and quotations in a note (sidenote, margin note or
+   caption, margin block, real footnote) are set at the note's size, as
+   LaTeX sets them in \footnotesize inside \footnote, \sidenote and a
+   margin minipage: the note's own font size and leading, small vertical
+   space, and a quote indented 1em on both sides instead of the UA's 40px
+   (its paragraphs and attribution fill it). */
+:is(.sidenote, .marginnote, .margin-block, ol.footnotes-list) .math-display {
+    font-size: inherit;
+    line-height: inherit;
+    margin-top: 0.4rem;
+    margin-bottom: 0.4rem;
+}
+
+:is(.sidenote, .marginnote, .margin-block, ol.footnotes-list) blockquote {
+    margin: 0.4rem 1em;
+    font-size: inherit;
+}
+
+:is(.sidenote, .marginnote, .margin-block, ol.footnotes-list) blockquote :is(p, footer) {
+    width: auto;
+    margin-right: 0;
+    font-size: inherit;
+}
+
 /* Invalid TeX (render-passthrough.html prints a build warning and shows the
    source). An explicit params.math.errorColor is set inline instead. */
 code.math-error {
@@ -882,10 +906,12 @@ blockquote:not(.alert) > div.highlight > div {
     margin-left: 2.5%;
 }
 
-/* Plain fences (tufte's pre > code) nested in a list item or an alert, both
-   already in the text column. In a plain blockquote tufte's 52.5% stays. */
+/* Plain fences (tufte's pre > code) nested in a list item, an alert or
+   the details shortcode, all already in the text column. In a plain
+   blockquote tufte's 52.5% stays (print: tufte-latex.css §12). */
 li pre > code,
-blockquote.alert pre > code {
+blockquote.alert pre > code,
+section > details pre > code {
     width: auto;
     margin-left: 0;
 }
@@ -1225,6 +1251,16 @@ details[open] > summary {
     margin-bottom: 0.6rem;
 }
 
+/* The content of a closed <details> is not rendered, so its numbered
+   sidenote marks do not step the counter. func/content-raw.html puts
+   <span class="sn-skip-details" style="--sn-skip: N"> after a block that
+   holds N of them: it steps the counter for them only while the block is
+   closed, so later marks keep the numbers that xrefs print. Not hidden: an
+   element with display: none steps no counter. */
+details:not([open]) + .sn-skip-details {
+    counter-increment: sidenote-counter var(--sn-skip, 0);
+}
+
 details > p,
 details > ul,
 details > ol {
@@ -1395,6 +1431,107 @@ figure.video video {
 @media (max-width: 760px) {
     section > details {
         width: 100%;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Right-to-left languages (languageDirection = "rtl")                 */
+/* ------------------------------------------------------------------ */
+/* <html dir="rtl">. Tufte CSS is a physical left-to-right grid (body
+   padding-left, sidenotes float:right with margin-right:-60%): in an RTL
+   document the text column would sit against the right edge of the
+   window and every note beyond it, off-screen. So the grid stays
+   left-to-right (text column on the left, notes, margin figures and
+   captions in the right margin, navigation arrows as drawn) and the
+   text of each block runs right to left: a block is placed by its
+   parent, which is left-to-right, and lays out its own lines with its
+   own direction. Code and math stay left-to-right. */
+html[dir="rtl"] {
+    direction: ltr;
+}
+
+html[dir="rtl"] :is(p, h1, h2, h3, h4, h5, h6, ul, ol, dl, div.table-wrapper,
+    table, figcaption, footer, summary, .sidenote, .marginnote, .site-title) {
+    direction: rtl;
+}
+
+html[dir="rtl"] :is(pre, code, kbd, samp, .katex, .math-display, .katex-display) {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* A heading spanning the article would put its (right-aligned) text over
+   the margin: keep it over the text column, as the paragraphs. */
+html[dir="rtl"] :is(main, article, section, header, div.post-summary) > :is(h1, h2, h3, h4, h5, h6, p.subtitle) {
+    max-width: 55%;
+}
+
+/* Its notes (a heading note, a \thanks note in the title or the chapter
+   title) then take the paragraph geometry, not the section-wide heading
+   geometry of tufte-latex.css (27.5%/12%, or 30.6%/2.2% in a chapter
+   title), which would put them inside the text column. Desktop screens:
+   phones use the toggle rules, print the --pw/--pl geometry (below). A
+   run-in h4 is left out: its notes are placed in section coordinates. */
+@media screen and (width > 760px) {
+    html[dir="rtl"] :is(main, article, section, header, div.post-summary) > :is(h1, h2, h3, h4:not(.run-in), h5, h6, p.subtitle) :is(.sidenote, .marginnote) {
+        min-width: 0;
+        width: 50%;
+        margin-right: -60%;
+    }
+}
+
+/* On paper the text column is --pt% of the page (tufte-latex.css §12),
+   chapter and part titles included; their notes measure the heading. */
+@media print {
+    html[dir="rtl"] :is(main, article, section, header, div.post-summary) > :is(h1, h2, h3, h4:not(.run-in), h5, h6, p.subtitle) {
+        max-width: calc(var(--pt) * 1%);
+        --pw: var(--pt);
+        --pl: 0;
+    }
+
+    html[dir="rtl"] section > h4.run-in {
+        max-width: calc(var(--pt) * 1%);
+    }
+}
+
+/* The site subtitle spans the header: keep it under the title. */
+html[dir="rtl"] .site-subtitle {
+    text-align: left;
+}
+
+/* A run-in heading floats left of its paragraph, which is where an RTL
+   paragraph's first line ends: show it as an ordinary heading. */
+html[dir="rtl"] section > h4.run-in {
+    float: none;
+    margin: 1.4rem 0 0 0;
+}
+
+html[dir="rtl"] dd {
+    margin-left: 0;
+    margin-right: 1.5rem;
+}
+
+html[dir="rtl"] div.table-wrapper :is(th, td) {
+    text-align: start;
+}
+
+html[dir="rtl"] div.table-wrapper :is(th, td):first-child {
+    padding-left: 0.8rem;
+    padding-right: 0;
+}
+
+html[dir="rtl"] div.table-wrapper :is(th, td):last-child {
+    padding-left: 0;
+    padding-right: 0.8rem;
+}
+
+html[dir="rtl"] div.table-wrapper :is(th, td):only-child {
+    padding-right: 0;
+}
+
+@media screen and (max-width: 760px) {
+    html[dir="rtl"] :is(main, article, section, header, div.post-summary) > :is(h1, h2, h3, h4, h5, h6, p.subtitle) {
+        max-width: none;
     }
 }
 

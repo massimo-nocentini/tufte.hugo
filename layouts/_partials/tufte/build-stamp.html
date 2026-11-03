@@ -1,0 +1,10 @@
+{{- /*
+  An id of the current build: the time of its first call. Always called
+  as partialCached "tufte/build-stamp.html" "stamp" "stamp", so it is
+  computed once per build; Hugo empties partialCached on every rebuild of
+  `hugo server` (and `hugo --watch`), and the next call gives a new id.
+  Read by tufte/memo.html.
+
+  Returns: an int.
+*/ -}}
+{{- return now.UnixNano -}}

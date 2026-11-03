@@ -11,10 +11,10 @@
   value is a page or false.
   Callers: partialCached "tufte/book/special.html" $root (or $root.RelPermalink $root.Path)
 */ -}}
-{{- /* Memoized in the root's Store (not in hugo server): see
+{{- /* Memoized in the root's Store for the current build: see
        tufte/opts.html. */ -}}
 {{- $memoRes := false -}}
-{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoSpecial") -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoSpecial") -}}
   {{- $memoRes = .v -}}
 {{- else -}}
 {{- $root := . -}}
@@ -32,6 +32,6 @@
   {{- end -}}
 {{- end -}}
 {{- $memoRes = $S.Get "f" -}}
-{{- if not hugo.IsServer }}{{ $root.Store.Set "tufteMemoSpecial" (dict "v" $memoRes) }}{{ end -}}
+{{- $root.Store.Set "tufteMemoSpecial" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $memoRes -}}

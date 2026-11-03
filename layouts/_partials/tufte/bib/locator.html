@@ -1,0 +1,18 @@
+{{- /*
+  The page locator of a citation (cite page=, the optional argument of
+  \cite[p. 42]{…}): "42" → "p. 42", "42-45" or "42--45" → "pp. 42–45" (en
+  dash), "42, 45" → "pp. 42, 45". The abbreviations are translated (i18n
+  keys bibPageAbbr and bibPagesAbbr: de "S.", fr "p.").
+
+  Takes: the page text (string).
+  Returns: the locator (string, not escaped), "" for an empty page.
+*/ -}}
+{{- $pn := strings.TrimSpace (printf "%v" .) -}}
+{{- $out := "" -}}
+{{- with $pn -}}
+  {{- $pn = replaceRE `([0-9A-Za-z])\s*-{1,3}\s*([0-9A-Za-z])` "$1–$2" . -}}
+  {{- $word := partial "func/t.html" "bibPageAbbr" | default "p." -}}
+  {{- if findRE `[–—,;&]` $pn 1 }}{{ $word = partial "func/t.html" "bibPagesAbbr" | default "pp." }}{{ end -}}
+  {{- $out = printf "%s %s" $word $pn -}}
+{{- end -}}
+{{- return $out -}}

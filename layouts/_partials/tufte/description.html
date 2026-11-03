@@ -11,7 +11,9 @@
       spans included),
     - margin toggles (label: the ⊕ of margin notes) and their checkboxes,
     - heading anchors (a.heading-anchor: "#"), footnote references
-      (sup.footnote-ref), the MathML copy of KaTeX output (span.katex-mathml),
+      (sup.footnote-ref), KaTeX output but its TeX (the visual HTML
+      span.katex-html reads in layout order, \frac{a}{b} as "ba"; the
+      formula reads $TeX$, from the TeX annotation of span.katex-mathml),
     - embedded media: <video>, <audio>, <iframe> and <object> elements (the
       video shortcode's fallback link names the file: "flow.mp4").
   The rest is plainified, whitespace is collapsed and the text is cut at
@@ -22,13 +24,21 @@
 */ -}}
 {{- $p := . -}}
 {{- $html := string (partialCached "func/content.html" (dict "page" $p "summary" true) (or $p.RelPermalink $p.Path) true) -}}
-{{- $skipRE := `^<(span|div|label|a|sup)\s[^>]*class="(?:sidenote|marginnote|citation-block|margin-toggle|heading-anchor|footnote-ref|katex-mathml)\b` -}}
+{{- $skipRE := `^<(span|div|label|a|sup)\s[^>]*class="(?:sidenote|marginnote|citation-block|margin-toggle|heading-anchor|footnote-ref|katex-mathml|katex-html)\b` -}}
 {{- $out := "" -}}
 {{- $tag := "" -}}
+{{- $skipMath := false -}}
+{{- $inTex := false -}}
 {{- $depth := 0 -}}
 {{- range findRE `<[^>]*>|[^<]+` $html -}}
   {{- if $tag -}}
-    {{- if findRE (printf `^<%s[\s>]` $tag) . 1 -}}
+    {{- if and $skipMath (eq . `<annotation encoding="application/x-tex">`) -}}
+      {{- $inTex = true -}}
+    {{- else if eq . "</annotation>" -}}
+      {{- $inTex = false -}}
+    {{- else if and $inTex (not (strings.HasPrefix . "<")) -}}
+      {{- $out = printf "%s$%s$" $out (strings.TrimSpace .) -}}
+    {{- else if findRE (printf `^<%s[\s>]` $tag) . 1 -}}
       {{- $depth = add $depth 1 -}}
     {{- else if eq . (printf "</%s>" $tag) -}}
       {{- $depth = sub $depth 1 -}}
@@ -38,6 +48,7 @@
     {{- /* checkbox of a margin toggle: dropped */ -}}
   {{- else if or (findRE $skipRE . 1) (findRE `^<(?:video|audio|iframe|object)[\s>]` . 1) -}}
     {{- $tag = replaceRE `^<([a-z]+)[\s\S]*$` "$1" . -}}
+    {{- $skipMath = strings.Contains . `class="katex-mathml"` -}}
     {{- $depth = 1 -}}
   {{- else -}}
     {{- /* Block boundaries become spaces, so paragraphs do not run together. */ -}}

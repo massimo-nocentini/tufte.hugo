@@ -1,9 +1,12 @@
 {{- /*
   The theme is CSS-only and ships no JavaScript. If the site (or a fork)
-  adds files under assets/js/*.js, they are concatenated in name order into
-  one deferred bundle, minified in production, fingerprinted with SRI.
+  adds files under assets/js/tufte/*.js, they are concatenated in name
+  order into one deferred classic script on every page, minified in
+  production, fingerprinted with SRI (README "Customisation"). Only that
+  theme-namespaced folder: a site's own assets/js/*.js (often js.Build
+  entry points with `import`) is never injected as a classic script.
 */ -}}
-{{- with resources.Match "js/*.js" -}}
+{{- with resources.Match "js/tufte/*.js" -}}
   {{- $js := . | resources.Concat "js/tufte-hugo.js" -}}
   {{- if hugo.IsProduction -}}
     {{- $js = $js | minify -}}

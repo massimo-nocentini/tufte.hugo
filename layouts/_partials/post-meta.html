@@ -1,7 +1,10 @@
 {{- /*
   One line of page metadata: date (and update date), author, reading time,
-  word count, categories, tags. Rendered only for pages that have a date,
-  categories or tags (or author sidenotes to show).
+  word count, categories, tags. Rendered only for pages that have a date
+  (or dateText), categories or tags, or an author of their own (front
+  matter `author`, with or without thanks sidenotes): the site-wide
+  params.author.name alone does not give an undated page (an About page)
+  a byline.
   Params: showReadingTime (default true), showWordCount (default false);
   both can be overridden in front matter.
   Front matter, as in the latex title block (\date): `showDate: false`
@@ -30,33 +33,33 @@
 {{- $showDate := ne $p.Params.showdate false -}}
 {{- $dateText := "" -}}
 {{- with $p.Params.datetext }}{{ $dateText = printf "%v" . }}{{ end -}}
-{{- if or (not $p.Date.IsZero) $tags $categories (and $showDate $dateText) (gt $notes 0) -}}
+{{- if or (not $p.Date.IsZero) $tags $categories (and $showDate $dateText) (gt $notes 0) (and $p.Params.author $author) -}}
 {{- $sep := false }}
 <p class="post-meta sans">
   {{- if $showDate -}}
     {{- if $dateText -}}
-      {{ T "postedOn" }} {{ $dateText }}
+      {{ partial "func/t.html" "postedOn" }} {{ $dateText }}
       {{- $sep = true -}}
     {{- else if not $p.Date.IsZero -}}
-      {{ T "postedOn" }} <time datetime="{{ $p.Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ partial "func/date.html" $p.Date }}</time>
-      {{- if and (not $p.Lastmod.IsZero) (gt ($p.Lastmod.Format "2006-01-02") ($p.Date.Format "2006-01-02")) }} ({{ T "updatedOn" }} <time datetime="{{ $p.Lastmod.Format "2006-01-02T15:04:05Z07:00" }}">{{ partial "func/date.html" $p.Lastmod }}</time>)
+      {{ partial "func/t.html" "postedOn" }} <time datetime="{{ $p.Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ partial "func/date.html" $p.Date }}</time>
+      {{- if and (not $p.Lastmod.IsZero) (gt ($p.Lastmod.Format "2006-01-02") ($p.Date.Format "2006-01-02")) }} ({{ partial "func/t.html" "updatedOn" }} <time datetime="{{ $p.Lastmod.Format "2006-01-02T15:04:05Z07:00" }}">{{ partial "func/date.html" $p.Lastmod }}</time>)
       {{- end -}}
       {{- $sep = true -}}
     {{- end -}}
   {{- end -}}
   {{- with $author -}}
     {{- if $sep }} &middot; {{ end -}}
-    {{ T "by" }} {{ . | safeHTML }}
+    {{ partial "func/t.html" "by" }} {{ . | safeHTML }}
     {{- $sep = true -}}
   {{- end -}}
-  {{- if and (ne ($p.Param "showReadingTime") false) (gt $p.ReadingTime 0) -}}
+  {{- if and (partial "func/flag.html" (dict "value" ($p.Param "showReadingTime") "default" true)) (gt $p.ReadingTime 0) -}}
     {{- if $sep }} &middot; {{ end -}}
-    {{ T "readingTime" $p.ReadingTime }}
+    {{ partial "func/t.html" (dict "key" "readingTime" "count" $p.ReadingTime) }}
     {{- $sep = true -}}
   {{- end -}}
-  {{- if and ($p.Param "showWordCount") (gt $p.WordCount 0) -}}
+  {{- if and (partial "func/flag.html" (dict "value" ($p.Param "showWordCount") "default" false)) (gt $p.WordCount 0) -}}
     {{- if $sep }} &middot; {{ end -}}
-    {{ T "wordCount" $p.WordCount }}
+    {{ partial "func/t.html" (dict "key" "wordCount" "count" $p.WordCount) }}
     {{- $sep = true -}}
   {{- end -}}
   {{- with $categories -}}

@@ -9,6 +9,14 @@
   the full page; links are relative to the site, as on the list pages.
   The language tag comes from func/lang.html (Hugo 0.158 renamed
   LanguageCode to Locale).
+
+  Authors: params.author.email, when set, is published, as in Hugo's
+  embedded feed: RSS 2.0 wants an address in <managingEditor>,
+  <webMaster> and an item's <author> ("EMAIL (NAME)"). An item credits its
+  page's own authors (front matter `author`, tufte/authors.html): the site
+  author's "EMAIL (NAME)" only when the page has no `author` of its own,
+  else the names in <dc:creator> (Dublin Core, which takes a name without
+  an address). Without an e-mail every item has <dc:creator>.
 */ -}}
 {{- $authorEmail := "" }}
 {{- with site.Params.author }}
@@ -48,13 +56,18 @@
 {{- end }}
 {{- $lang := partial "func/lang.html" site.Language }}
 {{- printf "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>" | safeHTML }}
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     {{- /* The channel title is the plain title (tufte/plain-title.html), as in <title>. */}}
-    {{- $chTitle := "" }}{{ if ne .Title site.Title }}{{ with .Title }}{{ $chTitle = partial "tufte/plain-title.html" (dict "page" $ "title" .) }}{{ end }}{{ end }}
-    <title>{{ with $chTitle }}{{ . }} on {{ end }}{{ site.Title }}</title>
+    {{- $chTitle := "" }}{{ $pt := partial "tufte/page-title.html" . }}{{ if ne $pt site.Title }}{{ with $pt }}{{ $chTitle = partial "tufte/plain-title.html" (dict "page" $ "title" .) }}{{ end }}{{ end }}
+    {{- /* "Posts on Site", "Recent content in Posts on Site": i18n keys
+           rssTitle, rssDescription and rssDescriptionSite (func/t.html);
+           html/template escapes the result for XML. */}}
+    {{- $fields := dict "Title" $chTitle "Site" site.Title }}
+    {{- $descKey := "rssDescriptionSite" }}{{ if $chTitle }}{{ $descKey = "rssDescription" }}{{ end }}
+    <title>{{ if $chTitle }}{{ partial "func/t.html" (dict "key" "rssTitle" "data" $fields) }}{{ else }}{{ site.Title }}{{ end }}</title>
     <link>{{ .Permalink }}</link>
-    <description>Recent content {{ with $chTitle }}in {{ . }} {{ end }}on {{ site.Title }}</description>
+    <description>{{ partial "func/t.html" (dict "key" $descKey "data" $fields) }}</description>
     <generator>Hugo</generator>
     <language>{{ $lang.locale }}</language>{{ with $authorEmail }}
     <managingEditor>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</managingEditor>{{ end }}{{ with $authorEmail }}
@@ -66,11 +79,26 @@
     {{- end }}
     {{- range $pages }}
     {{- $summary := partialCached "func/content.html" (dict "page" . "summary" true) (or .RelPermalink .Path) true }}
+    {{- /* Hugo makes the feed's root-relative src= and href= absolute,
+           not poster= (the video shortcode's poster image): done here,
+           with the site's scheme and host (the path already holds the
+           base path; with canonifyURLs, whose root-relative URLs lack it,
+           tufte/postprocess.html has made such a poster= absolute). */}}
+    {{- if strings.Contains (string $summary) ` poster="/` }}
+      {{- $bu := urls.Parse site.BaseURL }}
+      {{- if $bu.Host }}
+        {{- $summary = replaceRE ` poster="/([^/"][^"]*)?"` (printf ` poster="%s://%s/$1"` $bu.Scheme $bu.Host) (string $summary) }}
+      {{- end }}
+    {{- end }}
     <item>
       <title>{{ partial "tufte/plain-title.html" (dict "page" . "title" .Title) }}</title>
       <link>{{ .Permalink }}</link>
       <pubDate>{{ .PublishDate.Format "Mon, 02 Jan 2006 15:04:05 -0700" | safeHTML }}</pubDate>
-      {{- with $authorEmail }}<author>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</author>{{ end }}
+      {{- if and $authorEmail (not .Params.author) }}
+      <author>{{ $authorEmail }}{{ with $authorName }} ({{ . }}){{ end }}</author>
+      {{- else }}{{ with (partial "tufte/authors.html" (dict "page" .)).plain }}
+      <dc:creator>{{ . }}</dc:creator>
+      {{- end }}{{ end }}
       <guid>{{ .Permalink }}</guid>
       <description>{{ string $summary | transform.XMLEscape | safeHTML }}</description>
     </item>

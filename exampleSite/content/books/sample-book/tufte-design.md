@@ -119,18 +119,18 @@ designed for Tufte's books, with Gill Sans for the sans-serif.
 The following font sizes are defined by the Tufte-LaTeX classes:{{< index "typefaces!sizes" >}}
 
 {{< table label="tab:font-sizes" caption="A list of LaTeX font sizes as defined by the Tufte-LaTeX document classes." >}}
-| LaTeX size      | Font size | Leading | Used for                                        |
-|:----------------|:---------:|:-------:|:------------------------------------------------|
-| `\tiny`         | 5         | 6       | sidenote numbers                                |
-| `\scriptsize`   | 7         | 8       | –                                               |
-| `\footnotesize` | 8         | 10      | sidenotes, captions                             |
-| `\small`        | 9         | 12      | quote, quotation, and verse environments        |
-| `\normalsize`   | 10        | 14      | body text                                       |
-| `\large`        | 11        | 15      | b-heads                                         |
-| `\Large`        | 12        | 16      | a-heads, toc entries, author, date              |
-| `\LARGE`        | 14        | 18      | handout title                                   |
-| `\huge`         | 20        | 30      | chapter heads                                   |
-| `\Huge`         | 24        | 36      | part titles                                     |
+| LaTeX size      | Font size | Leading | Used for                                                                     |
+|:----------------|:---------:|:-------:|:-----------------------------------------------------------------------------|
+| `\tiny`         | 5         | 6       | sidenote numbers                                                             |
+| `\scriptsize`   | 7         | 8       | –                                                                            |
+| `\footnotesize` | 8         | 10      | sidenotes, captions                                                          |
+| `\small`        | 9         | 12      | quote, quotation, and verse environments                                     |
+| `\normalsize`   | 10        | 14      | body text                                                                    |
+| `\large`        | 11        | 15      | {{< sc >}}b{{< /sc >}}-heads                                                 |
+| `\Large`        | 12        | 16      | {{< sc >}}a{{< /sc >}}-heads, {{< sc >}}toc{{< /sc >}} entries, author, date |
+| `\LARGE`        | 14        | 18      | handout title                                                                |
+| `\huge`         | 20        | 30      | chapter heads                                                                |
+| `\Huge`         | 24        | 36      | part titles                                                                  |
 {{< /table >}}
 
 ## Headings {#sec:headings1}

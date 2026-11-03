@@ -1,0 +1,27 @@
+{{- /*
+  A cite in the text of a real footnote (SPEC-LATEX §3.7, §11): its
+  references go in the footnote too, as one citation block at the end of
+  its last paragraph (tufte/cite-gather.html), not in a numbered sidenote
+  floated from the footnote list. The text was rendered by Goldmark (a
+  Markdown footnote's definition, also one copied into a shortcode's inner
+  text by tufte/render-inner.html), so a cite there had no holder (.Parent)
+  and emitted its own citation sidenote: it is turned into a nested block
+  and gathered here.
+
+  Takes a dict: page, html (the footnote text, block HTML).
+  Returns: the HTML (string).
+  Callers: func/footnote-note.html, tufte/render-inner.html
+*/ -}}
+{{- $c := string .html -}}
+{{- if strings.Contains $c `<span class="sidenote citation"` -}}
+  {{- $c = replaceRE `(?s)<label for="[^"]*" class="margin-toggle sidenote-number"></label><input type="checkbox" id="[^"]*" class="margin-toggle"/><span class="sidenote citation"[^>]*>(.*?)</span><i class="sn-end" hidden></i>` `<span class="citation-block" data-nested="1">$1</span><i class="cite-end" hidden></i>` $c -}}
+  {{- with partial "tufte/cite-gather.html" (dict "page" .page "html" $c) -}}
+    {{- $c = .html -}}
+    {{- if strings.HasSuffix (strings.TrimSpace $c) "</p>" -}}
+      {{- $c = printf "%s%s</p>" (strings.TrimSuffix "</p>" (strings.TrimSpace $c)) .block -}}
+    {{- else -}}
+      {{- $c = printf "%s%s" $c .block -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $c -}}

@@ -133,11 +133,13 @@ The rendered block quote:
 Graphical excellence is that which gives to the viewer the greatest number of ideas in the shortest time with the least ink in the smallest space.
 {{< /blockquote >}}
 
-Collapsible asides use Hugo's built-in `details` shortcode; the theme keeps them in the text column:
+Collapsible asides use the `details` shortcode (the theme's version of Hugo's built-in one); the theme keeps them in the text column, and a Markdown footnote inside one becomes a footnote of the page. A sidenote inside one keeps its place in the page's numbering: the marks after the block show the same numbers whether it is open or closed.
 
 {{< details summary="Why sidenotes rather than footnotes?" >}}
-A sidenote sits next to the sentence it annotates, so the reader's eye never has to jump to the bottom of the page and back.
+A sidenote sits next to the sentence it annotates,{{< sidenote >}}This numbered sidenote is inside the collapsible block. Close the block and the marks after it keep their numbers.{{< /sidenote >}} so the reader's eye never has to jump to the bottom of the page and back.[^fn-details]
 {{< /details >}}
+
+[^fn-details]: A real footnote, referenced from inside the collapsible block, listed below the text.
 
 A self-hosted video becomes a Tufte figure, with its caption in the margin (or in a `figcaption` with `type="fullwidth"`):
 
@@ -145,7 +147,16 @@ A self-hosted video becomes a Tufte figure, with its caption in the margin (or i
 {{</* video src="flow.mp4" poster="flow.jpg" caption="Water flow, *slowed down*." */>}}
 ```
 
-(The example site ships no video file, so this one is not shown live.)
+(The example site ships no video file, so this one is not shown live.) Its options:
+
+- `src` (required) and `poster` resolve like figure sources: a page resource, an `assets/` resource, a `static/` path or a URL (also a `data:` URI with an image for `poster`, a video or audio for `src`);
+- `caption` takes inline Markdown, and `title` is the accessible label of the video (default: the caption as plain text);
+- `type` is `main` (default) or `fullwidth`;
+- `controls` is on by default, and `controls="false"` hides the player controls;
+- `autoplay`, `loop`, `muted` and `playsinline` take `"true"`, and `autoplay` implies `muted` and `playsinline`;
+- `width` and `height` become attributes of the `<video>`, and `class` adds classes to the `<figure>`.
+
+The [`video` section of the README](https://github.com/massimo-nocentini/tufte.hugo#video) has the same list.
 
 Figures and embeds are covered in [Figures and Tables]({{< relref "posts/figures-and-tables.md" >}}), math and code in [Math and Code]({{< relref "posts/math-and-code.md" >}}), and footnotes in [Footnotes as Sidenotes]({{< relref "posts/footnotes-as-sidenotes.md" >}}).
 
@@ -180,9 +191,9 @@ GitHub-style alerts are rendered as quiet, labelled blocks:
 
 ## Customisation
 
-The theme leaves empty partials for you to override from your site's `layouts/_partials/` folder: `head_custom.html`, `header_custom.html`, `before_content.html`, `after_content.html`, `footer_custom.html` and `scripts_custom.html`. Stylesheets listed in `params.customCSS` are appended to the theme's CSS bundle, so their rules win.
+The theme leaves empty partials for you to override from your site's `layouts/_partials/` folder: `head_custom.html`, `header_custom.html`, `before_content.html`, `after_content.html`, `footer_custom.html` and `scripts_custom.html`. Stylesheets listed in `params.customCSS` are appended to the theme's CSS bundle, so their rules win. The theme ships no JavaScript; scripts you put in your site's `assets/js/tufte/` folder (that folder only) are bundled, fingerprinted and loaded deferred on every page as one classic script.
 
-On a multilingual site, the header links every page to its translations, and the head lists them as `hreflang` alternates. Translations for the theme's few words, such as "Read more" or "Older posts", are provided in English, Italian, French, German and Spanish.
+On a multilingual site, the header links every page to its translations, and the head lists them as `hreflang` alternates. Translations for the theme's few words, such as "Read more" or "Older posts", are provided in English, Italian, French, German and Spanish; in any other language they fall back to English until you add your own `i18n/<lang>.yaml`. The short dates of the archive follow the language too ("Jan 2" in English, "2 Jan" in Italian): set `archiveDateFormat` under `[params]` to choose another Go layout.
 
 ## Writing like tufte-latex
 

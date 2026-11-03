@@ -36,7 +36,7 @@ question, or would like to report a bug, please send an email to our
 mailing list or visit our website.
 
 To help us troubleshoot the problem more quickly, please try to compile your
-document using the `debug` class option and send the generated
+document using the `debug`{{< index "debug class option@`debug` class option" >}}{{< index "class options!debug@`debug`" >}} class option and send the generated
 `.log` file to the mailing list with a brief description of the problem.
 (This theme's counterpart is `tufte.debug = true`, which outlines the layout
 and prints extra warnings.)
@@ -49,7 +49,7 @@ The following is a list of all of the errors, warnings, and other messages gener
 `Error: \subparagraph is undefined by this class.`
 {{< /fullwidth >}}
 
-The `\subparagraph` command is not defined in the Tufte-LaTeX document classes.
+The `\subparagraph`{{< index "subparagraph command@`\subparagraph`" >}} command is not defined in the Tufte-LaTeX document classes.
 If you'd like to use the `\subparagraph` command, you'll need to redefine
 it yourself. See the “Headings” section in the chapter
 “{{< xref "tufte-book.md#sec:headings" "page" >}}” for a description of the heading styles available in the Tufte-LaTeX document classes.
@@ -58,7 +58,7 @@ it yourself. See the “Headings” section in the chapter
 `Error: \subsubsection is undefined by this class.`
 {{< /fullwidth >}}
 
-The `\subsubsection` command is not defined in the Tufte-LaTeX document classes.
+The `\subsubsection`{{< index "subsubsection command@`\subsubsection`" >}} command is not defined in the Tufte-LaTeX document classes.
 If you'd like to use the `\subsubsection` command, you'll need to
 redefine it yourself. See the “Headings” section in the chapter
 “{{< xref "tufte-book.md#sec:headings" "page" >}}” for a description of the heading styles available
@@ -69,7 +69,7 @@ in the Tufte-LaTeX document classes.
 {{< /fullwidth >}}
 
 LaTeX allocates 18 slots for storing floats. The first time
-`\morefloats` is called, it allocates an additional 34 slots. The second
+`\morefloats`{{< index "morefloats command@`\morefloats`" >}} is called, it allocates an additional 34 slots. The second
 time `\morefloats` is called, it allocates another 26 slots.
 
 The `\morefloats` command may only be called two times. Calling it a
@@ -89,7 +89,7 @@ warning `tufte-bad-option` for an unknown option value.)
 `Info: The 'symmetric' option implies 'twoside'`
 {{< /fullwidth >}}
 
-You specified the `symmetric` document class option. This option automatically forces the `twoside` option as well. See the chapter “{{< xref "clsopt:symmetric" "page" >}}” for more information on the `symmetric` class option.
+You specified the `symmetric`{{< index "symmetric class option@`symmetric` class option" >}}{{< index "class options!symmetric@`symmetric`" >}} document class option. This option automatically forces the `twoside`{{< index "twoside class option@`twoside` class option" >}}{{< index "class options!twoside@`twoside`" >}} option as well. See the chapter “{{< xref "clsopt:symmetric" "page" >}}” for more information on the `symmetric` class option.
 
 The margin figure of an earlier chapter, {{< xref "fig:marginfig" "full" >}}, shows a helix; a reference like this one points backwards across chapters.
 

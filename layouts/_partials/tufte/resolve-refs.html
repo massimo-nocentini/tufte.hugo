@@ -86,17 +86,17 @@
   {{- $bookL := dict -}}
   {{- with $root }}{{ $bookL = partialCached "tufte/book/labels.html" . (or .RelPermalink .Path) }}{{ end -}}
   {{- $words := dict
-    "figure" (T "figure" | default "Figure")
-    "table" (T "table" | default "Table")
-    "listing" (T "listing" | default "Listing")
-    "eq" (T "equation" | default "Equation")
-    "heading" (T "section" | default "Section")
-    "label" (T "section" | default "Section")
-    "chapter" (T "chapter" | default "Chapter")
-    "appendix" (T "appendix" | default "Appendix")
-    "part" (T "part" | default "Part")
-    "sidenote" (T "note" | default "Note")
-    "footnote" (T "footnote" | default "Footnote")
+    "figure" (partial "func/t.html" "figure" | default "Figure")
+    "table" (partial "func/t.html" "table" | default "Table")
+    "listing" (partial "func/t.html" "listing" | default "Listing")
+    "eq" (partial "func/t.html" "equation" | default "Equation")
+    "heading" (partial "func/t.html" "section" | default "Section")
+    "label" (partial "func/t.html" "section" | default "Section")
+    "chapter" (partial "func/t.html" "chapter" | default "Chapter")
+    "appendix" (partial "func/t.html" "appendix" | default "Appendix")
+    "part" (partial "func/t.html" "part" | default "Part")
+    "sidenote" (partial "func/t.html" "note" | default "Note")
+    "footnote" (partial "func/t.html" "footnote" | default "Footnote")
   -}}
   {{- $marks := findRE `<a class="xref"[^>]*>[^<]*</a>` $html -}}
   {{- range findRE `&lt;a class=&#34;xref&#34;.*?&lt;/a&gt;` $html }}{{ $marks = $marks | append (htmlUnescape .) }}{{ end -}}
@@ -145,8 +145,9 @@
         {{- end -}}
         {{- /* Too deep (a caption naming itself): no raw keys. */ -}}
         {{- $c = replaceRE `<a class="xref" data-ref[^>]*>[^<]*</a>` "??" $c -}}
-        {{- $c = replaceRE `(?s)<math.*?</math>` "" $c -}}
         {{- $c = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/>` "" $c -}}
+        {{- /* a lone toggle: footnotemark (its input is in the footnotetext) */ -}}
+        {{- $c = replaceRE `<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label>` "" $c -}}
         {{- /* Margin material (sidenotes, margin notes, citation blocks,
                real-footnote markers span.tufte-fn) with its nested spans, as lists/render.html strips it: a
                non-greedy match would stop at the first inner </span> and
@@ -164,12 +165,10 @@
           {{- end -}}
           {{- $c = replace (replace $c "<xspan" "<span") "</xspan>" "</span>" -}}
         {{- end -}}
-        {{- $c = $c | plainify | htmlUnescape | strings.TrimSpace -}}
-        {{- $c = replaceRE `\s+` " " $c -}}
-        {{- if gt (strings.RuneCount $c) 80 -}}
-          {{- $c = printf "%s…" (strings.TrimSpace (substr $c 0 80)) -}}
-        {{- end -}}
-        {{- $name = htmlEscape $c -}}
+        {{- /* Plain text, cut at 80 characters, with its math still
+               typeset (plainify would read KaTeX's visual HTML in layout
+               order). */ -}}
+        {{- $name = partial "tufte/plain-math.html" (dict "html" $c "max" 80) -}}
       {{- end -}}
       {{- $d := $e.display -}}
       {{- $text := "" -}}
@@ -177,7 +176,7 @@
         {{- $text = $d | default "??" -}}
       {{- else if eq $fmt "full" -}}
         {{- if $d -}}
-          {{- $text = printf "%s&nbsp;%s" (htmlEscape (index $words $e.kind | default "")) $d -}}
+          {{- $text = printf "%s&nbsp;%s" (htmlEscape (index $words ($e.word | default $e.kind) | default "")) $d -}}
         {{- else -}}
           {{- $text = $name -}}
         {{- end -}}
@@ -207,7 +206,8 @@
           {{- $r := "??" -}}
           {{- with index $xm (substr $tok 9 16) -}}
             {{- if lt $depth 2 -}}
-              {{- $r = partial "tufte/resolve-refs.html" (dict "page" $tp "html" . "summary" $summary "quiet" true "depth" (add $depth 1)) | plainify | htmlUnescape | strings.TrimSpace | htmlEscape -}}
+              {{- $r = partial "tufte/resolve-refs.html" (dict "page" $tp "html" . "summary" $summary "quiet" true "depth" (add $depth 1)) -}}
+              {{- $r = partial "tufte/plain-math.html" (dict "html" $r) -}}
             {{- end -}}
           {{- end -}}
           {{- $text = replace $text $tok $r -}}
@@ -218,11 +218,26 @@
       {{- if and $samePage (not $summary) -}}
         {{- $href = printf "#%s" $e.anchor -}}
         {{- if not $e.anchor }}{{ $href = $tp.RelPermalink }}{{ end -}}
+        {{- $out = printf `<a class="xref" href="%s">%s</a>` (htmlEscape $href) $text -}}
+      {{- else if not $tp.RelPermalink -}}
+        {{- /* A target page that is never rendered (build.render = never)
+               has no URL: a "#key" here would point into the current page.
+               The text stays, as a placeholder link without href (plain
+               text). In a book, the whole-book print document, where a
+               chapter like that is still an article, turns it into an
+               in-document link by the target's page path
+               (tufte/book/print-links.html). */ -}}
+        {{- $attrs := "" -}}
+        {{- if $inBook -}}
+          {{- $attrs = printf ` data-tufte-path="%s"` (htmlEscape $tp.Path) -}}
+          {{- with $e.anchor }}{{ $attrs = printf `%s data-tufte-anchor="%s"` $attrs (htmlEscape .) }}{{ end -}}
+        {{- end -}}
+        {{- $out = printf `<a class="xref"%s>%s</a>` $attrs $text -}}
       {{- else -}}
         {{- $href = $tp.RelPermalink -}}
         {{- with $e.anchor }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
+        {{- $out = printf `<a class="xref" href="%s">%s</a>` (htmlEscape $href) $text -}}
       {{- end -}}
-      {{- $out = printf `<a class="xref" href="%s">%s</a>` (htmlEscape $href) $text -}}
     {{- else if $summary -}}
       {{- /* As on the page ("??"), but no link and no warning. */ -}}
       {{- $out = `<span class="xref xref-missing">??</span>` -}}
@@ -233,7 +248,8 @@
       {{- $out = `<a class="xref xref-missing" href="#">??</a>` -}}
     {{- end -}}
     {{- $html = replace $html $m $out -}}
-    {{- $html = replace $html (htmlEscape $m) ($out | plainify | htmlUnescape | htmlEscape) -}}
+    {{- /* In an attribute the math is its TeX ($x^2$). */ -}}
+    {{- $html = replace $html (htmlEscape $m) (partial "tufte/plain-math.html" (dict "html" $out "math" "tex")) -}}
   {{- end -}}
 {{- end -}}
 {{- return $html -}}

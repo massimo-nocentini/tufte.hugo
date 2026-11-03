@@ -14,10 +14,10 @@
   Returns: map normalised key → entry dict (see tufte/labels.html).
   Callers: partialCached "tufte/book/labels.html" $root (or $root.RelPermalink $root.Path)
 */ -}}
-{{- /* Memoized in the root's Store (not in hugo server): see
+{{- /* Memoized in the root's Store for the current build: see
        tufte/opts.html. Every chapter's xrefs read it. */ -}}
 {{- $memoRes := false -}}
-{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoBookLabels") -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoBookLabels") -}}
   {{- $memoRes = .v -}}
 {{- else -}}
 {{- $root := . -}}
@@ -35,6 +35,8 @@
 {{- range $pages -}}
   {{- $L := partialCached "tufte/labels.html" . (or .RelPermalink .Path) -}}
   {{- range $k, $v := $L.entries -}}
+    {{- /* Markdown footnote labels are page-local (tufte/labels.html). */ -}}
+    {{- if eq $v.local true }}{{ continue }}{{ end -}}
     {{- $old := index ($E.Get "e") $k -}}
     {{- $rank := 2 -}}
     {{- if isset $ranks $v.kind }}{{ $rank = index $ranks $v.kind }}{{ end -}}
@@ -60,6 +62,6 @@
   {{- warnidf "tufte-duplicate-label" "tufte.hugo: duplicate label(s) across the book %s: %s (the first one in reading order wins)" $at (delimit . ", ") -}}
 {{- end -}}
 {{- $memoRes = $E.Get "e" -}}
-{{- if not hugo.IsServer }}{{ $root.Store.Set "tufteMemoBookLabels" (dict "v" $memoRes) }}{{ end -}}
+{{- $root.Store.Set "tufteMemoBookLabels" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $memoRes -}}

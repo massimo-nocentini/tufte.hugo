@@ -10,6 +10,8 @@ wordCount:
   other: "{{ .Count }} words"
 tags: "Tags"
 categories: "Categories"
+# The e-mail link of the footer (params.social.email).
+email: "Email"
 archives: "Archives"
 allPosts: "All posts"
 olderPosts: "Older posts"
@@ -32,6 +34,20 @@ alertWarning: "Warning"
 alertCaution: "Caution"
 translations: "Translations"
 undated: "Undated"
+# The short date of the archive list (a Go layout: month and day).
+archiveDateFormat: "Jan 2"
+# The date of the post metadata, summaries and title blocks, unless
+# params.dateFormat is set: a Go layout (Hugo translates the month names) or
+# ":date_long", the language's own long date ("March 5, 2024", "5 marzo 2024",
+# "5. März 2024"). Keep it ":date_long" here: Hugo's T gives a language without
+# the key the default language's value, so a Go layout here would put every
+# such language in English order ("março 5, 2024").
+dateFormat: ":date_long"
+# The RSS feed of a section or term ("Posts on Site"), and its description.
+rssTitle: "{{ .Title }} on {{ .Site }}"
+rssDescription: "Recent content in {{ .Title }} on {{ .Site }}"
+# The description of the feed of the home page.
+rssDescriptionSite: "Recent content on {{ .Site }}"
 # tufte-latex parity: float and cross-reference words, book structure,
 # generated lists, index and bibliography.
 figure: "Figure"
@@ -62,9 +78,25 @@ editors: "editors"
 pages: "pages"
 edition: "{{ .Edition }} edition"
 volume: "volume"
+# Bibliography entries only (format.html): "volume 42 of Series",
+# lowercase "chapter 3" mid-entry, and the last of three or more names
+# ("A, B, and C"; English keeps the serial comma, as plainnat does).
+bibOf: "of"
+bibChapter: "chapter"
+# A book's number in its series: "number 12 in Lecture Notes" (capitalized
+# when it opens a sentence: "Number 12 in Lecture Notes").
+bibNumber: "number"
+bibIn: "in"
+# Page locator of a citation (cite page=): one page, a range or list.
+bibPageAbbr: "p."
+bibPagesAbbr: "pp."
+bibNamesLast: "{{ .Names }}, and {{ .Last }}"
 phdThesis: "PhD thesis"
 mastersThesis: "Master's thesis"
 techReport: "Technical Report"
 footnote: "Footnote"
 footnotes: "Footnotes"
 backToText: "Back to text"
+embeddedContent: "Embedded content"
+youtubeVideo: "YouTube video"
+details: "Details"

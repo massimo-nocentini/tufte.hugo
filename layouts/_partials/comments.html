@@ -12,6 +12,8 @@
 {{- end -}}
 {{- if not .Section }}{{ $enabled = false }}{{ end -}}
 {{- if isset .Params "comments" }}{{ $enabled = .Params.comments }}{{ end -}}
+{{- /* "false" too (a HUGO_PARAMS_COMMENTS_ENABLE string): func/flag.html. */ -}}
+{{- $enabled = partial "func/flag.html" (dict "value" $enabled "default" true) -}}
 {{- $giscus := false -}}
 {{- with site.Params.giscus -}}
   {{- if and .repo .repoId .category .categoryId }}{{ $giscus = . }}
@@ -22,8 +24,8 @@
 {{- $disqus := site.Config.Services.Disqus.Shortname -}}
 {{- $lang := (partial "func/lang.html" site.Language).name -}}
 {{- if and $enabled .IsPage (or $giscus $disqus) }}
-<section class="comments" id="tufte-comments">
-  <h2>{{ T "comments" }}</h2>
+<section class="comments" id="{{ partial "tufte/gen-id.html" (dict "page" . "base" "tufte-comments") }}">
+  <h2>{{ partial "func/t.html" "comments" }}</h2>
   {{- with $giscus }}
   <script src="https://giscus.app/client.js"
     data-repo="{{ .repo }}"

@@ -86,7 +86,7 @@
   {{- end -}}
   {{- $html = partial "tufte/book/print-links.html" (dict "html" $html "page" $p "root" $root) -}}
   {{- $matter := $ch.Matter | default "main" -}}
-  {{- /* The named page (list.print.html's @page rules) is c<Index>. */ -}}
+  {{- /* The named page (the @page rules of tufte/book/print-style.html) is c<Index>. */ -}}
   {{- $html = printf `<article class="chapter matter-%s" id="%s" style="page: c%v">%s%s</article>` (htmlEscape $matter) $prefix $ch.Index "\n" $html -}}
 {{- end -}}
 {{- return ($html | safeHTML) -}}

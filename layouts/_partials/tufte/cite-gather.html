@@ -12,6 +12,14 @@
   before them, so "see {{< cite "x" >}}." reads "see.") and merged, after
   them the references of the holder's own cite= parameter.
 
+  With bibliography.margin = false (class option nobib), tufte-latex uses
+  the standard \cite everywhere (tufte-common.def redefines it in notes and
+  captions only when natbib is loaded): the cite= keys become the bracketed
+  list numbers of cite.html, " [<a class="citation-ref" …>…</a>, …]",
+  returned as the block (after the text, outside any citation-block), so
+  postprocess numbers and links them like every other nobib citation. A
+  nested cite already is "[n]" in that mode (cite.html), never a block.
+
   Takes a dict:
     page  the page (its bibliography database)            required
     html  the rendered text (string)
@@ -19,7 +27,7 @@
   Returns: dict
     html   the text without the nested blocks
     block  <span class="citation-block">E1; E2; and E3</span>, or "" when
-           there is no citation
+           there is no citation (nobib: " [n, m]" for the cite= keys)
 */ -}}
 {{- $html := string (.html | default "") -}}
 {{- $pieces := slice -}}
@@ -30,8 +38,19 @@
   {{- end -}}
   {{- $html = replaceRE $re "" $html -}}
 {{- end -}}
+{{- $nobib := "" -}}
 {{- with .keys -}}
-  {{- $pieces = $pieces | append (string (partial "tufte/bib/entries.html" (dict "page" $.page "keys" . "postnote" ""))) -}}
+  {{- $p := $.page -}}
+  {{- $margin := partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.margin") (or $p.RelPermalink $p.Path) "bibliography.margin") -}}
+  {{- if $margin -}}
+    {{- $pieces = $pieces | append (string (partial "tufte/bib/entries.html" (dict "page" $p "keys" . "postnote" ""))) -}}
+  {{- else -}}
+    {{- $refs := slice -}}
+    {{- range . -}}
+      {{- $refs = $refs | append (printf `<a class="citation-ref" href="#ref-%s" data-cite="%s"><span class="cite-num" data-key="%s"></span></a>` (htmlEscape .) (htmlEscape .) (htmlEscape .)) -}}
+    {{- end -}}
+    {{- $nobib = printf ` [%s]` (delimit $refs ", ") -}}
+  {{- end -}}
 {{- end -}}
 {{- $block := "" -}}
 {{- if eq (len $pieces) 1 -}}
@@ -39,7 +58,7 @@
 {{- else if gt (len $pieces) 1 -}}
   {{- /* Each piece is "E1", "E1; and E2" or "E1; E2; and E3" (entries.html):
          drop the inner "and", join, and put one "and" before the last. */ -}}
-  {{- $and := T "and" | default "and" -}}
+  {{- $and := partial "func/t.html" "and" | default "and" -}}
   {{- $sep := `; <span class="bib-entry` -}}
   {{- $flat := slice -}}
   {{- range $pieces -}}
@@ -56,4 +75,5 @@
 {{- with $block -}}
   {{- $block = printf `<span class="citation-block">%s</span>` . -}}
 {{- end -}}
+{{- $block = printf "%s%s" $block $nobib -}}
 {{- return (dict "html" $html "block" $block) -}}

@@ -16,6 +16,7 @@
     <h2 id="tufte-index">Index</h2>
     <div class="tufte-index fullwidth"><ul class="index-list">
       <li>term, <a href="REL#idx-…">3</a>, <a …>5</a><ul><li>subterm, …</li></ul></li>
+  (a locator in a chapter that is never rendered: tufte/page-link.html)
       <li class="index-gap">…</li>
     </ul></div>
 
@@ -23,7 +24,9 @@
   data-index="RAW"></span> found in each scope page's phase-1 HTML, parsed
   by tufte/index/parse.html (makeindex syntax). Grouping is by the
   lowercased sort key of level 1, then 2, then 3; the display text is
-  Markdown, rendered inline (so `code` and $math$ work).
+  Markdown, rendered inline (so `code` and $math$ work); a leading block
+  marker ("1984. Orwell", "+ (plus)", "# (hash)") is text
+  (tufte/block-escape.html), as are those of the see / see-also texts.
   Locators: in a book, the chapter number when chapters are numbered, else
   the chapter's short title (linkTitle); the book title for the landing
   body and the part title for a part page; on a handout, the title of the
@@ -34,7 +37,9 @@
   section prints OPEN–CLOSE (two links joined by an en dash, makeindex's
   "1–3"), absorbing the plain locators inside it; closed where it opened,
   it prints one locator. A new initial
-  letter at level 1 gets the class index-gap.
+  letter at level 1 gets the class index-gap; the letter is the base letter
+  of the first rune when the language collator sorts it there
+  (tufte/index/initial.html: é with e, but Spanish ñ apart from n).
 */ -}}
 {{- define "_partials/inline/tufte-index-level.html" -}}
   {{- $items := .items -}}
@@ -53,7 +58,7 @@
     {{- $children := where $sub "depth" "gt" $d -}}
     {{- $src := cond (gt (len $self) 0) $self $sub -}}
     {{- $disp := index (index $src 0) $dk -}}
-    {{- $html := printf "%s" ($p.RenderString $disp) -}}
+    {{- $html := printf "%s" ($p.RenderString (partial "tufte/block-escape.html" $disp)) -}}
 
     {{- /* locators, one per chapter/section, in reading order. A range
            |( … |) becomes one locator OPEN–CLOSE (makeindex's "1–3")
@@ -75,9 +80,9 @@
         {{- if not $open }}{{ $open = $it }}{{ end -}}
       {{- else if eq $it.rng "close" -}}
         {{- with $open -}}
-          {{- $h := printf `<a href="%s">%s</a>` (htmlEscape .href) .lt -}}
+          {{- $h := .link -}}
           {{- if ne .lk $it.lk -}}
-            {{- $h = printf `%s–<a href="%s">%s</a>` $h (htmlEscape $it.href) $it.lt -}}
+            {{- $h = printf `%s–%s` $h $it.link -}}
           {{- end -}}
           {{- /* an earlier plain locator of the opening chapter is part
                  of the range now */ -}}
@@ -93,7 +98,7 @@
         {{- $pend = $pend | append $it -}}
       {{- else if not ($seen.Get $it.lk) -}}
         {{- $seen.Set $it.lk true -}}
-        {{- $locs = $locs | append (dict "lk" $it.lk "html" (printf `<a href="%s">%s</a>` (htmlEscape $it.href) $it.lt)) -}}
+        {{- $locs = $locs | append (dict "lk" $it.lk "html" $it.link) -}}
       {{- end -}}
     {{- end -}}
     {{- with $open -}}
@@ -103,7 +108,7 @@
       {{- range $it := $u -}}
         {{- if not ($seen.Get $it.lk) -}}
           {{- $seen.Set $it.lk true -}}
-          {{- $locs = $locs | append (dict "lk" $it.lk "html" (printf `<a href="%s">%s</a>` (htmlEscape $it.href) $it.lt)) -}}
+          {{- $locs = $locs | append (dict "lk" $it.lk "html" $it.link) -}}
         {{- end -}}
       {{- end -}}
     {{- end -}}
@@ -113,11 +118,11 @@
       {{- $html = printf "%s, %s" $html (delimit $lh ", ") -}}
     {{- end -}}
     {{- range uniq $sees -}}
-      {{- $html = printf "%s, <em>%s</em> %s" $html (T "see" | default "see") ($p.RenderString .) -}}
+      {{- $html = printf "%s, <em>%s</em> %s" $html (partial "func/t.html" "see" | default "see") ($p.RenderString (partial "tufte/block-escape.html" .)) -}}
     {{- end -}}
     {{- range uniq $seealsos -}}
       {{- $sep := cond (or (gt (len $locs) 0) (gt (len $sees) 0)) ";" "," -}}
-      {{- $html = printf "%s%s <em>%s</em> %s" $html $sep (T "seeAlso" | default "see also") ($p.RenderString .) -}}
+      {{- $html = printf "%s%s <em>%s</em> %s" $html $sep (partial "func/t.html" "seeAlso" | default "see also") ($p.RenderString (partial "tufte/block-escape.html" .)) -}}
     {{- end -}}
     {{- if and $children (lt $d 3) -}}
       {{- $html = printf "%s<ul>%s</ul>" $html (partial "inline/tufte-index-level.html" (dict "items" $children "depth" (add $d 1) "page" $p)) -}}
@@ -125,7 +130,9 @@
 
     {{- $cls := "" -}}
     {{- if eq $d 1 -}}
-      {{- $init := substr $k 0 1 -}}
+      {{- /* the base letter, so that accented initials (é, Ä, Å…) stay in
+             the group the collator sorted them into */ -}}
+      {{- $init := partial "tufte/index/initial.html" $k -}}
       {{- if and $prev (ne $init $prev) }}{{ $cls = ` class="index-gap"` }}{{ end -}}
       {{- $prev = $init -}}
     {{- end -}}
@@ -142,7 +149,7 @@
 {{- if isset . "heading" -}}
   {{- with .heading }}{{ $heading = printf "%v" . }}{{ $given = true }}{{ else }}{{ if eq (printf "%T" .heading) "string" }}{{ $given = true }}{{ end }}{{ end -}}
 {{- end -}}
-{{- if not $given }}{{ $heading = T "index" | default "Index" }}{{ end -}}
+{{- if not $given }}{{ $heading = partial "func/t.html" "index" | default "Index" }}{{ end -}}
 
 {{- /* scope */ -}}
 {{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
@@ -175,26 +182,33 @@
     {{- end -}}
   {{- end -}}
   {{- $where := partial "tufte/plain-title.html" (dict "page" $c) | htmlEscape -}}
+  {{- /* the locator key: pages that are never rendered have no
+         RelPermalink */ -}}
+  {{- $cKey := or $c.RelPermalink $c.Path -}}
   {{- range $m := findRE `(?s)<h2[\s>].*?</h2>|<span class="index-anchor"[^>]*></span>` $raw -}}
     {{- /* an h2 match updates the handout locator and may itself hold
            index anchors (an index shortcode in a "##" heading): collect
            those too, after the update, so they point to their own section */ -}}
     {{- $anchors := slice $m -}}
     {{- if hasPrefix $m "<h2" -}}
-      {{- $t := replaceRE `(?s)<a class="heading-anchor"[^>]*>.*?</a>` "" $m -}}
-      {{- if findRE `<span class="(?:sidenote|marginnote|citation-block)` $t 1 -}}
-        {{- /* drop margin material, nested spans included (see lists/render.html) */ -}}
-        {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<s[^p]|</[^s]|</s[^p])*` -}}
-        {{- $t = replaceRE `<span class="(sidenote|marginnote|citation-block)` `<tufnote class="$1` $t -}}
-        {{- range seq 40 -}}
-          {{- if not (strings.Contains $t "<tufnote") }}{{ break }}{{ end -}}
-          {{- $t = replaceRE (printf `<tufnote[^>]*>%s</span>` $C) "" $t -}}
-          {{- $t = replaceRE (printf `<span([^>]*)>(%s)</span>` $C) "<xspan$1>$2</xspan>" $t -}}
+      {{- /* The section title, cleaned as tufte/labels.html cleans a
+             heading's name: no heading anchor, no margin material or
+             real-footnote markers (tufte/strip-notes.html), no number,
+             index or label anchors, cross-references resolved to their
+             text (tufte/resolve-refs.html, quiet: the page itself reports
+             undefined keys), then plain text with its math still typeset
+             (tufte/plain-math.html). In a book the locator is the
+             chapter's. */ -}}
+      {{- if eq $chapLoc "" -}}
+        {{- $t := replaceRE `(?s)^<h2[^>]*>(.*)</h2>$` "$1" $m -}}
+        {{- $t = replaceRE `(?s)<a class="heading-anchor"[^>]*>.*?</a>` "" $t -}}
+        {{- $t = partial "tufte/strip-notes.html" $t -}}
+        {{- $t = replaceRE `<span class="(?:index-anchor|tufte-anchor|tufte-num)[^>]*></span>` "" $t -}}
+        {{- if strings.Contains $t `class="xref"` -}}
+          {{- $t = partial "tufte/resolve-refs.html" (dict "page" $c "html" $t "quiet" true) -}}
         {{- end -}}
+        {{- with partial "tufte/plain-math.html" (dict "html" $t) }}{{ $where = . }}{{ end -}}
       {{- end -}}
-      {{- $t = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $t -}}
-      {{- $t = trim ($t | plainify) " \n" -}}
-      {{- with $t }}{{ $where = . }}{{ end -}}
       {{- $anchors = findRE `<span class="index-anchor"[^>]*></span>` $m -}}
     {{- end -}}
     {{- range $anchors -}}
@@ -210,9 +224,8 @@
       "s1" (index $lv 0).sort "d1" (index $lv 0).display
       "s2" "" "d2" "" "s3" "" "d3" ""
       "see" $parsed.see "seealso" $parsed.seealso "rng" (index $parsed "range")
-      "href" (printf "%s#%s" $c.RelPermalink $id)
-      "lt" (cond (ne $chapLoc "") $chapLoc $where)
-      "lk" (cond (ne $chapLoc "") $c.RelPermalink (printf "%s|%s" $c.RelPermalink $where)) -}}
+      "link" (partial "tufte/page-link.html" (dict "page" $c "anchor" $id "html" (cond (ne $chapLoc "") $chapLoc $where) "book" $root))
+      "lk" (cond (ne $chapLoc "") $cKey (printf "%s|%s" $cKey $where)) -}}
     {{- if ge (len $lv) 2 }}{{ $it = merge $it (dict "s2" (index $lv 1).sort "d2" (index $lv 1).display) }}{{ end -}}
     {{- if ge (len $lv) 3 }}{{ $it = merge $it (dict "s3" (index $lv 2).sort "d3" (index $lv 2).display) }}{{ end -}}
     {{- $items = $items | append $it -}}

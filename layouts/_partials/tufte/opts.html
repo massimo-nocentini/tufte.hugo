@@ -8,8 +8,9 @@
     1. the page's top-level front matter, for the flat keys footnotes,
        footnoteStyle, footnotePlacement and citeAs;
     2. the page's `tufte` front matter;
-    3. the nearest part's `tufte` (a section between the page and its book
-       root), when the page is inside a part and is not that part;
+    3. the part's `tufte` (the section, child of the book root, that holds
+       the page, also through a sub-section), when the page is inside a
+       part and is not that part;
     4. the book root's `tufte`, when the page is in a book and is not the
        root;
     5. site [params.tufte];
@@ -18,12 +19,16 @@
        with the book flag).
   `style` itself comes from levels 1–6 (default "css").
 
-  Memoized in the page's Store (one map per page): partialCached's
-  bounded cache (1000 entries) is not used for it. Not in `hugo server`,
-  where Store survives rebuilds (and an edited option must show).
-  `hugo --watch` also keeps Store across rebuilds but cannot be detected
-  from templates (hugo.IsServer is false): it is unsupported (README,
-  Books), and `hugo server` is the live-editing mode.
+  Validated here (warning tufte-bad-option, naming the file or the site
+  configuration that sets the value; the preset's default is used
+  instead): style (css, latex), the boolean options (a bool, or true,
+  false, yes, no, on, off, 1, 0), floats.number (those or "auto") and
+  headings.number (0, 1, 2).
+
+  Memoized in the page's Store (one map per page) for the current build
+  (tufte/memo.html: Store survives the rebuilds of `hugo server` and
+  `hugo --watch`, and an edited option must show): partialCached's
+  bounded cache (1000 entries) is not used for it.
 
   Takes: a page.
   Returns: a map (flat dotted keys).
@@ -31,7 +36,7 @@
 {{- $page := . -}}
 {{- $memoKey := "tufteMemoOpts" -}}
 {{- $res := false -}}
-{{- with cond hugo.IsServer nil ($page.Store.Get $memoKey) -}}
+{{- with partial "tufte/memo.html" (dict "page" $page "key" $memoKey) -}}
   {{- $res = .v -}}
 {{- else -}}
   {{- $flatKeys := slice "footnotes" "footnotestyle" "footnoteplacement" "citeas" -}}
@@ -40,52 +45,96 @@
   {{- range $fk := $flatKeys -}}
     {{- with index $page.Params $fk }}{{ $top = merge $top (dict $fk .) }}{{ end -}}
   {{- end -}}
-  {{- $levels := slice $top (partial "tufte/flatten.html" (dict "m" (index $page.Params "tufte"))) -}}
+  {{- /* Each level with where it is set (for the warnings below: a value
+         set by the site or a book is reported once, not once per page). */ -}}
+  {{- $here := $page.RelPermalink -}}
+  {{- with $page.File }}{{ $here = .Path }}{{ end -}}
+  {{- $levels := slice (dict "m" $top "w" $here) (dict "m" (partial "tufte/flatten.html" (dict "m" (index $page.Params "tufte"))) "w" $here) -}}
   {{- with $root -}}
     {{- if ne $page . -}}
+      {{- /* The part is the ancestor that is a child of the root (as in
+             tufte/book/chapters.html): a page of a section inside a part
+             is a chapter of that part and takes the part's options; the
+             sub-section's own front matter is not read (its page is not
+             part of the book). */ -}}
       {{- $part := false -}}
-      {{- $done := false -}}
       {{- range $page.Ancestors -}}
-        {{- if not $done -}}
-          {{- if eq . $root -}}
-            {{- $done = true -}}
-          {{- else if and (not $part) .IsSection -}}
-            {{- $part = . -}}
-          {{- end -}}
-        {{- end -}}
+        {{- if and (ne . $root) (eq .Parent $root) }}{{ $part = . }}{{ end -}}
       {{- end -}}
-      {{- with $part }}{{ $levels = $levels | append (partial "tufte/flatten.html" (dict "m" (index .Params "tufte"))) }}{{ end -}}
-      {{- $levels = $levels | append (partial "tufte/flatten.html" (dict "m" (index .Params "tufte"))) -}}
+      {{- with $part -}}
+        {{- $w := .RelPermalink }}{{ with .File }}{{ $w = .Path }}{{ end -}}
+        {{- $levels = $levels | append (dict "m" (partial "tufte/flatten.html" (dict "m" (index .Params "tufte"))) "w" $w) -}}
+      {{- end -}}
+      {{- $w := .RelPermalink }}{{ with .File }}{{ $w = .Path }}{{ end -}}
+      {{- $levels = $levels | append (dict "m" (partial "tufte/flatten.html" (dict "m" (index .Params "tufte"))) "w" $w) -}}
     {{- end -}}
   {{- end -}}
-  {{- $levels = $levels | append (partial "tufte/flatten.html" (dict "m" (index site.Params "tufte"))) -}}
+  {{- $levels = $levels | append (dict "m" (partial "tufte/flatten.html" (dict "m" (index site.Params "tufte"))) "w" "the site configuration ([params.tufte])") -}}
   {{- $siteTop := dict -}}
   {{- range $fk := $flatKeys -}}
     {{- with index site.Params $fk }}{{ $siteTop = merge $siteTop (dict $fk .) }}{{ end -}}
   {{- end -}}
-  {{- $levels = $levels | append $siteTop -}}
+  {{- $levels = $levels | append (dict "m" $siteTop "w" "the site configuration ([params])") -}}
 
   {{- /* Nearest first: a key already set is kept. */ -}}
   {{- $S := newScratch -}}
   {{- $S.Set "m" dict -}}
-  {{- range $levels -}}
-    {{- range $k, $v := . -}}
+  {{- $S.Set "w" dict -}}
+  {{- range $lv := $levels -}}
+    {{- range $k, $v := $lv.m -}}
       {{- if not (isset ($S.Get "m") $k) -}}
         {{- $S.SetInMap "m" $k $v -}}
+        {{- $S.SetInMap "w" $k $lv.w -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
   {{- $m := $S.Get "m" -}}
-  {{- $style := lower (printf "%v" (index $m "style" | default "css")) -}}
+  {{- $from := $S.Get "w" -}}
+  {{- /* style: css or latex; anything else is reported and read as css
+         (the preset of the defaults below). */ -}}
+  {{- $style := lower (strings.TrimSpace (printf "%v" (index $m "style" | default "css"))) -}}
+  {{- if not (in (slice "css" "latex") $style) -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.style must be \"css\" or \"latex\", not %q, in %s; using css" (printf "%v" (index $m "style")) (index $from "style") -}}
+    {{- $style = "css" -}}
+  {{- end -}}
+  {{- $S.SetInMap "m" "style" $style -}}
   {{- $book := false -}}
   {{- with $root }}{{ $book = true }}{{ end -}}
   {{- $defs := partial "tufte/flatten.html" (dict "m" (partialCached "tufte/defaults.html" (dict "style" $style "book" $book) $style $book)) -}}
+  {{- /* Values the readers would misread without a word (truthy.html
+         reads any unknown word as false): booleans, floats.number and
+         headings.number. An invalid value is reported (tufte-bad-option)
+         and replaced by the preset's default. The other enum options are
+         checked where they are read (titleBlock, numerals, marginals,
+         *.align, *.font, print.paper, bibliography.style, book.tocDepth,
+         footnotes, footnoteStyle, footnotePlacement, citeAs). */ -}}
+  {{- $bools := slice "justified" "hyphenate" "indent" "sfsidenotes" "letterspacing" "debug" "innerhtml" "headings.strict" "bibliography.list" "bibliography.margin" "book.numberchapters" "book.continuous" "book.toc" "book.titlepage" "print.runningheads" -}}
+  {{- $boolWords := slice "true" "false" "yes" "no" "on" "off" "1" "0" -}}
+  {{- range $k, $v := $m -}}
+    {{- $bad := "" -}}
+    {{- $use := index $defs $k -}}
+    {{- $sv := lower (strings.TrimSpace (printf "%v" $v)) -}}
+    {{- $isBool := or (eq (printf "%T" $v) "bool") (in $boolWords $sv) -}}
+    {{- if in $bools $k -}}
+      {{- if not $isBool }}{{ $bad = "true or false" }}{{ end -}}
+      {{- if eq $k "innerhtml" }}{{ $use = false }}{{ end -}}
+    {{- else if eq $k "floats.number" -}}
+      {{- if eq $sv "auto" }}{{ $S.SetInMap "m" $k "auto" }}{{ else if not $isBool }}{{ $bad = "true, false or \"auto\"" }}{{ end -}}
+    {{- else if eq $k "headings.number" -}}
+      {{- $nv := replaceRE `^(-?[0-9]+)\.0*$` "$1" $sv -}}
+      {{- if not (findRE `^[0-2]$` $nv 1) }}{{ $bad = "0, 1 or 2" }}{{ end -}}
+    {{- end -}}
+    {{- with $bad -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.%s must be %s, not %q, in %s; using %v" $k . (printf "%v" $v) (index $from $k) $use -}}
+      {{- $S.SetInMap "m" $k $use -}}
+    {{- end -}}
+  {{- end -}}
   {{- range $k, $v := $defs -}}
     {{- if not (isset ($S.Get "m") $k) -}}
       {{- $S.SetInMap "m" $k $v -}}
     {{- end -}}
   {{- end -}}
   {{- $res = $S.Get "m" -}}
-  {{- if not hugo.IsServer }}{{ $page.Store.Set $memoKey (dict "v" $res) }}{{ end -}}
+  {{- $page.Store.Set $memoKey (dict "v" $res "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $res -}}

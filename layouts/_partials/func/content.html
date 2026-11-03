@@ -39,7 +39,19 @@
   {{- $print = eq .print true -}}
 {{- end -}}
 {{- $sections := "h2" -}}
-{{- with $page.Param "sections" }}{{ $sections = lower (printf "%v" .) }}{{ end -}}
+{{- with $page.Param "sections" }}{{ $sections = lower (strings.TrimSpace (printf "%v" .)) }}{{ end -}}
+{{- if not (in (slice "h2" "none") $sections) -}}
+  {{- if not $summary -}}
+    {{- /* Reported where it is set: the page, or once for the site. */ -}}
+    {{- $at := "the site configuration ([params])" -}}
+    {{- if isset $page.Params "sections" -}}
+      {{- $at = $page.RelPermalink -}}
+      {{- with $page.File }}{{ $at = .Path }}{{ end -}}
+    {{- end -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: sections must be \"h2\" or \"none\", not %q, in %s; using h2" $sections $at -}}
+  {{- end -}}
+  {{- $sections = "h2" -}}
+{{- end -}}
 {{- /* raw → postprocess, once per (page, summary) (tufte/processed.html):
        tufte/abstract.html reads the same processed HTML, and the
        whole-book print document reuses the chapter pages'. */ -}}
@@ -47,9 +59,22 @@
 {{- /* The front-matter abstract (first in the phase-1 content, see
        func/content-raw.html) belongs to the title block
        (tufte/abstract.html), not to the sections. */ -}}
+{{- /* So do the title-block notes before it (tufte/title-notes.html). */ -}}
+{{- /* And the book's front pages (tufte/book/front-fields.html). */ -}}
+{{- if and (not $summary) (strings.Contains $html `<i class="tufte-ff-end" hidden></i>`) -}}
+  {{- $html = replaceRE `(?s)<i class="tufte-ff" data-slot="[a-z]+" hidden></i>.*?<i class="tufte-ff-end" hidden></i>\n?` "" $html -}}
+{{- end -}}
+{{- $uncut := string $html -}}
+{{- if and (not $summary) (strings.Contains $html `<i class="tufte-tn-end" hidden></i>`) -}}
+  {{- $html = replaceRE `(?s)^.*?<i class="tufte-tn-end" hidden></i>\n?` "" $html -}}
+{{- end -}}
 {{- if and (not $summary) (strings.Contains $html `<i class="tufte-abstract-end" hidden></i>`) -}}
   {{- $html = replaceRE `(?s)^.*?<i class="tufte-abstract-end" hidden></i>\n?` "" $html -}}
 {{- end -}}
+{{- /* What was cut (the title-block notes and the abstract): their real
+       footnotes belong to the first section's list ("section" placement
+       below), as they come before its text. */ -}}
+{{- $headCut := strings.TrimSuffix (string $html) $uncut -}}
 {{- if not $summary -}}
   {{- if eq $sections "none" -}}
     {{- with strings.TrimSpace $html -}}
@@ -113,7 +138,7 @@
         {{- end -}}
         {{- if eq $placement "section" -}}
           {{- $lis := "" -}}
-          {{- range findRE `<sup class="footnote-ref" id="[^"]*"><a href="#[^"]*"` $chunk -}}
+          {{- range findRE `<sup class="footnote-ref" id="[^"]*"><a href="#[^"]*"` (cond (eq $i 0) (printf "%s%s" $headCut $chunk) $chunk) -}}
             {{- $fid := replaceRE `^.*href="#([^"]*)"$` "$1" . -}}
             {{- with index ($items.Get "li") $fid -}}
               {{- if not ($items.Get (printf "done-%s" $fid)) -}}

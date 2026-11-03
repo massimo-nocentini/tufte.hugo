@@ -1,0 +1,49 @@
+{{- /*
+  T with an English fallback (README, Languages). For a key the current
+  language does not define (no theme i18n file for it, and no such key
+  in the site's i18n/<lang>.yaml: func/t-own.html), Hugo's T returns the
+  defaultContentLanguage's string, or "" when that language has none
+  either. This partial then takes the string from the theme's
+  i18n/en.yaml (mounted as the asset tufte/i18n-en.yaml, hugo.toml)
+  instead, filling in its {{ .Name }} fields.
+
+  Takes: a key, or a dict with
+    key    the i18n key
+    count  for a key with one/other forms (readingTime, wordCount)
+    data   a map for the {{ .Name }} fields (poweredBy, edition, …)
+  Returns: the string (HTML is not escaped: as T, it is what the
+  translation says).
+*/ -}}
+{{- $key := . -}}
+{{- $count := false -}}
+{{- $data := false -}}
+{{- if reflect.IsMap . -}}
+  {{- $key = .key -}}
+  {{- if isset . "count" }}{{ $count = .count }}{{ end -}}
+  {{- with .data }}{{ $data = . }}{{ end -}}
+{{- end -}}
+{{- $s := "" -}}
+{{- $own := partialCached "func/t-own.html" (partial "func/lang.html" site.Language).name (partial "func/lang.html" site.Language).name -}}
+{{- if or $own.all (index $own.keys (lower $key)) -}}
+  {{- if ne $count false }}{{ $s = T $key $count }}{{ else if $data }}{{ $s = T $key $data }}{{ else }}{{ $s = T $key }}{{ end -}}
+{{- end -}}
+{{- if not $s -}}
+  {{- $en := partialCached "func/t-en.html" "en" -}}
+  {{- with index $en $key -}}
+    {{- $v := . -}}
+    {{- if reflect.IsMap $v -}}
+      {{- $v = cond (eq $count 1) ($v.one | default $v.other) $v.other -}}
+    {{- end -}}
+    {{- $v = printf "%v" $v -}}
+    {{- if ne $count false }}{{ $v = replaceRE `\{\{-?\s*\.Count\s*-?\}\}` (printf "%v" $count) $v }}{{ end -}}
+    {{- if $data -}}
+      {{- range $k, $x := $data -}}
+        {{- /* $ doubled: replaceRE expands $1 in the replacement, and a
+               field may hold one (a title with $math$). */ -}}
+        {{- $v = replaceRE (printf `\{\{-?\s*\.%s\s*-?\}\}` $k) (replace (printf "%v" $x) "$" "$$") $v -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $s = $v -}}
+  {{- end -}}
+{{- end -}}
+{{- return $s -}}

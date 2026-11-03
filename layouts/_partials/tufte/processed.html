@@ -6,8 +6,8 @@
   whole-book print document for every chapter: postprocess does not depend
   on "print" (add it to the keys below if it ever does).
 
-  Memoized in the page's Store, as content-raw is (not in hugo server, see
-  tufte/opts.html): partialCached's bounded cache would evict it on large
+  Memoized in the page's Store for the current build, as content-raw is
+  (tufte/memo.html): partialCached's bounded cache would evict it on large
   books, and the print document would process every chapter again.
 
   Takes: a dict with page, summary (bool) and optional print (bool).
@@ -17,12 +17,12 @@
 {{- $summary := eq .summary true -}}
 {{- $memoKey := printf "tufteMemoPost|%v" $summary -}}
 {{- $res := "" -}}
-{{- with cond hugo.IsServer nil ($p.Store.Get $memoKey) -}}
+{{- with partial "tufte/memo.html" (dict "page" $p "key" $memoKey) -}}
   {{- $res = .v -}}
 {{- else -}}
   {{- $key := or $p.RelPermalink $p.Path -}}
   {{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" $summary) $key $summary -}}
   {{- $res = partialCached "tufte/postprocess.html" (dict "page" $p "html" $raw "summary" $summary "print" (eq .print true)) $key $summary | string -}}
-  {{- if not hugo.IsServer }}{{ $p.Store.Set $memoKey (dict "v" $res) }}{{ end -}}
+  {{- $p.Store.Set $memoKey (dict "v" $res "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $res -}}

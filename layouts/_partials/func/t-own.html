@@ -1,0 +1,49 @@
+{{- /*
+  Which UI strings a language has of its own, for func/t.html: Hugo's T
+  falls back to the defaultContentLanguage's string, which func/t.html
+  must not show in another language (README, Languages: English is the
+  fallback).
+
+  A theme language (the five i18n/*.yaml files, every key in each) has
+  them all. Another language has the keys of the site's own file
+  i18n/<lang>.yaml (.yml, .toml or .json; the language key as written,
+  or with its region in capitals: pt-br, pt-BR), read relative to the
+  project directory (os.ReadFile). Keys compare lowercased, as Hugo's T.
+
+  Takes: the language key (string). Called through partialCached.
+  Returns: dict
+    all   bool: the language has every key (a theme language)
+    keys  map lowercased key → true (when not all)
+*/ -}}
+{{- $name := lower (printf "%v" .) -}}
+{{- $out := dict "all" false "keys" (dict) -}}
+{{- if in (slice "en" "it" "fr" "de" "es") $name -}}
+  {{- $out = dict "all" true "keys" (dict) -}}
+{{- else -}}
+  {{- $names := slice $name -}}
+  {{- with findRESubmatch `^([a-z]+)-([a-z]+)$` $name 1 -}}
+    {{- $names = $names | append (printf "%s-%s" (index . 0 1) (upper (index . 0 2))) -}}
+  {{- end -}}
+  {{- $keys := dict -}}
+  {{- range $n := $names -}}
+    {{- range $ext := slice "yaml" "yml" "toml" "json" -}}
+      {{- $f := printf "i18n/%s.%s" $n $ext -}}
+      {{- if os.FileExists $f -}}
+        {{- with try (os.ReadFile $f | transform.Unmarshal (dict "format" (cond (eq $ext "yml") "yaml" $ext))) -}}
+          {{- with .Value -}}
+            {{- if reflect.IsMap . -}}
+              {{- range $k, $v := . }}{{ $keys = merge $keys (dict (lower $k) true) }}{{ end -}}
+            {{- else -}}
+              {{- /* go-i18n v1 list: - id: key  translation: … */ -}}
+              {{- range . -}}
+                {{- if reflect.IsMap . }}{{ with .id }}{{ $keys = merge $keys (dict (lower (printf "%v" .)) true) }}{{ end }}{{ end -}}
+              {{- end -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $out = dict "all" false "keys" $keys -}}
+{{- end -}}
+{{- return $out -}}

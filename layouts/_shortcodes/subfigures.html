@@ -12,7 +12,8 @@
   Each image title becomes a subcaption "(a) Handout", "(b) Book": inline
   Markdown, like any caption ("*Book*", "$x^2$"), taken off the <img>.
 
-  Named params: cols (default 2), type ("main" | "fullwidth"), caption,
+  Named params: cols (default 2), type ("main" | "fullwidth" | "margin": a
+  margin figure, caption below the grid), caption,
   label, short, numbered, captionpos, offset, cite, class.
 
   Output: <figure class="[fullwidth ]tufte-figure figure-grid" style="--cols:2"><div class="grid">IMGS</div>…caption…</figure>
@@ -27,8 +28,21 @@
   {{- if findRE `^[0-9]{1,3}$` $v 1 }}{{ $n = int (strings.TrimLeft "0" $v | default "0") }}{{ end -}}
   {{- if and (ge $n 1) (le $n 12) }}{{ $cols = $n }}{{ else }}{{ warnidf "tufte-bad-option" "subfigures shortcode: cols must be 1–12, not %q (%s)" $v $.Position }}{{ end -}}
 {{- end -}}
-{{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" (strings.TrimSpace .Inner) "display" "inline" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
-{{- $imgs := findRE `(?:<a [^>]*>)?<img [^>]*>(?:</a>)?` $html -}}
+{{- /* tips "keep": a title holding a nested shortcode stays marked after
+       its img (render-image.html), with its nest tokens unswapped, so it is
+       rendered below as the subcaption, Markdown and shortcode alike. */ -}}
+{{- /* tufteRawImgTitles: the image hook keeps each title as written (its
+       backslash escapes and entities unresolved), since it is rendered
+       below as Markdown. */ -}}
+{{- $p.Store.Set "tufteRawImgTitles" true -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" (strings.TrimSpace .Inner) "display" "inline" "tips" "keep" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
+{{- $p.Store.Set "tufteRawImgTitles" false -}}
+{{- $tipRE := `<i class="tufte-tip" hidden></i>(.*?)<i class="tufte-tip-end" hidden></i>` -}}
+{{- /* The notes, citations and footnote marks of an alt text that held a
+       shortcode or a [^x] follow their img (tufte/attr-marks.html): they
+       stay with it in its cell. */ -}}
+{{- $noteRE := `(?:<label [^>]*>[^<]*</label><input [^>]*/><span class="sidenote[^"]*"[^>]*>.*?</span><i class="sn-end" hidden></i>|<span class="citation-block" data-nested="1">.*?</span><i class="cite-end" hidden></i>|<span class="tufte-fn"[^>]*>.*?</span><i class="fn-end" hidden></i>|<sup [^>]*id="fnref[^>]*>.*?</sup>)` -}}
+{{- $imgs := findRE (printf `(?s)(?:<a [^>]*>)?<img [^>]*>(?:%s)?(?:</a>)?(?:%s)?(?:%s)*` $tipRE $tipRE $noteRE) $html -}}
 {{- if not $imgs -}}
   {{- warnidf "tufte-empty" "subfigures shortcode: no images found; write them as ![alt](src \"title\") on consecutive lines (%s)" .Position -}}
 {{- end -}}
@@ -36,13 +50,29 @@
 {{- $cells := "" -}}
 {{- range $i, $img := $imgs -}}
   {{- $sub := "" -}}
-  {{- with findRESubmatch `\stitle="([^"]*)"` $img 1 -}}
-    {{- /* The title is inline Markdown, like every caption ($x$, *em*);
-           it becomes the subcaption, so it leaves the img (no tooltip
-           repeating it). */ -}}
-    {{- $t := $p.RenderString (dict "display" "inline") (htmlUnescape (index . 0 1)) | string | strings.TrimSpace -}}
+  {{- $title := "" -}}
+  {{- with findRESubmatch (printf `(?s)%s` $tipRE) $img 1 -}}
+    {{- /* A title with a nested shortcode: its text, escaped, with the
+           shortcode's nest token (TUFTENESTTIP…). */ -}}
+    {{- $title = htmlUnescape (index . 0 1) | replaceRE `TUFTENESTTIP([0-9a-f]{16}END)` "TUFTENEST$1" -}}
+    {{- $img = replaceRE (printf `(?s)%s` $tipRE) "" $img -}}
+  {{- else -}}
+    {{- with findRESubmatch `\stitle="([^"]*)"` $img 1 -}}
+      {{- $title = htmlUnescape (index . 0 1) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $img = replaceRE `\stitle="[^"]*"` "" $img 1 -}}
+  {{- with $title -}}
+    {{- /* The title is inline Markdown, like every caption ($x$, *em*,
+           a footnote [^x], a shortcode: tufte/render-inner.html); it
+           becomes the subcaption, so it leaves the img (no tooltip
+           repeating it). A sidenote or margin note in it cannot float
+           out of its grid cell: as in every caption, its text stays
+           inline (tufte/note-in-note.html, tufte-note-in-note), and a
+           cite in it joins the float's citation block. */ -}}
+    {{- $t := partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string | strings.TrimSpace -}}
+    {{- $t = partial "tufte/note-in-note.html" (dict "page" $p "html" $t "holder" "subfigure caption" "where" $.Position) -}}
     {{- $sub = printf `<span class="subcaption">(%s) %s</span>` (index $letters (mod $i 26)) $t -}}
-    {{- $img = replaceRE `\stitle="[^"]*"` "" $img 1 -}}
   {{- end -}}
   {{- $cells = printf `%s<span class="subfigure">%s%s</span>` $cells $img $sub -}}
 {{- end -}}

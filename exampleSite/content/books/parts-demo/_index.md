@@ -6,6 +6,7 @@ author: "Massimo Nocentini"
 publisher: "tufte.hugo"
 date: 2026-10-28
 description: "A two-part book with numbered chapters, continuous figure numbers and a lettered appendix."
+outputs: ["html", "print"]   # also a single-page print view, print.html
 bibliography: refs.bib   # a BibTeX file of this bundle, merged with data/bibliography.yaml
 frontispiece:            # the illustration facing the title page
   src: /images/latex/hilbertcurves.svg

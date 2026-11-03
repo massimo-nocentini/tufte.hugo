@@ -12,12 +12,14 @@
 
   Output: a placeholder, replaced at render time (tufte/postprocess.html):
     <div class="tufte-placeholder" data-what="toc"[ data-opts="k=v;k=v"]></div>
+  (in each value, % ; = are written %25 %3B %3D; tufte/postprocess.html
+  decodes them)
 */ -}}
 {{- $opts := slice -}}
 {{- if .IsNamedParams -}}
   {{- range $k := slice "depth" "heading" -}}
     {{- if isset $.Params $k -}}
-      {{- $v := printf "%v" (index $.Params $k) | replaceRE `[;=]` "" | strings.TrimSpace -}}
+      {{- $v := printf "%v" (index $.Params $k) | strings.TrimSpace | replaceRE "%" "%25" | replaceRE ";" "%3B" | replaceRE "=" "%3D" -}}
       {{- if eq $k "depth" }}{{ $v = replaceRE `^([0-9]+)\.0+$` "$1" $v }}{{ end -}}
       {{- if and (eq $k "depth") (not (findRE `^[0-9]{1,2}$` $v 1)) -}}
         {{- warnidf "tufte-bad-option" "tableofcontents shortcode: depth must be a whole number (0 = chapters only, 1 = with sections), not %q; ignored (%s)" $v $.Position -}}

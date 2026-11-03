@@ -8,6 +8,9 @@
   1. Content: .Content, or the .Summary with its headings removed (Hugo's
      automatic summary can run past the first <h2>; on a list page those
      headings would read as list-level titles and their ids could clash).
+     A removed heading's numbered note marks leave
+       <span class="sn-skip" aria-hidden="true" style="counter-increment: sidenote-counter N"></span>
+     so the summary's later notes keep their page numbers.
   2. Footnotes (mode: front matter `footnotes`, else tufte.footnotes via
      tufte/opt.html, else site params.footnotes, default "sidenotes"):
      func/footnotes.html turns each Markdown footnote into a sidenote
@@ -21,6 +24,12 @@
      block alone in its paragraph replaces the paragraph (a <figure> may
      not sit in a <p>); a block sharing its paragraph with text becomes a
      linked plain image and its caption (func/inline-figures.html).
+  7. Headings of a shortcode's inner text or of the abstract (each
+     rendered in its own Goldmark document by tufte/render-inner.html,
+     which marks them data-tufte-inner): one whose id the page already
+     uses (a heading of the text, an earlier inner heading, any element)
+     gets the first free ID-1, ID-2…, with its anchor link and section
+     number key; the page's own headings keep their ids (TOC links).
   The front-matter `abstract` (Markdown, shortcodes run) is part of the
   full content: it comes first, as
     <section class="abstract">BLOCKS</section><i class="tufte-abstract-end" hidden></i>
@@ -28,6 +37,16 @@
   numbered and resolved with the rest of the page (the abstract
   environment may hold \cite and \ref). func/content.html cuts it off the
   processed content and tufte/abstract.html gives it to the title block.
+  Before it come the title-block notes (front matter `thanks`, authors'
+  thanks: tufte/title-notes.html), up to <i class="tufte-tn-end" hidden></i>,
+  for the same reason (\thanks{…\cite{…}}).
+  A book's front pages made from Markdown front matter (epigraphs,
+  frontispiece, title-page publisher, copyright page, dedication:
+  tufte/book/front-fields.html) come in the same way, each as
+    <i class="tufte-ff" data-slot="SLOT" hidden></i>HTML<i class="tufte-ff-end" hidden></i>
+  in the order the landing shows them (epigraphs and frontispiece before
+  the title-block notes, the publisher before the abstract, the copyright
+  page and dedication after it); func/content.html cuts them off.
 
   Takes a dict:
     page     the page
@@ -35,12 +54,12 @@
   Returns: template.HTML.
   Callers: partialCached "func/content-raw.html" (dict "page" $p "summary" $s) (or $p.RelPermalink $p.Path) $s
 */ -}}
-{{- /* Memoized in the page's Store (see tufte/memo note in tufte/opts.html):
+{{- /* Memoized in the page's Store for the current build (tufte/memo.html):
        cross-page scans read this for every chapter of a book, and
        partialCached's bounded cache would evict it on large books. */ -}}
 {{- $memoKey := printf "tufteMemoRaw|%v" (eq .summary true) -}}
 {{- $memoRes := "" -}}
-{{- with cond hugo.IsServer nil (.page.Store.Get $memoKey) -}}
+{{- with partial "tufte/memo.html" (dict "page" .page "key" $memoKey) -}}
   {{- $memoRes = .v -}}
 {{- else -}}
 {{- $page := .page -}}
@@ -67,7 +86,17 @@
 {{- $full := string $page.Content -}}
 {{- if $summary -}}
   {{- $html = string $page.Summary -}}
-  {{- $html = replaceRE `(?s)<h[1-6][\s>].*?</h[1-6]>\s*` "" $html -}}
+  {{- /* The note marks in a removed heading (a sidenote, a footnote
+         turned sidenote) stay as a placeholder, converted below into a
+         counter step, so the later notes of the summary keep the
+         numbers they have on the page. */ -}}
+  {{- range findRE `(?s)<h[1-6][\s>].*?</h[1-6]>\s*` $html -}}
+    {{- /* Not a cite's real-footnote form (5a below): it is no sidenote. */ -}}
+    {{- $marks := findRE `<sup [^>]*>\s*<a [^>]*class="footnote-ref"[^>]*>[^<]*</a>\s*</sup>|<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>[^<]*</label>` (replaceRE `(?s)<label for="[^"]*" class="margin-toggle sidenote-number"></label><input type="checkbox" id="[^"]*" class="margin-toggle"/><span class="sidenote citation" data-as="footnote">.*?</span><i class="sn-end" hidden></i>` "" .) -}}
+    {{- $repl := "" -}}
+    {{- with $marks }}{{ $repl = printf `<i class="tufte-sh" hidden></i>%s<i class="tufte-sh-end" hidden></i>` (delimit . "") }}{{ end -}}
+    {{- $html = replace $html . $repl 1 -}}
+  {{- end -}}
   {{- /* A front-matter `summary:` of one paragraph comes without its <p>
          (Hugo renders it with TrimShortHTML): inline-only summary HTML is
          wrapped in a <p>, so it gets the text column and size of
@@ -80,16 +109,17 @@
   {{- /* An automatic summary (no <!--more-->) may be cut inside a block
          (Hugo 0.146 cuts after a margin block's caption paragraph): close
          the elements still open at the end, innermost first, so they do not
-         swallow what the list page puts after the summary. */ -}}
-  {{- $balanced := true -}}
-  {{- range slice "div" "span" "figure" "section" "blockquote" "ul" "ol" "li" "table" "p" "a" "em" "strong" "label" -}}
-    {{- if ne (len (findRE (printf `<%s[\s>]` .) $html)) (len (findRE (printf `</%s\s*>` .) $html)) }}{{ $balanced = false }}{{ end -}}
-  {{- end -}}
-  {{- if not $balanced -}}
+         swallow what the list page puts after the summary. Any element
+         (details, dl, pre, a table cell…): every tag of the summary is
+         checked, which is cheap on a summary. */ -}}
+  {{- if findRE `<[a-zA-Z]` $html 1 -}}
     {{- $void := slice "area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr" -}}
     {{- $stack := slice -}}
-    {{- range findRE `<(/?)([a-zA-Z][a-zA-Z0-9-]*)[^>]*>` $html -}}
-      {{- $name := replaceRE `^</?([a-zA-Z][a-zA-Z0-9-]*).*$` "$1" . | lower -}}
+    {{- /* Not the tags in comments or script/style/textarea text
+           (func/raw-mask.html). */ -}}
+    {{- range findRE `<(/?)([a-zA-Z][a-zA-Z0-9-]*)[^>]*>` (partial "func/raw-mask.html" (dict "html" $html)).html -}}
+      {{- /* (?s): a tag's attributes may span lines. */ -}}
+      {{- $name := replaceRE `(?s)^</?([a-zA-Z][a-zA-Z0-9-]*).*$` "$1" . | lower -}}
       {{- if strings.HasPrefix . "</" -}}
         {{- if in $stack $name -}}
           {{- /* Pop up to and including the matching open tag. */ -}}
@@ -109,21 +139,70 @@
   {{- $html = $full -}}
 {{- end -}}
 
+{{- /* The front-matter Markdown (see above) is rendered first: a footnote
+       referenced there is a real footnote, and func/footnotes.html keeps
+       the same footnote a real one in the text ("real"). A summary takes
+       those labels from the page's phase-1 HTML. */ -}}
+{{- $ff := dict "pre" "" "mid" "" "post" "" -}}
+{{- $abs := "" -}}
+{{- $tn := "" -}}
+{{- if not $summary -}}
+  {{- $ff = partial "tufte/book/front-fields.html" (dict "page" $page "mode" "raw") -}}
+  {{- with $page.Params.abstract -}}
+    {{- $md := printf "%v" . -}}
+    {{- $abs = partial "tufte/render-inner.html" (dict "page" $page "inner" $md "display" "block" "shortcodes" "run" "where" "front matter abstract") | string -}}
+  {{- end -}}
+  {{- $tn = partial "tufte/title-notes.html" (dict "page" $page "mode" "raw") | string -}}
+{{- end -}}
 {{- /* Also when only Goldmark's endnotes block is left (a summary whose
        sole footnote reference sat in a removed heading): it is dropped. */ -}}
 {{- if or (strings.Contains $html "footnote-ref") (strings.Contains $html `<div class="footnotes" role="doc-endnotes">`) -}}
-  {{- $html = partial "func/footnotes.html" (dict "page" $page "content" $html "source" $full "mode" $footnotes "summary" $summary) | string -}}
+  {{- $real := "" -}}
+  {{- if $summary -}}
+    {{- if strings.Contains $html "footnote-ref" -}}
+      {{- $real = partialCached "func/content-raw.html" (dict "page" $page "summary" false) (or $page.RelPermalink $page.Path) false | string -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $real = printf "%s%s%s%s%s" $ff.pre $tn $ff.mid $abs $ff.post -}}
+  {{- end -}}
+  {{- $html = partial "func/footnotes.html" (dict "page" $page "content" $html "source" $full "mode" $footnotes "summary" $summary "real" $real) | string -}}
+{{- end -}}
+{{- /* The marks of the removed headings (above): an empty span that steps
+       the sidenote counter as many times as they did (numbered marks only,
+       not data-number ones). Not hidden: an element with display: none
+       steps no counter. */ -}}
+{{- if strings.Contains $html `<i class="tufte-sh" hidden></i>` -}}
+  {{- range findRE `(?s)<i class="tufte-sh" hidden></i>.*?<i class="tufte-sh-end" hidden></i>` $html -}}
+    {{- $n := 0 -}}
+    {{- range findRE `<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>` . -}}
+      {{- if not (strings.Contains . "data-number=") }}{{ $n = add $n 1 }}{{ end -}}
+    {{- end -}}
+    {{- $html = replace $html . (cond (gt $n 0) (printf `<span class="sn-skip" aria-hidden="true" style="counter-increment: sidenote-counter %d"></span>` $n) "") 1 -}}
+  {{- end -}}
 {{- end -}}
 
 {{- /* The front-matter abstract, first (see above). */ -}}
 {{- if not $summary -}}
-  {{- with $page.Params.abstract -}}
-    {{- $md := printf "%v" . -}}
-    {{- $abs := partial "tufte/render-inner.html" (dict "page" $page "inner" $md "display" "block" "shortcodes" "run" "where" "front matter abstract") | string -}}
+  {{- /* A book's front pages (see above), in the landing's order:
+         epigraphs and frontispiece, title-block notes, publisher,
+         abstract, copyright page and dedication, content. */ -}}
+  {{- $html = printf "%s%s" $ff.post $html -}}
+  {{- if $page.Params.abstract -}}
     {{- $html = printf "<section class=\"abstract\">%s</section><i class=\"tufte-abstract-end\" hidden></i>\n%s" $abs $html -}}
   {{- end -}}
+  {{- $html = printf "%s%s" $ff.mid $html -}}
+  {{- /* The title-block notes (\thanks), before the abstract (see above). */ -}}
+  {{- with $tn -}}
+    {{- $html = printf "%s%s" . $html -}}
+  {{- end -}}
+  {{- $html = printf "%s%s" $ff.pre $html -}}
 {{- end -}}
 
+{{- /* A nest token kept in a marked image title (render-image.html,
+       TUFTENESTTIP…) that no render-inner call resolved: a plain token. */ -}}
+{{- if strings.Contains $html "TUFTENESTTIP" -}}
+  {{- $html = replace $html "TUFTENESTTIP" "TUFTENEST" -}}
+{{- end -}}
 {{- if strings.Contains $html "TUFTENEST" -}}
   {{- $map := $page.Store.Get "tufteNest" | default dict -}}
   {{- range seq 4 -}}
@@ -136,6 +215,74 @@
       {{- end -}}
     {{- end -}}
   {{- end -}}
+{{- end -}}
+
+{{- /* 4a. Deferred alt texts of images and titles of links that held a
+       shortcode or a footnote reference (render-image.html,
+       render-link.html): the plain text goes into the attribute, the notes
+       follow the element (tufte/attr-marks.html). Before 4b (an image's
+       title mark stays right after it) and before the block markers below
+       (which read the alt text). */ -}}
+{{- if strings.Contains $html "TUFTEATTR" -}}
+  {{- $html = partial "tufte/attr-marks.html" (dict "page" $page "html" $html "final" true) -}}
+{{- end -}}
+
+{{- /* 4c. footnotemark / footnotetext pairs whose name is used more than
+       once on the page (two tables each with a "w" mark): each
+       footnotetext takes the marks of its name written since the previous
+       footnotetext of that name (later marks: the last one). The K-th text
+       of a name and its marks get the id NAME.K (from 2; "." never occurs
+       in a name, tufte/ft-name.html), so each toggle opens its own note. */ -}}
+{{- if strings.Contains $html `-ft-` -}}
+  {{- $ftRE := `<label for="sn-[0-9a-f]{6}-ft-[A-Za-z0-9_-]+" class="margin-toggle sidenote-number"|<input type="checkbox" id="sn-[0-9a-f]{6}-ft-[A-Za-z0-9_-]+" class="margin-toggle"/>` -}}
+  {{- $ftTags := findRE $ftRE $html -}}
+  {{- $ftTotal := newScratch -}}
+  {{- $ftRepeat := false -}}
+  {{- range $ftTags -}}
+    {{- if strings.HasPrefix . "<input" -}}
+      {{- $id := replaceRE `^.*\sid="([^"]+)".*$` "$1" . -}}
+      {{- $ftTotal.Add $id 1 -}}
+      {{- if gt ($ftTotal.Get $id) 1 }}{{ $ftRepeat = true }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $ftRepeat -}}
+    {{- $ftSeen := newScratch -}}
+    {{- $ftPut := slice -}}
+    {{- range $i, $tag := $ftTags -}}
+      {{- $isInput := strings.HasPrefix $tag "<input" -}}
+      {{- $id := replaceRE `^.*\s(?:id|for)="([^"]+)".*$` "$1" $tag -}}
+      {{- $total := int ($ftTotal.Get $id | default 0) -}}
+      {{- $k := int ($ftSeen.Get $id | default 0) -}}
+      {{- if $isInput -}}
+        {{- $k = add $k 1 -}}
+        {{- $ftSeen.Set $id $k -}}
+      {{- else -}}
+        {{- $k = add $k 1 -}}
+        {{- if gt $k $total }}{{ $k = $total }}{{ end -}}
+      {{- end -}}
+      {{- $new := $tag -}}
+      {{- if gt $k 1 -}}
+        {{- $new = replace $tag (printf `="%s"` $id) (printf `="%s.%d"` $id $k) 1 -}}
+      {{- end -}}
+      {{- $html = replace $html $tag (printf "TUFTEFTTAG%dEND" $i) 1 -}}
+      {{- $ftPut = $ftPut | append $new -}}
+    {{- end -}}
+    {{- range $i, $t := $ftPut -}}
+      {{- $html = replace $html (printf "TUFTEFTTAG%dEND" $i) $t 1 -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* 4b. Image titles shown as a tooltip that held a shortcode (an image
+       in a table cell, tufte/cell-images.html, or in running text,
+       render-image.html): marked after the img, now that the shortcode's
+       HTML is in place. The plain text becomes the title attribute, the
+       notes and citations follow the img (tufte/img-tip.html). Before 5:
+       the caption markers inside are dropped with the rest. */ -}}
+{{- if strings.Contains $html `<i class="tufte-tip" hidden></i>` -}}
+  {{- $html = partial "tufte/img-tips.html" $html -}}
+  {{- /* A marker not after an img (should not happen): the title goes. */ -}}
+  {{- $html = replaceRE `(?s)<i class="tufte-tip" hidden></i>.*?<i class="tufte-tip-end" hidden></i>` "" $html -}}
 {{- end -}}
 
 {{- /* 5. Captions of the image and table render hooks that held a
@@ -165,16 +312,67 @@
   {{- end -}}
 {{- end -}}
 
+{{- /* 5a. Cites with as="footnote" (or citeas = "footnote") left in the
+       running text: every holder (notes, captions, Markdown footnotes,
+       image titles) has gathered its own by now, so these become real
+       footnote markers (cite.html), numbered and listed by postprocess.
+       Before 6, which counts sidenote marks. */ -}}
+{{- if strings.Contains $html `<span class="sidenote citation" data-as="footnote">` -}}
+  {{- $html = replaceRE `(?s)<label for="sn-[0-9a-f]{6}-([0-9]+)" class="margin-toggle sidenote-number"></label><input type="checkbox" id="[^"]*" class="margin-toggle"/><span class="sidenote citation" data-as="footnote">(.*?)</span><i class="sn-end" hidden></i>` `<span class="tufte-fn" data-key="s$1" hidden>$2</span>` $html -}}
+{{- end -}}
+
 {{- if strings.Contains $html `<i class="tufte-block" hidden></i>` -}}
   {{- $blocks := findRE `(?s)<i class="tufte-block" hidden></i>.*?<i class="tufte-block-end" hidden></i>` $html | uniq -}}
   {{- range $i, $b := $blocks -}}
     {{- $html = replace $html $b (printf "TUFTEBLOCK%dEND" $i) -}}
   {{- end -}}
-  {{- /* Alone in its paragraph: the paragraph goes (attributes such as
-         {.margin} on it go with it). */ -}}
-  {{- $html = replaceRE `<p(?:\s[^>]*)?>\s*TUFTEBLOCK([0-9]+)END\s*</p>` "TUFTEFIGURE${1}END" $html -}}
+  {{- /* Alone in its paragraph: the paragraph goes (a class such as
+         {.margin} on it goes with it). Its id ({#fig:x} on the next line,
+         which Goldmark gives the link's paragraph) is the figure's label,
+         as for an unlinked block image: it replaces the figure's automatic
+         key (id and number token), or, on a figure without caption, makes
+         the anchor and the inert float marker of tufte/figure.html. */ -}}
+  {{- $blockKeys := dict -}}
+  {{- range $m := findRESubmatch `<p(\s[^>]*)?>\s*TUFTEBLOCK([0-9]+)END\s*</p>` $html -}}
+    {{- with findRESubmatch `\sid="([^"]*)"` (index $m 1) 1 -}}
+      {{- $at := $page.RelPermalink -}}
+      {{- with $page.File }}{{ $at = .Path }}{{ end -}}
+      {{- $raw := htmlUnescape (index . 0 1) -}}
+      {{- $k := "" -}}
+      {{- if $summary -}}
+        {{- $k = partial "tufte/key.html" $raw -}}
+      {{- else -}}
+        {{- $k = partial "tufte/label-key.html" (dict "key" $raw "where" (printf "linked image in %s" $at)) -}}
+      {{- end -}}
+      {{- with $k -}}
+        {{- $blockKeys = merge $blockKeys (dict (printf "b%s" (index $m 2)) .) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $html = replace $html (index $m 0) (printf "TUFTEFIGURE%sEND" (index $m 2)) 1 -}}
+  {{- end -}}
   {{- range $i, $b := $blocks -}}
     {{- $inner := $b | strings.TrimPrefix `<i class="tufte-block" hidden></i>` | strings.TrimSuffix `<i class="tufte-block-end" hidden></i>` -}}
+    {{- with index $blockKeys (printf "b%d" $i) -}}
+      {{- $key := . -}}
+      {{- with findRESubmatch `^<figure([^>]*)>` $inner 1 -}}
+        {{- $fa := index . 0 1 -}}
+        {{- with findRESubmatch `\sid="(auto-[^"]*)"` $fa 1 -}}
+          {{- $auto := index . 0 1 -}}
+          {{- $inner = replace $inner (printf ` id="%s"` $auto) (printf ` id="%s"` (htmlEscape $key)) 1 -}}
+          {{- $inner = replace $inner (printf ` data-key="%s"` $auto) (printf ` data-key="%s" data-labeled="1"` (htmlEscape $key)) 1 -}}
+        {{- else -}}
+          {{- if not (findRE `\sid="` $fa 1) -}}
+            {{- $alt := "" -}}
+            {{- with findRESubmatch `<img [^>]*\salt="([^"]*)"` $inner 1 }}{{ $alt = index . 0 1 }}{{ end -}}
+            {{- $mark := printf `<i class="tufte-float" data-kind="figure" data-key="%s" data-name="%s" hidden></i>` (htmlEscape $key) (htmlEscape $alt) -}}
+            {{- /* "$" doubled: the replacement holds user text (the alt
+                   text, the label), where "$1" or "$5000" would expand. */ -}}
+            {{- $inner = replaceRE `^<figure([^>]*)>` (printf `<figure$1 id="%s">` (replace (htmlEscape $key) "$" "$$")) $inner 1 -}}
+            {{- $inner = replaceRE `(<a [^>]*>)?(<img )` (printf `%s$1$2` (replace $mark "$" "$$")) $inner 1 -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
     {{- $html = replace $html (printf "TUFTEFIGURE%dEND" $i) $inner -}}
     {{- $tok := printf "TUFTEBLOCK%dEND" $i -}}
     {{- if strings.Contains $html $tok -}}
@@ -182,7 +380,109 @@
     {{- end -}}
   {{- end -}}
 {{- end -}}
+
+{{- /* 6. Collapsible blocks (<details>: the details shortcode, or raw
+       HTML). A browser does not render the content of a closed <details>
+       (display: none, or content-visibility: hidden, whose style
+       containment scopes counters), so its numbered sidenote marks do not
+       step the CSS sidenote counter, while the theme's numbers (labels.html,
+       xrefs) count them. Each </details> whose content (not its own
+       <summary>, which stays visible) holds N numbered marks (not
+       data-number ones, plus removed-heading sn-skip steps) is followed by
+         <span class="sn-skip-details" aria-hidden="true" style="--sn-skip: N"></span>
+       which steps the counter N times only while the block is closed
+       (theme.css: details:not([open]) + .sn-skip-details), so the marks
+       after it keep their numbers either way. Nested blocks: the outer
+       count includes the inner ones (an inner span inside a closed outer
+       block steps nothing). */ -}}
+{{- if strings.Contains $html "</details>" -}}
+  {{- $segs := split $html "</details>" -}}
+  {{- $last := sub (len $segs) 1 -}}
+  {{- $out := "" -}}
+  {{- $stack := slice -}}
+  {{- $inSum := false -}}
+  {{- $detRE := `<details(?:\s[^>]*)?>|<summary(?:\s[^>]*)?>|</summary>|<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>|<span class="sn-skip" aria-hidden="true" style="counter-increment: sidenote-counter [0-9]+">` -}}
+  {{- range $i, $seg := $segs -}}
+    {{- range findRE $detRE $seg -}}
+      {{- if strings.HasPrefix . "<details" -}}
+        {{- $stack = $stack | append 0 -}}
+        {{- $inSum = false -}}
+      {{- else if strings.HasPrefix . "<summary" -}}
+        {{- $inSum = true -}}
+      {{- else if eq . "</summary>" -}}
+        {{- $inSum = false -}}
+      {{- else if and $stack (not (strings.Contains . "data-number=")) -}}
+        {{- $step := 1 -}}
+        {{- with findRESubmatch `sidenote-counter ([0-9]+)"` . 1 }}{{ $step = int (index . 0 1) }}{{ end -}}
+        {{- $top := sub (len $stack) 1 -}}
+        {{- $new := slice -}}
+        {{- range $j, $c := $stack -}}
+          {{- $new = $new | append (cond (and $inSum (eq $j $top)) $c (add $c $step)) -}}
+        {{- end -}}
+        {{- $stack = $new -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $out = printf "%s%s" $out $seg -}}
+    {{- if lt $i $last -}}
+      {{- $out = printf "%s</details>" $out -}}
+      {{- if $stack -}}
+        {{- $n := index $stack (sub (len $stack) 1) -}}
+        {{- $stack = first (sub (len $stack) 1) $stack -}}
+        {{- $inSum = false -}}
+        {{- if gt $n 0 -}}
+          {{- $out = printf `%s<span class="sn-skip-details" aria-hidden="true" style="--sn-skip: %d"></span>` $out $n -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $html = $out -}}
+{{- end -}}
+
+{{- /* 7. Unique ids for the headings of inner texts (see above). Each
+       piece after a mark starts with the heading's id; its anchor link
+       and section number token follow in the same piece (headings do not
+       nest). In a summary (headings removed) only the mark goes. */ -}}
+{{- $innerMark := ` data-tufte-inner id="` -}}
+{{- if strings.Contains $html $innerMark -}}
+  {{- $pieces := split $html $innerMark -}}
+  {{- if $summary -}}
+    {{- $html = delimit $pieces ` id="` -}}
+  {{- else -}}
+    {{- $norm := slice -}}
+    {{- range findRE `\sid="[^"]*"` $html }}{{ $norm = $norm | append (printf " %s" (substr . 1)) }}{{ end -}}
+    {{- $used := slice -}}
+    {{- range findRE `\sid="[^"]*"` (replaceRE ` data-tufte-inner id="[^"]*"` "" $html) }}{{ $used = $used | append (printf " %s" (substr . 1)) }}{{ end -}}
+    {{- $out := index $pieces 0 -}}
+    {{- range after 1 $pieces -}}
+      {{- $piece := . -}}
+      {{- $id := replaceRE `(?s)^([^"]*)".*$` "$1" $piece -}}
+      {{- $new := $id -}}
+      {{- if and $id (in $used (printf ` id="%s"` $id)) -}}
+        {{- range $n := seq 1 999 -}}
+          {{- $c := printf ` id="%s-%d"` $id $n -}}
+          {{- if not (or (in $norm $c) (in $used $c)) }}{{ $new = printf "%s-%d" $id $n }}{{ break }}{{ end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if ne $new $id -}}
+        {{- $rest := strings.TrimPrefix $id $piece -}}
+        {{- /* The anchor link: its href may be percent-encoded
+               (html/template), so the suffix is appended to it as is. */ -}}
+        {{- with findRE `<a class="heading-anchor" href="#[^"]*"` $rest 1 -}}
+          {{- $a := index . 0 -}}
+          {{- $rest = replace $rest $a (printf `%s%s"` (strings.TrimSuffix `"` $a) (strings.TrimPrefix $id $new)) 1 -}}
+        {{- end -}}
+        {{- $ok := htmlEscape (partial "tufte/key.html" (htmlUnescape $id)) -}}
+        {{- $nk := htmlEscape (partial "tufte/key.html" (htmlUnescape $new)) -}}
+        {{- $rest = replace $rest (printf `data-kind="sec" data-key="%s"` $ok) (printf `data-kind="sec" data-key="%s"` $nk) 1 -}}
+        {{- $piece = printf "%s%s" $new $rest -}}
+      {{- end -}}
+      {{- $used = $used | append (printf ` id="%s"` $new) -}}
+      {{- $out = printf `%s id="%s` $out $piece -}}
+    {{- end -}}
+    {{- $html = $out -}}
+  {{- end -}}
+{{- end -}}
 {{- $memoRes = $html | safeHTML -}}
-{{- if not hugo.IsServer }}{{ $page.Store.Set $memoKey (dict "v" $memoRes) }}{{ end -}}
+{{- $page.Store.Set $memoKey (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $memoRes -}}

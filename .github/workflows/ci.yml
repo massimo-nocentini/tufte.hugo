@@ -262,6 +262,8 @@ jobs:
             grep -q 'id="ref-knuth1984"' "$PD/bibliography/index.html" || fail "$PD: refs.bib entries missing from the bibliography"
             # book root `frontispiece`: an unnumbered figure before the title page
             grep -q '<section class="frontispiece"><figure class="tufte-figure">' "$PD/index.html" || fail "$PD: no frontispiece on the landing page"
+            # a label outside a numbered section of a numbered appendix gives the appendix letter (\label after \chapter)
+            grep -qE 'class="xref"[^>]*>Appendix&nbsp;A<' "$PD/notation/index.html" || fail "$PD: label in appendix A does not refer to the appendix"
           fi
 
           # 7. Cheat-sheet page: nested shortcodes in a sidenote, every placeholder resolved.
@@ -381,3 +383,88 @@ jobs:
           # Chapter 150 refers to the first figure of chapter 149: 148 × 4 + 1.
           grep -q '>Figure&nbsp;593</a>' "$B/public/books/big/ch150/index.html" || { echo "::error::cross-chapter xref not resolved"; exit 1; }
           grep -q -- '-fig-c150-f3"' "$B/public/books/big/print.html" || { echo "::error::print document incomplete"; exit 1; }
+          # The same book under `hugo server`, the live-editing mode: the
+          # .Store memos (tufte/memo.html) must keep it as fast as a one-shot
+          # build, and must not survive a rebuild: a figure added to chapter 1
+          # renumbers the reference in chapter 150.
+          log="$RUNNER_TEMP/bigbook-server.log"
+          hugo server --source "$B" --bind 127.0.0.1 --port 1414 --renderToMemory > "$log" 2>&1 &
+          srv=$!
+          trap 'kill "$srv" 2>/dev/null || true' EXIT
+          for i in $(seq 1 90); do
+            grep -q 'Web Server is available' "$log" && break
+            kill -0 "$srv" 2>/dev/null || { cat "$log"; echo "::error::hugo server exited"; exit 1; }
+            sleep 1
+          done
+          grep -q 'Web Server is available' "$log" || { cat "$log"; echo "::error::hugo server not ready within 90s"; exit 1; }
+          curl -fsS http://127.0.0.1:1414/books/big/ch150/ | grep -q '>Figure&nbsp;593</a>' || { echo "::error::hugo server: cross-chapter xref not resolved"; exit 1; }
+          sed -i 's/^## Section 0 {#sec:c1-s0}$/{{< figure src="\/x.png" caption="New" label="fig:new" >}}\n\n&/' "$B/content/books/big/ch001.md"
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:1414/books/big/ch150/ | grep -q '>Figure&nbsp;594</a>'; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || { cat "$log"; echo "::error::hugo server: an edit of chapter 1 did not renumber chapter 150"; exit 1; }
+
+      # Footnotes inside footnotes and other edge cases of the Markdown
+      # footnote engine (func/footnotes.html, tufte/fn-split.html): the
+      # markers must never nest, every reference must reach its note, ids
+      # must stay unique, and a [^x] in an image title or table caption, or
+      # a second reference to a label, must not change the kind of the
+      # page's other notes.
+      - name: Check nested and mixed footnotes
+        shell: bash
+        run: |
+          set -euo pipefail
+          N="$RUNNER_TEMP/nested"
+          mkdir -p "$N/content/posts" "$N/static"
+          cp static/images/latex/hilbertcurves.svg "$N/static/h.svg"
+          cat > "$N/hugo.toml" <<EOF
+          baseURL = "https://example.org/"
+          title = "Nested footnotes"
+          theme = "tufte.hugo"
+          themesDir = "$GITHUB_WORKSPACE"
+          mainSections = ["posts"]
+          [markup.goldmark.parser]
+            wrapStandAloneImageWithinParagraph = false
+            [markup.goldmark.parser.attribute]
+              block = true
+              title = true
+          EOF
+          cd "$N/content/posts"
+          printf -- '---\ntitle: A\ndate: 2024-01-01\n---\n\nCase A {{< footnote >}}inner with [^f]{{< /footnote >}} end.\n\nCase D {{< sidenote >}}side with {{< footnote >}}fn with [^g]{{< /footnote >}} inside{{< /sidenote >}} end.\n\n{{< fig src="/h.svg" >}}Caption {{< footnote >}}fn with [^h]{{< /footnote >}} end{{< /fig >}}\n\n[^f]: F def.\n[^g]: G def.\n[^h]: H def.\n' > a.md
+          printf -- '---\ntitle: F\ndate: 2024-01-02\n---\n\nCase F1[^fn-r] and F2[^fn-p] and another[^fn-z] and a side[^x].\n\n[^fn-r]: Real with {{< footnote >}}nested sc{{< /footnote >}} hmm.\n[^fn-p]: Real with [^fn-s] hmm.\n[^fn-s]: S def.\n[^fn-z]: Z def.\n[^x]: Side refers to [^fn-q].\n[^fn-q]: Inner real q.\n' > f.md
+          printf -- '---\ntitle: T\ndate: 2024-01-03\n---\n\nA proof.[^fn-proof] An aside.[^why]\n\n![A curve](/h.svg "Hilbert curves.[^fn-src]")\n\n| a | b |\n|---|---|\n| 1 | 2 |\n{#tab:t caption="A table.[^fn-tsrc]"}\n\n[^fn-proof]: The proof.\n[^why]: An aside.\n[^fn-src]: Source of the figure.\n[^fn-tsrc]: Source of the table.\n' > t.md
+          printf -- '---\ntitle: R\ndate: 2024-01-04\nfootnotes: endnotes\n---\n\nTwice[^1] and again[^1] and[^1-2].\n\nBody[^fn-x] text.\n\n{{< table caption="T" >}}\n| a | b |\n|---|---|\n| c[^fn-x] | d |\n{{< /table >}}\n\n[^1]: One.\n[^1-2]: One-two.\n[^fn-x]: Shared.\n' > r.md
+          printf -- '---\ntitle: M\ndate: 2024-01-05\n---\n\nThree.[^fn-a][^fn-b][^fn-c] Mixed.[^s][^fn-d][^t]\n\n[^fn-a]: A.\n[^fn-b]: B.\n[^fn-c]: C.\n[^fn-d]: D.\n[^s]: S.\n[^t]: T.\n' > m.md
+          hugo --source "$N" --destination "$N/public" --panicOnWarning
+          cd "$N/public"
+          fail() { echo "::error::$1"; exit 1; }
+          for f in posts/*/index.html; do
+            ! grep -q 'class="tufte-fn"\|href="#fn:\|fnref:\|TUFTE' "$f" || fail "unresolved footnote in $f"
+            [ "$(grep -o '<span[ >]' "$f" | wc -l)" -eq "$(grep -o '</span>' "$f" | wc -l)" ] || fail "unbalanced <span> in $f"
+            d=$(grep -o ' id="[^"]*"' "$f" | sort | uniq -d)
+            [ -z "$d" ] || fail "duplicate ids in $f: $d"
+            for h in $(grep -o 'href="#[^"]*"' "$f" | sed 's/^href="#//; s/"$//' | sort -u); do
+              grep -q " id=\"$h\"" "$f" || fail "dangling link #$h in $f"
+            done
+          done
+          # Inner notes are kept, as their own footnotes, after the outer one
+          # (with the \multfootsep comma between the two marks).
+          grep -q 'Case A <sup class="footnote-ref"[^>]*><a [^>]*>[^<]*</a></sup><sup class="footnote-sep">,</sup><sup class="footnote-ref" id="fnref-[^"]*-f">' posts/a/index.html || fail "case A: inner footnote not after the outer mark"
+          grep -q '<span class="sidenote">side with <sup[^>]*>.*</sup> inside</span> end' posts/a/index.html || fail "case D: sidenote text broken"
+          grep -q '<span class="caption-text">Caption <sup.*</sup> end</span>' posts/a/index.html || fail "case H: caption text broken"
+          for t in 'nested sc' 'S def.' 'Z def.' 'Inner real q.'; do grep -q "$t" posts/f/index.html || fail "note text \"$t\" lost"; done
+          grep -q '<li id="fn-[^"]*-fn-z" class="footnote-item"' posts/f/index.html || fail "[^fn-z] is not a real footnote"
+          # [^x] in an image title or table caption does not turn [^fn-proof] into a sidenote.
+          grep -q '<li id="fn-[^"]*-fn-proof" class="footnote-item"' posts/t/index.html || fail "[^fn-proof] is not a real footnote"
+          grep -q '<span class="sidenote">An aside.</span>' posts/t/index.html || fail "[^why] is not a sidenote"
+          # One item per footnote, also when referenced from a shortcode.
+          [ "$(grep -o 'class="footnote-item"' posts/r/index.html | wc -l)" -eq 3 ] || fail "posts/r: expected 3 footnote items"
+          # \multfootsep: adjacent marks are separated by a superscript comma.
+          [ "$(grep -o '<sup class="footnote-sep">,</sup><sup class="footnote-ref"' posts/m/index.html | wc -l)" -eq 3 ] || fail "posts/m: adjacent footnote marks without a comma"
+          grep -q '</sup><label for="[^"]*" class="margin-toggle sidenote-number sidenote-number--multi"' posts/m/index.html || fail "posts/m: sidenote mark after a footnote mark without a comma"
+          # Automatic summaries are closed before "Read more".
+          for f in index.html posts/index.html; do
+            [ "$(grep -o '<span[ >]' "$f" | wc -l)" -eq "$(grep -o '</span>' "$f" | wc -l)" ] || fail "unbalanced <span> in $f"
+          done

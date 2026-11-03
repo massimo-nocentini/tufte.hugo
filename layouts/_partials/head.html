@@ -7,7 +7,9 @@
 {{- /* The full title as plain text, as og:title, twitter:title, the
        schema name and the RSS item title below (linkTitle is the link text
        of lists, navigation and running heads, not metadata). */}}
-<title>{{ with .Title }}{{ with partial "tufte/plain-title.html" (dict "page" $ "title" .) }}{{ . }} | {{ end }}{{ end }}{{ site.Title }}</title>
+{{- /* tufte/page-title.html: .Title, translated for the 404 page and
+       taxonomy pages whose title is Hugo's English default. */}}
+<title>{{ with partial "tufte/page-title.html" . }}{{ with partial "tufte/plain-title.html" (dict "page" $ "title" .) }}{{ . }} | {{ end }}{{ end }}{{ site.Title }}</title>
 {{- end }}
 
 {{- /* Description: front matter, then subtitle, then the summary of a
@@ -32,13 +34,21 @@
 <meta name="author" content="{{ . }}">
 {{- end }}
 {{- /* Canonical: every pager of a list renders from the same page, whose
-       .Permalink is the first pager; later pagers point to themselves. */ -}}
+       .Permalink is the first pager; later pagers point to themselves.
+       A pager URL is root-relative and holds the base path (/blog/page/2/),
+       except with canonifyURLs (/page/2/), and absURL resolves a leading
+       slash against the host: so the root-relative prefix that relURL
+       gives ("/blog/", or "/" with canonifyURLs) goes first. */ -}}
 {{- $canonical := .Permalink -}}
 {{- /* Book landings and parts list no summaries: no paginator (it would
        also publish /page/N/ copies of them). */ -}}
 {{- if and (not $inBook) (or .IsHome (eq .Kind "section")) -}}
   {{- with partial "func/paginate.html" . -}}
-    {{- if gt .PageNumber 1 }}{{ $canonical = .URL | absURL }}{{ end -}}
+    {{- if gt .PageNumber 1 -}}
+      {{- $u := .URL -}}
+      {{- if strings.HasPrefix $u "/" }}{{ $u = strings.TrimPrefix (relURL "") $u }}{{ end -}}
+      {{- $canonical = absURL $u -}}
+    {{- end -}}
   {{- end -}}
 {{- end }}
 <link rel="canonical" href="{{ $canonical }}">
@@ -74,7 +84,7 @@
 {{- $social := printf "%s\n%s\n%s" (partial "opengraph.html" . | string) (partial "twitter_cards.html" . | string) (partial "schema.html" . | string) -}}
 {{- $social = replaceRE `[ \t]*<meta (?:property="og:(?:title|description)"|name="twitter:(?:title|description)"|itemprop="(?:name|description)") content="[^"]*"\s*/?>\n?` "" $social -}}
 {{- $socialTitle := site.Title -}}
-{{- with .Title }}{{ $socialTitle = partial "tufte/plain-title.html" (dict "page" $ "title" .) | default site.Title }}{{ end }}
+{{- with partial "tufte/page-title.html" . }}{{ $socialTitle = partial "tufte/plain-title.html" (dict "page" $ "title" .) | default site.Title }}{{ end }}
 {{ $social | safeHTML }}
 {{- with $socialTitle }}
 <meta property="og:title" content="{{ . }}">
@@ -131,7 +141,7 @@
          shows its content, params.homeIntro; a home book landing always
          does). */ -}}
   {{- if not $math -}}
-    {{- if not (and .IsHome (not $inBook) (eq site.Params.homeIntro false)) -}}
+    {{- if not (and .IsHome (not $inBook) (not (partial "func/flag.html" (dict "value" site.Params.homeIntro "default" true)))) -}}
       {{- $body := printf "%s%s" (partial "tufte/abstract.html" .) (partialCached "func/content.html" . $key false) -}}
       {{- if or (findRE $mathRE $body 1) (.Store.Get "hasMath") }}{{ $math = true }}{{ end -}}
     {{- end -}}

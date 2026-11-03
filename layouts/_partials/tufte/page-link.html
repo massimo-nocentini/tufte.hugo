@@ -1,0 +1,41 @@
+{{- /*
+  A link to a page (and an anchor in it) for the generated lists: the
+  lists of figures, tables and listings (tufte/lists/render.html), the
+  index locators (tufte/index/render.html) and the book contents
+  (tufte/book/toc.html).
+
+  Takes: dict
+    "page"    the target page
+    "anchor"  optional id in it
+    "html"    the link text (HTML)
+    "book"    truthy when the list belongs to a book
+  Returns: HTML
+    <a href="REL[#ANCHOR]">HTML</a>   a rendered page
+    <a data-tufte-path="PATH"[ data-tufte-anchor="ANCHOR"]>HTML</a>
+                                      a page of a book that is never
+                                      rendered (build.render = never: no
+                                      RelPermalink): a placeholder link
+                                      without href (plain text), which the
+                                      book's print document, where the page
+                                      is still printed, turns into an
+                                      in-document link
+                                      (tufte/book/print-links.html), as for
+                                      the xrefs of tufte/resolve-refs.html
+    HTML                              such a page outside a book
+  A "#ANCHOR" alone would point into the page that shows the list.
+*/ -}}
+{{- $p := .page -}}
+{{- $a := .anchor | default "" -}}
+{{- $out := .html -}}
+{{- with $p.RelPermalink -}}
+  {{- $href := . -}}
+  {{- with $a }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
+  {{- $out = printf `<a href="%s">%s</a>` (htmlEscape $href) $out -}}
+{{- else -}}
+  {{- if $.book -}}
+    {{- $attrs := printf ` data-tufte-path="%s"` (htmlEscape $p.Path) -}}
+    {{- with $a }}{{ $attrs = printf `%s data-tufte-anchor="%s"` $attrs (htmlEscape .) }}{{ end -}}
+    {{- $out = printf `<a%s>%s</a>` $attrs $out -}}
+  {{- end -}}
+{{- end -}}
+{{- return $out -}}

@@ -14,16 +14,18 @@
   Takes: a page.
   Returns: dict
     style    the resolved style (never "auto")
-    items    slice of dict { ident, n, mark, id, key } in number order;
-             id = "HASH6-NAME" (the list item is fn-<id>, the first
-             reference fnref-<id>, later ones fnref-<id>-2 …)
+    items    slice of dict { ident, n, mark, id, key, local } in number
+             order; id = "HASH6-NAME" (the list item is fn-<id>, the first
+             reference fnref-<id>, later ones fnref2-<id>, fnref3-<id> …);
+             local = the key is a Markdown label (page-local, see
+             tufte/labels.html), not a shortcode's label=
     byIdent  map ident → item (ident as in tufte/fn-split.html)
   Callers: partialCached "tufte/fn-model.html" $p (or $p.RelPermalink $p.Path)
 */ -}}
-{{- /* Memoized in the page's Store (not in hugo server): see
+{{- /* Memoized in the page's Store for the current build: see
        tufte/opts.html. */ -}}
 {{- $memoRes := false -}}
-{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoFnModel") -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoFnModel") -}}
   {{- $memoRes = .v -}}
 {{- else -}}
 {{- $p := . -}}
@@ -97,14 +99,18 @@
     {{- if isset ($S.Get "used") $name }}{{ $name = printf "%s-x%d" $name $n }}{{ end -}}
     {{- $S.SetInMap "used" $name true -}}
     {{- $key := "" -}}
+    {{- $local := false -}}
     {{- with .label }}{{ $key = partial "tufte/key.html" . }}{{ end -}}
-    {{- if and (not $key) .md (not (findRE `^[0-9]+$` .md 1)) }}{{ $key = partial "tufte/key.html" .md }}{{ end -}}
-    {{- $it := dict "ident" .ident "n" $n "mark" $mark "id" (printf "%s-%s" $hash $name) "key" $key -}}
+    {{- if and (not $key) .md (not (findRE `^[0-9]+$` .md 1)) -}}
+      {{- $key = partial "tufte/key.html" .md -}}
+      {{- $local = true -}}
+    {{- end -}}
+    {{- $it := dict "ident" .ident "n" $n "mark" $mark "id" (printf "%s-%s" $hash $name) "key" $key "local" $local -}}
     {{- $S.SetInMap "by" .ident $it -}}
     {{- $items = $items | append $it -}}
   {{- end -}}
 {{- end -}}
 {{- $memoRes = dict "style" $style "items" $items "byIdent" ($S.Get "by") -}}
-{{- if not hugo.IsServer }}{{ $p.Store.Set "tufteMemoFnModel" (dict "v" $memoRes) }}{{ end -}}
+{{- $p.Store.Set "tufteMemoFnModel" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $memoRes -}}

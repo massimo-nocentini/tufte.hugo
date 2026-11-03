@@ -1,0 +1,31 @@
+{{- /*
+  canonifyURLs = true with a base path (baseURL https://example.org/blog/):
+  Hugo then writes most root-relative URLs without the base path (relURL,
+  a page's .RelPermalink: /media/flow.jpg; a resource's .RelPermalink
+  keeps it: /blog/posts/p/flow.jpg) and adds the baseURL to the src=,
+  href= and srcset= of the output only, never to poster= (the video
+  shortcode's poster image). So a root-relative poster= becomes absolute
+  here, as Hugo's canonifier does it: a path that already starts with the
+  base path only gets the scheme and host. Without canonifyURLs
+  (root-relative URLs then hold the base path) or with a root baseURL,
+  the HTML is returned unchanged.
+
+  Takes: the HTML string. Returns: the HTML string.
+*/ -}}
+{{- $html := . | string -}}
+{{- if strings.Contains $html ` poster="/` -}}
+  {{- $bu := urls.Parse site.BaseURL -}}
+  {{- $bp := strings.TrimSuffix "/" $bu.Path -}}
+  {{- if and $bp $bu.Host (ne (relURL "") (printf "%s/" $bp)) -}}
+    {{- range uniq (findRE ` poster="/(?:[^/"][^"]*)?"` $html) -}}
+      {{- $u := replaceRE `^ poster="(.*)"$` "$1" . -}}
+      {{- if or (eq $u $bp) (strings.HasPrefix $u (printf "%s/" $bp)) -}}
+        {{- $u = printf "%s://%s%s" $bu.Scheme $bu.Host $u -}}
+      {{- else -}}
+        {{- $u = absURL (strings.TrimPrefix "/" $u) -}}
+      {{- end -}}
+      {{- $html = replace $html . (printf ` poster="%s"` $u) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $html -}}

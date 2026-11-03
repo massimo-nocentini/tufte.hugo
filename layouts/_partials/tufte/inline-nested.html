@@ -1,0 +1,64 @@
+{{- /*
+  Turns the HTML of a nested shortcode into phrasing content, when it sits
+  in inline text (a sidenote, margin note, caption…: a <span>). Called by
+  tufte/render-inner.html (inline mode) as it swaps the nest tokens back:
+  the Markdown part of the text has already been through
+  func/inline-figures.html and tufte/inline-blocks.html, but a nested
+  shortcode's HTML (a figure, table, listing, iframe, epigraph…) arrives
+  only then, and a <figure>, <div>, <table> or <pre> in a <span> would close
+  the paragraph around the note in the browser.
+
+  The same steps, in the same order:
+    1. func/inline-figures.html: a figure of an image (figure, fig,
+       fullwidthfigure, the image hook) becomes the plain image with its
+       caption as text, unnumbered (in LaTeX a float in a note is
+       "Float(s) lost");
+    2. paragraphs: <p ATTRS>…</p> → <span data-sn="p" ATTRS>…</span>,
+       </p><p> → <br>, other <p> tags removed;
+    3. tufte/inline-blocks.html: every other block element (a table's or
+       listing's figure, an iframe wrapper, a div, pre, table…) becomes a
+       span[data-sn] laid out as a block by tufte-latex.css.
+
+  HTML that holds no block element (notes, cites, math, a margin figure,
+  whose own wrapper tufte/note-in-note.html handles) is returned
+  unchanged. Real-footnote markers (span.tufte-fn: the text of a footnote
+  shortcode, which goes to the footnote list, where blocks are fine) are
+  left alone.
+
+  Takes: the HTML (string or template.HTML).
+  Returns: dict { html, changed } (changed: true when a block was turned
+  into phrasing content; the caller warns tufte-block-in-note).
+*/ -}}
+{{- $html := string . -}}
+{{- $changed := false -}}
+{{- $blockRE := `(?i)<(?:figure|figcaption|div|table|pre|ul|ol|dl|blockquote|section|header|footer|aside|nav|address|article|details|h[1-6]|hr)[\s/>]|<p>` -}}
+{{- if findRE $blockRE $html 1 -}}
+  {{- $head := $html -}}
+  {{- $items := slice -}}
+  {{- if strings.Contains $html `<span class="tufte-fn"` -}}
+    {{- $s := partial "tufte/fn-split.html" $html -}}
+    {{- $head = $s.head -}}
+    {{- $items = $s.items -}}
+  {{- end -}}
+  {{- $parts := slice $head -}}
+  {{- range $items }}{{ $parts = $parts | append .tail }}{{ end -}}
+  {{- $flat := slice -}}
+  {{- range $parts -}}
+    {{- $t := . -}}
+    {{- if findRE $blockRE $t 1 -}}
+      {{- $t = partial "func/inline-figures.html" $t -}}
+      {{- $t = replaceRE `(?s)<p(\s[^>]*)>(.*?)</p>` `<span data-sn="p"$1>$2</span>` $t -}}
+      {{- $t = $t | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" -}}
+      {{- $t = partial "tufte/inline-blocks.html" $t -}}
+      {{- if ne $t . }}{{ $changed = true }}{{ end -}}
+    {{- end -}}
+    {{- $flat = $flat | append $t -}}
+  {{- end -}}
+  {{- if $changed -}}
+    {{- $html = index $flat 0 -}}
+    {{- range $i, $it := $items -}}
+      {{- $html = printf `%s<span class="tufte-fn"%s>%s</span>%s` $html $it.attrs $it.text (index $flat (add $i 1)) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "html" $html "changed" $changed) -}}

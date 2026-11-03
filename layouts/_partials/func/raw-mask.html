@@ -1,0 +1,35 @@
+{{- /*
+  Hides the text that is not markup from the regex tag scanners (raw HTML
+  of a site with markup.goldmark.renderer.unsafe = true): HTML comments
+  and the contents of <script>, <style> and <textarea> (raw and escapable
+  raw text: a "<p>" or "<div>" in them is not a tag). Each such run, with
+  its tags, is swapped for an opaque token TUFTERAW<n>X, which holds no
+  "<", and put back afterwards.
+
+  Used by tufte/unnest-blocks.html, func/sectionize.html and the summary
+  tag balancer of func/content-raw.html.
+
+  Takes a dict:
+    html  the HTML (string)
+    raw   optional: the slice returned by an earlier call; the tokens of
+          html are then put back (restore mode)
+  Returns: dict
+    html  the HTML with the tokens (mask mode) or restored (restore mode)
+    raw   slice of the hidden runs (mask mode; empty when there is none)
+*/ -}}
+{{- $html := string .html -}}
+{{- $raw := slice -}}
+{{- if isset . "raw" -}}
+  {{- range $i, $r := .raw -}}
+    {{- $html = replace $html (printf "TUFTERAW%dX" $i) $r -}}
+  {{- end -}}
+{{- else if findRE `<!--|<(?i:script|style|textarea)[\s>]` $html 1 -}}
+  {{- $re := `(?s)<!--.*?-->|<(?i:script)[\s>].*?</(?i:script)\s*>|<(?i:style)[\s>].*?</(?i:style)\s*>|<(?i:textarea)[\s>].*?</(?i:textarea)\s*>` -}}
+  {{- range findRE $re $html -}}
+    {{- if not (in $raw .) -}}
+      {{- $html = replace $html . (printf "TUFTERAW%dX" (len $raw)) -}}
+      {{- $raw = $raw | append . -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "html" $html "raw" $raw) -}}

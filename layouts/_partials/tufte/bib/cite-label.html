@@ -1,0 +1,35 @@
+{{- /*
+  The author part of an author-year citation (natbib with plainnat):
+  "Adams", "Adams and Brown", "Adams et al." from the family names of the
+  authors (else the editors; a name suffix such as "Jr." is left out, and
+  "and others" gives "et al."); the title, else the key, without names.
+  The cite shortcode prints it (modes text, paren, author) and
+  tufte/bib/extra.html groups entries by it.
+
+  Takes a dict:
+    n    the normalized entry (tufte/bib/normalize.html)
+    key  the citation key
+  Returns: the label (plain text, unescaped).
+*/ -}}
+{{- $n := .n -}}
+{{- $fams := slice -}}
+{{- range $n.authors | default $n.editors -}}
+  {{- $fams = $fams | append (.family | default .literal | default "") -}}
+{{- end -}}
+{{- /* BibTeX's "and others" (normalize.html: authorsEtal / editorsEtal)
+       counts as a further name: "Doe et al.", as natbib's format.lab.names. */ -}}
+{{- $etal := cond (gt (len ($n.authors | default slice)) 0) $n.authorsEtal $n.editorsEtal -}}
+{{- $who := "" -}}
+{{- if and $etal (gt (len $fams) 0) -}}
+  {{- $who = printf "%s et al." (index $fams 0) -}}
+{{- else if eq (len $fams) 1 -}}
+  {{- $who = index $fams 0 -}}
+{{- else if eq (len $fams) 2 -}}
+  {{- $who = printf "%s %s %s" (index $fams 0) (partial "func/t.html" "and" | default "and") (index $fams 1) -}}
+{{- else if gt (len $fams) 2 -}}
+  {{- $who = printf "%s et al." (index $fams 0) -}}
+{{- else -}}
+  {{- /* without CSL rich-text markers (normalize.html) */ -}}
+  {{- $who = replaceRE `[\x11-\x19\x1b]` "" ($n.title | default "") | default .key -}}
+{{- end -}}
+{{- return $who -}}

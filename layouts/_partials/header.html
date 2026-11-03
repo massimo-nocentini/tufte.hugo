@@ -18,7 +18,7 @@
   {{- end }}
   {{- /* Multilingual sites: links to the other translations of this page. */ -}}
   {{- if .IsTranslated }}
-  <nav class="site-languages" aria-label="{{ T "translations" }}">
+  <nav class="site-languages" aria-label="{{ partial "func/t.html" "translations" }}">
     <ul>
       {{- range .Translations }}
       {{- $l := partial "func/lang.html" .Language }}

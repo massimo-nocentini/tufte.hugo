@@ -1,0 +1,84 @@
+{{- /*
+  Resolves the deferred attributes of the image and link render hooks: an
+  image's alt text whose Markdown holds a shortcode, a nest token, a
+  footnote reference [^x] or other markup that is not plain text, and a
+  link title that holds a shortcode or a nest token.
+
+  Inside a hook a shortcode is still Hugo's placeholder (or, in a theme
+  shortcode's inner text, a nest token): written into the attribute, it
+  would be replaced by the shortcode's HTML there and break the tag. So
+  the hook writes a token in the attribute and the text after the element:
+
+    <img … alt="TUFTEATTR<key>END" …/>…<i class="tufte-attr" data-key="<key>" data-at="img"[ data-in="note"] hidden></i>TEXT<i class="tufte-attr-end" hidden></i>
+    <a … title="TUFTEATTR<key>END" …>…</a><i class="tufte-attr" data-key="<key>" data-at="a" hidden></i>TEXT<i class="tufte-attr-end" hidden></i>
+
+  (key: 12 hex digits; TEXT: the rendered alt text, or the escaped title).
+  Once the shortcodes' HTML is in place, TEXT is split by
+  tufte/img-tip.html: its plain text (math as its TeX source,
+  cross-reference markers kept for postprocess) replaces the token, and
+  its notes, citations and footnote markers follow the element (the img,
+  after its own title mark if any; the </a>), so a [^x] in an alt text
+  is still a footnote of the page and a cite still a citation sidenote.
+  data-in="note": the img is inside a margin note (a margin figure), so
+  those notes are cleaned like a caption's (tufte/note-in-note.html,
+  tufte/cite-gather.html).
+
+  Callers: func/content-raw.html (page-level Markdown, after Hugo put the
+  shortcodes' output in place; final = true removes leftovers) and
+  tufte/render-inner.html (a theme shortcode's inner text, once its nest
+  tokens are swapped).
+
+  Takes a dict:
+    page   the page                                   required
+    html   the HTML (string or template.HTML)
+    final  bool: drop the marks and tokens left unresolved
+  Returns: the HTML string.
+*/ -}}
+{{- $page := .page -}}
+{{- $html := string (.html | default "") -}}
+{{- if strings.Contains $html `<i class="tufte-attr" ` -}}
+  {{- $markRE := `(?s)<i class="tufte-attr" data-key="([0-9a-f]+)" data-at="(img|a)"( data-in="note")? hidden></i>(.*?)<i class="tufte-attr-end" hidden></i>` -}}
+  {{- range findRESubmatch $markRE $html -}}
+    {{- $mark := index . 0 -}}
+    {{- $tok := printf "TUFTEATTR%sEND" (index . 1) -}}
+    {{- $tip := partial "tufte/img-tip.html" (index . 4) -}}
+    {{- $notes := $tip.notes -}}
+    {{- if and $notes (index . 3) -}}
+      {{- $at := $page.RelPermalink -}}
+      {{- with $page.File }}{{ $at = .Path }}{{ end -}}
+      {{- if strings.Contains $notes `class="margin-toggle` -}}
+        {{- $notes = partial "tufte/note-in-note.html" (dict "page" $page "html" $notes "holder" "margin figure's alt text" "where" $at) -}}
+      {{- end -}}
+      {{- if strings.Contains $notes `class="cite-end"` -}}
+        {{- with partial "tufte/cite-gather.html" (dict "page" $page "html" $notes) -}}
+          {{- $notes = printf "%s%s" .html .block -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if strings.Contains $html $mark -}}
+      {{- $target := "" -}}
+      {{- if $notes -}}
+        {{- $re := printf `(?s)<a [^>]*\stitle="%s"[^>]*>.*?</a>` $tok -}}
+        {{- if eq (index . 2) "img" -}}
+          {{- $re = printf `(?s)<img [^>]*\salt="%s"[^>]*/>(?:</a>)?(?:<i class="tufte-tip" hidden></i>.*?<i class="tufte-tip-end" hidden></i>)?` $tok -}}
+        {{- end -}}
+        {{- with findRE $re (replace $html $mark "" 1) 1 }}{{ $target = index . 0 }}{{ end -}}
+      {{- end -}}
+      {{- if $target -}}
+        {{- $html = replace $html $mark "" 1 -}}
+        {{- $html = replace $html $target (printf "%s%s" $target $notes) 1 -}}
+      {{- else -}}
+        {{- $html = replace $html $mark $notes 1 -}}
+      {{- end -}}
+    {{- end -}}
+    {{- /* An unnumbered labelled float names itself by its alt text
+           (tufte/figure.html escapes it once more there). */ -}}
+    {{- $html = replace $html (printf `data-name="%s"` $tok) (printf `data-name="%s"` (htmlEscape $tip.title)) -}}
+    {{- $html = replace $html $tok $tip.title -}}
+  {{- end -}}
+{{- end -}}
+{{- if and .final (strings.Contains $html "TUFTEATTR") -}}
+  {{- $html = replaceRE `(?s)<i class="tufte-attr" [^>]*></i>.*?<i class="tufte-attr-end" hidden></i>` "" $html -}}
+  {{- $html = replaceRE `TUFTEATTR[0-9a-f]+END` "" $html -}}
+{{- end -}}
+{{- return $html -}}

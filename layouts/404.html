@@ -1,9 +1,9 @@
 {{ define "main" }}
 <article class="not-found">
-  <h1>{{ T "pageNotFound" }}</h1>
+  <h1>{{ partial "func/t.html" "pageNotFound" }}</h1>
   <section>
-    <p>{{ T "pageNotFoundText" }}</p>
-    <p><a href="{{ site.Home.RelPermalink }}">&larr;&nbsp;{{ T "backHome" }}</a></p>
+    <p>{{ partial "func/t.html" "pageNotFoundText" }}</p>
+    <p><a href="{{ site.Home.RelPermalink }}">{{ cond (eq (partial "func/lang.html" site.Language).dir "rtl") "&rarr;" "&larr;" | safeHTML }}&nbsp;{{ partial "func/t.html" "backHome" }}</a></p>
   </section>
 </article>
 {{ end }}

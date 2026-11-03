@@ -5,12 +5,9 @@
   Takes: dict
     "page"     the citing page (its database: db.html)
     "keys"     a slice of keys, or a comma-separated string
-    "postnote" optional, added to the last entry only (see format.html);
-               when empty, "page" / "note" build one: page "42" → "p. 42",
-               "42–45" → "pp. 42–45"; note is appended after it
-    "pagenum"  optional page locator (alias of the "page" above, since
-               "page" is the page object here)
-    "note"     optional free text
+    "postnote" optional, added to the last entry only (see format.html):
+               the cite shortcode's note=, or its page= locator
+               ("p. 42", "pp. 42–45": tufte/bib/locator.html)
     "margin"   bool, default true (entries in the margin: sidenotes,
                bibentry); false for in-text use
   Returns: HTML, a sequence of <span class="bib-entry" data-cite="key">.
@@ -29,24 +26,14 @@
   {{- end -}}
 {{- end -}}
 
-{{- $post := .postnote -}}
-{{- if not $post -}}
-  {{- $parts := slice -}}
-  {{- with .pagenum -}}
-    {{- $pn := printf "%v" . -}}
-    {{- $pn = replaceRE `([0-9A-Za-z])\s*-{1,2}\s*([0-9A-Za-z])` "$1–$2" $pn -}}
-    {{- $parts = $parts | append (printf "%s %s" (cond (findRE `[–,]` $pn 1) "pp." "p.") $pn) -}}
-  {{- end -}}
-  {{- with .note }}{{ $parts = $parts | append (printf "%v" .) }}{{ end -}}
-  {{- $post = delimit $parts ", " -}}
-{{- end -}}
+{{- $post := .postnote | default "" -}}
 
 {{- $db := partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path) -}}
 {{- $where := "" -}}
 {{- with $p.File }}{{ $where = .Path }}{{ else }}{{ $where = $p.RelPermalink }}{{ end -}}
 {{- $out := slice -}}
 {{- $n := len $keys -}}
-{{- $and := T "and" | default "and" -}}
+{{- $and := partial "func/t.html" "and" | default "and" -}}
 {{- range $i, $k := $keys -}}
   {{- $raw := index $db $k -}}
   {{- $e := false -}}

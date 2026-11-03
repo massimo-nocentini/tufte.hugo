@@ -12,11 +12,36 @@
   [module.hugoVersion]
     min = "0.146.0"
     extended = false # no SCSS, no WebP encoding: the standard edition is enough
+  # Hugo's default mounts (a module that lists mounts gets no defaults),
+  # plus i18n/en.yaml as an asset: func/t.html reads it as the English
+  # fallback of a language that has no i18n file of the theme.
+  [[module.mounts]]
+    source = "archetypes"
+    target = "archetypes"
+  [[module.mounts]]
+    source = "assets"
+    target = "assets"
+  [[module.mounts]]
+    source = "data"
+    target = "data"
+  [[module.mounts]]
+    source = "i18n"
+    target = "i18n"
+  [[module.mounts]]
+    source = "layouts"
+    target = "layouts"
+  [[module.mounts]]
+    source = "static"
+    target = "static"
+  [[module.mounts]]
+    source = "i18n/en.yaml"
+    target = "assets/tufte/i18n-en.yaml"
 
 [params]
   subtitle = ""                 # shown under the site title on the home page
   description = ""              # last fallback <meta name="description"> (after page description, subtitle, summary)
-  dateFormat = "January 2, 2006"
+  dateFormat = ""                # Go layout of dates; "" = the language's i18n dateFormat (":date_long", the localized long date, in every theme language)
+  archiveDateFormat = ""        # Go layout of the archive's month and day; "" = the language's i18n archiveDateFormat ("Jan 2", "2 Jan", …; else English's)
   sections = "h2"               # "h2" | "none" — wrap content in <section> at each h2 (front matter `sections` overrides)
   footnotes = "sidenotes"       # "sidenotes" | "endnotes" (front matter `footnotes` overrides)
   etBook = true                 # load the bundled ET Book web fonts
@@ -51,7 +76,7 @@
     enable = "auto"             # "auto" (only pages that contain math) | true | false
     engine = "server"           # "server" (build-time KaTeX, no JS) | "client" (KaTeX JS in the browser)
     fleqn = false               # display math flush left
-    leqno = false               # equation tags (\tag) on the left
+    leqno = false               # equation numbers on the left: \label numbers and \tag
     errorColor = ""             # colour of invalid TeX ("" = the theme's red, adapted to dark mode)
     strict = "error"            # KaTeX strict mode: "error" | "ignore" | "warn"
     minRuleThickness = 0.04     # minimum fraction-line thickness, in em

@@ -12,10 +12,14 @@
      links with the formatted text (auto num full name page eq).
   5. With bibliography.margin = false: citation numbers (cite-num spans)
      from tufte/bib/numbers.html; in a book, citation links point to the
-     bibliography chapter.
+     bibliography chapter. With no list to link to (no bibliography
+     chapter; a handout with bibliography.list off and no placeholder) the
+     links become <span class="citation-ref"> and tufte-no-bibliography
+     is warned.
   5b. Real footnotes (SPEC-LATEX §11): markers numbered (tufte/fn-model),
      references <sup class="footnote-ref">, list
-     <section class="footnotes"> appended (moved/split by
+     <section class="footnotes"> appended, or put before a bibliography
+     placeholder that follows the last reference (moved/split by
      func/content.html per footnotePlacement); dropped in summaries.
   5b'. Notes and footnote marks inside link text move after the link;
      links nested in a link are unlinked (tufte/unnest-links.html).
@@ -27,8 +31,10 @@
   7. Handouts: the automatic bibliography is appended when
      bibliography.list is on, the page cites something and has no
      bibliography placeholder.
-  8. Strictly adjacent sidenote marks get sidenote-number--multi; the
-     sn-end, cap-end and tufte-float markers are removed.
+  8. \multfootsep: a sidenote mark strictly after another mark (sidenote
+     or footnote) gets sidenote-number--multi; a footnote mark strictly
+     after another mark gets <sup class="footnote-sep">,</sup> before it.
+     The sn-end, cap-end and tufte-float markers are removed.
   9. debug: orphan footnotemarks and unlabelled numbered floats are
      reported.
   No warnings in summary mode.
@@ -71,7 +77,9 @@
 {{- /* 1c. Two non-heading elements with one id (two \label anchors or
        floats with the same normalised key: tufte-duplicate-label was
        warned and the first one wins): the later ones get KEY-2, KEY-3…,
-       so the page has no duplicate id. */ -}}
+       so the page has no duplicate id. Headings are left out: Goldmark
+       makes the text's heading ids unique, and func/content-raw.html
+       (step 7) those of inner texts and of the abstract. */ -}}
 {{- $idTags := slice -}}
 {{- range findRE `<[a-zA-Z][^>]*\sid="[^"]+"[^>]*>` $html -}}
   {{- if not (findRE `^<h[1-6][\s>]` . 1) }}{{ $idTags = $idTags | append . }}{{ end -}}
@@ -87,8 +95,8 @@
   {{- range $i, $tag := $idTags -}}
     {{- $id := index $ids $i -}}
     {{- $new := $tag -}}
+    {{- $nid := "" -}}
     {{- if isset ($seen.Get "s") $id -}}
-      {{- $nid := "" -}}
       {{- range $n := seq 2 99 -}}
         {{- $c := printf "%s-%d" $id $n -}}
         {{- if not (or (in $all (printf ` id="%s"` $c)) (isset ($seen.Get "s") $c)) }}{{ $nid = $c }}{{ break }}{{ end -}}
@@ -102,6 +110,13 @@
     {{- /* Each tag, in document order, becomes a token (the first
            remaining occurrence), then the token its final form. */ -}}
     {{- $html = replace $html $tag (printf "TUFTEIDTAG%dEND" $i) 1 -}}
+    {{- /* A Chroma line anchor (anchorlinenos: a code block of a
+           shortcode's inner text numbers its lines hl-0-N again) links
+           to itself: its link follows the renamed id. */ -}}
+    {{- if $nid -}}
+      {{- $ln := printf `TUFTEIDTAG%dEND<a class="lnlinks" href="#%%s">` $i -}}
+      {{- $html = replace $html (printf $ln $id) (printf $ln $nid) 1 -}}
+    {{- end -}}
     {{- $put = $put | append $new -}}
   {{- end -}}
   {{- range $i, $t := $put -}}
@@ -143,11 +158,46 @@
   {{- $bibPage := $p -}}
   {{- with $root -}}
     {{- $bibPage = (partialCached "tufte/book/special.html" . (or .RelPermalink .Path)).bibliography -}}
+  {{- else -}}
+    {{- /* A handout has a list when it holds a bibliography placeholder
+           or gets the automatic one (step 7, bibliography.list). */ -}}
+    {{- $full := partialCached "func/content-raw.html" (dict "page" $p "summary" false) (or $p.RelPermalink $p.Path) false | string -}}
+    {{- if not (strings.Contains $full `data-what="bibliography"`) -}}
+      {{- if not (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.list") (or $p.RelPermalink $p.Path) "bibliography.list")) -}}
+        {{- $bibPage = false -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
   {{- with $bibPage -}}
+    {{- /* An entry whose id ref-KEY a heading of the list's page uses
+           ("## Ref tufte2001") is ref-KEY-2 there (tufte/bib/list.html,
+           tufte/gen-id.html): its links follow. */ -}}
+    {{- $bp := . -}}
+    {{- range $tag := findRE `<a class="citation-ref" href="#ref-[^"]*" data-cite="[^"]*">` $html | uniq -}}
+      {{- $k := replaceRE `^.*data-cite="([^"]*)">$` "$1" $tag -}}
+      {{- $rid := partial "tufte/gen-id.html" (dict "page" $bp "base" (printf "ref-%s" $k)) -}}
+      {{- if ne $rid (printf "ref-%s" $k) -}}
+        {{- $html = replace $html $tag (replace $tag (printf `href="#ref-%s"` $k) (printf `href="#%s"` $rid)) -}}
+      {{- end -}}
+    {{- end -}}
     {{- if or $summary (ne . $p) -}}
       {{- with .RelPermalink -}}
         {{- $html = replace $html `<a class="citation-ref" href="#ref-` (printf `<a class="citation-ref" href="%s#ref-` .) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- else -}}
+    {{- /* No reference list to link to (a book without a bibliography
+           chapter, a handout with bibliography.list = false and no
+           bibliography shortcode): the numbers stay, unlinked, and
+           tufte-no-bibliography is warned (once per book or page). */ -}}
+    {{- $html = replaceRE `<a class="citation-ref" href="#ref-[^"]*"( data-cite="[^"]*")?>(<span class="cite-num"[^>]*>[^<]*</span>)</a>` `<span class="citation-ref"$1>$2</span>` $html -}}
+    {{- if not $summary -}}
+      {{- with $root -}}
+        {{- $ra := .RelPermalink -}}
+        {{- with .File }}{{ $ra = .Path }}{{ end -}}
+        {{- warnidf "tufte-no-bibliography" "tufte.hugo: the book %s numbers its citations (bibliography.margin = false) but has no chapter with {{< bibliography >}}: the numbers link nowhere and are printed unlinked" $ra -}}
+      {{- else -}}
+        {{- warnidf "tufte-no-bibliography" "tufte.hugo: %s numbers its citations (bibliography.margin = false) but has no reference list (bibliography.list = false and no {{< bibliography >}}): the numbers link nowhere and are printed unlinked" $at -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
@@ -165,7 +215,7 @@
   {{- else -}}
     {{- $model := partialCached "tufte/fn-model.html" $p (or $p.RelPermalink $p.Path) -}}
     {{- $F := newScratch -}}
-    {{- $back := T "backToText" | default "Back to text" -}}
+    {{- $back := partial "func/t.html" "backToText" | default "Back to text" -}}
     {{- range $sp.items -}}
       {{- $it := index $model.byIdent .ident -}}
       {{- if not $it -}}
@@ -177,7 +227,9 @@
       {{- $F.Add (printf "c-%s" $it.id) 1 -}}
       {{- $c := $F.Get (printf "c-%s" $it.id) -}}
       {{- $rid := printf "fnref-%s" $it.id -}}
-      {{- if gt $c 1 }}{{ $rid = printf "%s-%d" $rid $c }}{{ end -}}
+      {{- /* Later references: fnref2-ID, fnref3-ID… (never the id of
+             another footnote: those all start fnref-, whatever the label). */ -}}
+      {{- if gt $c 1 }}{{ $rid = printf "fnref%d-%s" $c $it.id }}{{ end -}}
       {{- if eq $c 1 -}}
         {{- $F.Add "order" (slice $it) -}}
         {{- $F.SetInMap "text" $it.id .text -}}
@@ -209,9 +261,27 @@
       {{- if $arabic }}{{ $num = printf ` value="%d"` .n }}{{ end -}}
       {{- $lis = printf `%s<li id="fn-%s" class="footnote-item"%s>%s</li>` $lis .id $num $t -}}
     {{- end -}}
-    {{- $buf = printf `%s
+    {{- $sec := printf `
 <section class="footnotes footnotes-%s" role="doc-endnotes" aria-label="%s"><hr class="footnotes-sep"><ol class="footnotes-list">%s</ol></section>
-` $buf $model.style (htmlEscape (T "footnotes" | default "Footnotes")) $lis -}}
+` $model.style (htmlEscape (partial "func/t.html" "footnotes" | default "Footnotes")) $lis -}}
+    {{- /* Before the first bibliography placeholder after the last
+           reference (SPEC-LATEX §11.3: the References section comes
+           after the notes, as with the automatic list of step 7), when it
+           stands as a block (not inside a paragraph); else at the end. */ -}}
+    {{- $placed := false -}}
+    {{- $phRE := `<div class="tufte-placeholder" data-what="bibliography"` -}}
+    {{- with $sp.items -}}
+      {{- $tail := (index . (sub (len .) 1)).tail -}}
+      {{- if strings.Contains $tail $phRE -}}
+        {{- $pre := index (split $tail $phRE) 0 -}}
+        {{- $before := printf "%s%s" (strings.TrimSuffix $tail $buf) $pre -}}
+        {{- if eq (len (findRE `<p[\s>]` $before)) (len (findRE `</p>` $before)) -}}
+          {{- $buf = printf "%s%s%s" $before $sec (strings.TrimPrefix $pre $tail) -}}
+          {{- $placed = true -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if not $placed }}{{ $buf = printf "%s%s" $buf $sec }}{{ end -}}
   {{- end -}}
   {{- $html = $buf -}}
 {{- end -}}
@@ -231,15 +301,22 @@
        splits a paragraph. */ -}}
 {{- with partial "tufte/unnest-blocks.html" (dict "html" $html) -}}
   {{- $html = .html -}}
-  {{- if and .blocks (not $summary) -}}
-    {{- $what := slice -}}
-    {{- range .blocks -}}
-      {{- $d := replaceRE `(?s)^<([a-zA-Z0-9]+).*$` "$1" . -}}
-      {{- with replaceRE `(?s)^<[^>]*\sclass="([^"]*)".*$|^.*$` "$1" . }}{{ $d = printf "%s.%s" $d (replace . " " ".") }}{{ end -}}
-      {{- with replaceRE `(?s)^<[^>]*\sdata-what="([^"]*)".*$|^.*$` "$1" . }}{{ $d = printf "%s (%s)" $d . }}{{ end -}}
-      {{- $what = $what | append $d -}}
+  {{- $ub := . -}}
+  {{- if not $summary -}}
+    {{- /* .blocks: moved out of their paragraph; .kept: left in it (inside
+           an unclosed span, e.g. a note written with raw HTML). */ -}}
+    {{- range $key, $how := dict "blocks" "the paragraph was split around it" "kept" "it was left in the paragraph, inside an unclosed element (the HTML is invalid)" -}}
+      {{- with index $ub $key -}}
+        {{- $what := slice -}}
+        {{- range . -}}
+          {{- $d := replaceRE `(?s)^<([a-zA-Z0-9]+).*$` "$1" . -}}
+          {{- with replaceRE `(?s)^<[^>]*\sclass="([^"]*)".*$|^.*$` "$1" . }}{{ $d = printf "%s.%s" $d (replace . " " ".") }}{{ end -}}
+          {{- with replaceRE `(?s)^<[^>]*\sdata-what="([^"]*)".*$|^.*$` "$1" . }}{{ $d = printf "%s (%s)" $d . }}{{ end -}}
+          {{- $what = $what | append $d -}}
+        {{- end -}}
+        {{- warnidf "tufte-block-in-paragraph" "tufte.hugo: block content (%s) inside a paragraph in %s: block shortcodes (figure, fig, table, marginblock, equation, bibliography, listoffigures, tableofcontents, printindex…) must stand alone, with a blank line before and after; %s" (delimit (uniq $what) ", ") $at $how -}}
+      {{- end -}}
     {{- end -}}
-    {{- warnidf "tufte-block-in-paragraph" "tufte.hugo: block content (%s) inside a paragraph in %s: block shortcodes (figure, fig, table, marginblock, equation, bibliography, listoffigures, tableofcontents, printindex…) must stand alone, with a blank line before and after; the paragraph was split around it" (delimit (uniq $what) ", ") $at -}}
   {{- end -}}
 {{- end -}}
 
@@ -251,14 +328,19 @@
   {{- /* the same rank for the other generated lists (heading ids
          tufte-list-of-figures-2, tufte-index-2, …) */ -}}
   {{- $genSeq := newScratch -}}
-  {{- range $m := findRE `<div class="tufte-placeholder"[^>]*></div>` $html -}}
+  {{- /* A placeholder in a note or caption (a <span>) was turned into a
+         span[data-sn="div"] by tufte/inline-blocks.html (render-inner
+         warned tufte-block-in-note): its list is shown as inline blocks. */ -}}
+  {{- range $m := findRE `<div class="tufte-placeholder"[^>]*></div>|<span data-sn="div" class="tufte-placeholder"[^>]*></span>` $html -}}
     {{- $what := replaceRE `(?s)^.*data-what="([^"]*)".*$` "$1" $m -}}
     {{- $o := newScratch -}}
     {{- $o.Set "opts" dict -}}
+    {{- /* data-opts="k=v;k=v": the shortcode wrote % ; = in a value as
+           %25 %3B %3D (a heading may contain them). */ -}}
     {{- if strings.Contains $m `data-opts="` -}}
       {{- range split (replaceRE `(?s)^.*data-opts="([^"]*)".*$` "$1" $m | htmlUnescape) ";" -}}
         {{- if strings.Contains . "=" -}}
-          {{- $o.SetInMap "opts" (replaceRE `(?s)^([^=]*)=.*$` "$1" . | strings.TrimSpace | lower) (replaceRE `(?s)^[^=]*=(.*)$` "$1" . | strings.TrimSpace) -}}
+          {{- $o.SetInMap "opts" (replaceRE `(?s)^([^=]*)=.*$` "$1" . | strings.TrimSpace | lower) (replaceRE `(?s)^[^=]*=(.*)$` "$1" . | strings.TrimSpace | replaceRE "%3B" ";" | replaceRE "%3D" "=" | replaceRE "%25" "%") -}}
         {{- else if strings.TrimSpace . -}}
           {{- $o.SetInMap "opts" (lower (strings.TrimSpace .)) "true" -}}
         {{- end -}}
@@ -305,6 +387,12 @@
       {{- end -}}
     {{- end -}}
     {{- $out = string $out -}}
+    {{- if and $out (strings.HasPrefix $m "<span") -}}
+      {{- /* Paragraphs too keep their attributes (a bibliography entry's
+             id): span[data-sn="p"], a block like the others. */ -}}
+      {{- $out = $out | replaceRE `(?i)<p(\s[^>]*)?>` `<span data-sn="p"$1>` | replaceRE `(?i)</p\s*>` `</span>` -}}
+      {{- $out = partial "tufte/inline-blocks.html" $out | strings.TrimSpace -}}
+    {{- end -}}
     {{- $html = replace $html $m $out 1 -}}
   {{- end -}}
 {{- end -}}
@@ -369,6 +457,19 @@
       {{- $html = replace $html $lab "" -}}
     {{- end -}}
   {{- end -}}
+  {{- /* And the other way round: a footnotetext whose marks are all out
+         of the summary (in a heading, which summaries drop, or after the
+         cut) would show a numbered note with no mark and a checkbox with
+         no toggle, so it goes too (the removed heading's mark still steps
+         the counter: func/content-raw.html). */ -}}
+  {{- if strings.Contains $html `<p class="footnotetext-anchor">` -}}
+    {{- range $ft := findRE `(?s)<p class="footnotetext-anchor"><input type="checkbox" id="[^"]*".*?</p>` $html | uniq -}}
+      {{- $id := replaceRE `(?s)^<p class="footnotetext-anchor"><input type="checkbox" id="([^"]*)".*$` "$1" $ft -}}
+      {{- if not (strings.Contains $html (printf `<label for="%s"` $id)) -}}
+        {{- $html = replace $html $ft "" -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
   {{- /* Fragment-only links ([details](#details), a heading anchor): the
          anchor is on the full page, not on the list page that shows the
          summary, so they point to the page (as xrefs and citation links
@@ -376,10 +477,75 @@
   {{- with $p.RelPermalink -}}
     {{- $html = replace $html `href="#` (printf `href="%s#` .) -}}
   {{- end -}}
+  {{- /* Every other id that nothing in the summary refers to ({#id} block
+         attributes, Chroma's hl-N-M line anchors, raw HTML ids) goes as
+         well: two summaries on one list page could repeat it, and its
+         fragment links now point to the page. The ids that a for= or
+         aria-* attribute of the summary names stay (the note toggles,
+         whose ids are hashed per page). */ -}}
+  {{- if findRE `(?i)\sid=` $html 1 -}}
+    {{- $refd := slice -}}
+    {{- range findRESubmatch `(?i)\s(?:for|form|list|headers|popovertarget|commandfor|aria-(?:labelledby|describedby|controls|owns|details|flowto|activedescendant|errormessage))="([^"]*)"` $html -}}
+      {{- range split (index . 1) " " }}{{ with . }}{{ $refd = $refd | append . }}{{ end }}{{ end -}}
+    {{- end -}}
+    {{- range findRE `(?i)\sid=(?:"[^"]*"|'[^']*')` $html | uniq -}}
+      {{- if not (in $refd (replaceRE `(?s)^\s[iI][dD]=["']([^"']*)["']$` "$1" .)) -}}
+        {{- $html = replace $html . "" -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Page-relative links and images ([other](../other/), img.png that
+         is not a resource): the browser resolves them against the page,
+         and the home page, a section list or the feed would point
+         elsewhere, so they are resolved here against the page's URL, as
+         the browser does on the page itself (query and fragment kept).
+         poster= too (the video shortcode's poster image). */ -}}
+  {{- with $p.RelPermalink -}}
+    {{- $rp := . -}}
+    {{- $dir := $rp -}}
+    {{- if not (strings.HasSuffix $rp "/") }}{{ $dir = path.Dir $rp }}{{ end -}}
+    {{- range findRESubmatch `\s(href|src|poster)="([^"]*)"` $html -}}
+      {{- $v := index . 2 -}}
+      {{- if or (eq $v "") (strings.HasPrefix $v "/") (strings.HasPrefix $v "#") (findRE `^[a-zA-Z][a-zA-Z0-9+.-]*:` $v 1) }}{{ continue }}{{ end -}}
+      {{- $pp := replaceRE `^([^?#]*).*$` "$1" $v -}}
+      {{- $rest := strings.TrimPrefix $pp $v -}}
+      {{- $abs := $rp -}}
+      {{- if $pp -}}
+        {{- $abs = path.Join $dir $pp -}}
+        {{- if and (ne $abs "/") (or (strings.HasSuffix $pp "/") (in (slice "." "..") (path.Base $pp))) }}{{ $abs = printf "%s/" $abs }}{{ end -}}
+      {{- end -}}
+      {{- $html = replace $html (index . 0) (printf `%s%s="%s%s"` (substr (index . 0) 0 1) (index . 1) $abs $rest) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* canonifyURLs with a base path: Hugo adds it to src= and href=, not
+       to poster= (tufte/canon-poster.html). */ -}}
+{{- $html = partial "tufte/canon-poster.html" $html -}}
+
+{{- /* 7b. plainnat's extra labels (1999a, 1999b) after the years of
+       references and author-year citations (tufte/bib/extra.html); the
+       markers of the other years go. */ -}}
+{{- if strings.Contains $html `<span class="bib-extra" data-key="` -}}
+  {{- $xl := partialCached "tufte/bib/extra.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- range $tok := findRE `<span class="bib-extra" data-key="[^"]*"></span>` $html | uniq -}}
+    {{- $k := htmlUnescape (replaceRE `^.*data-key="([^"]*)".*$` "$1" $tok) -}}
+    {{- $html = replace $html $tok (index $xl $k | default "") -}}
+  {{- end -}}
 {{- end -}}
 
 {{- /* 8. Adjacent marks, then strip the markers. */ -}}
 {{- $html = replaceRE `</span><i class="sn-end" hidden></i>(<label for="[^"]*" class="margin-toggle sidenote-number)` "</span>${1} sidenote-number--multi" $html -}}
+{{- /* \multfootsep for real footnotes too: a superscript comma between a
+       footnote mark and a strictly adjacent footnote or sidenote mark
+       (otherwise [^a][^b] reads "12", like footnote 12). The match ends
+       at the next mark's opening tag, so a run of three is handled in one
+       pass. role="doc-noteref" is only on footnote references (step 5b). */ -}}
+{{- if strings.Contains $html `<sup class="footnote-ref"` -}}
+  {{- $sep := `<sup class="footnote-sep">,</sup>` -}}
+  {{- $html = replaceRE `(role="doc-noteref">[^<]*</a></sup>)(<sup class="footnote-ref")` (printf "${1}%s${2}" $sep) $html -}}
+  {{- $html = replaceRE `(role="doc-noteref">[^<]*</a></sup>)(<label for="[^"]*" class="margin-toggle sidenote-number)` "${1}${2} sidenote-number--multi" $html -}}
+  {{- $html = replace $html `</span><i class="sn-end" hidden></i><sup class="footnote-ref"` (printf `</span>%s<sup class="footnote-ref"` $sep) -}}
+{{- end -}}
 {{- $html = replace $html `<i class="sn-end" hidden></i>` "" -}}
 {{- $html = replace $html `<i class="cap-end" hidden></i>` "" -}}
 {{- /* Labels of unnumbered floats (tufte/figure.html). */ -}}

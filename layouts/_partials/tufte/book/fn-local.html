@@ -1,0 +1,28 @@
+{{- /*
+  Makes the Markdown footnotes defined inside one front-matter field of a
+  book's front pages (an epigraph quote, the copyright page, the
+  dedication…: tufte/book/front-fields.html) its own. Each field is a
+  Markdown document of its own, so `[^1]` defined in the epigraph and
+  `[^1]` defined in the dedication are two footnotes; but a footnote
+  rendered from an inner text carries its Markdown label (data-md,
+  tufte/render-inner.html), which merges notes of one label into one
+  item. A label defined in the field ([^L]: … at the start of a line) is
+  therefore renamed L-TAG, in its references and its definition (the
+  fn-/sn- prefix, which picks a real footnote or a sidenote, is kept).
+  References to footnotes defined elsewhere (the landing's text) are left
+  alone, so they stay one footnote with the text's.
+
+  Takes: a dict with
+    text  the Markdown text
+    tag   a short field tag (letters and digits), unique on the page
+  Returns: the text.
+*/ -}}
+{{- $text := printf "%v" .text -}}
+{{- $tag := .tag -}}
+{{- if strings.Contains $text "]:" -}}
+  {{- range findRESubmatch `(?m)^(?:[ \t]{0,3}>[ \t]?)*[ \t]{0,3}\[\^([^\]\s]+)\]:` $text -}}
+    {{- $l := index . 1 -}}
+    {{- $text = replace $text (printf "[^%s]" $l) (printf "[^%s-%s]" $l $tag) -}}
+  {{- end -}}
+{{- end -}}
+{{- return $text -}}

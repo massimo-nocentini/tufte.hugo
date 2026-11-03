@@ -1,0 +1,33 @@
+{{- /*
+  The title of a page, translated where Hugo's own title is a fixed
+  English string:
+
+    404 page               i18n "pageNotFound" (Hugo: "404 Page not found")
+    taxonomy page          i18n key named after its plural ("tags",
+                           "categories"), when the title is Hugo's default
+                           (the title-cased plural: no content _index.md,
+                           or one without a title) and the key exists
+    archive page           i18n "archives", when the page has no title
+                           (layout: archive)
+
+  Any other page, or a title set in front matter: .Title. Used by the
+  <title> and social titles (head.html), the h1 of taxonomy.html and
+  archive.html, the back link of term.html and the RSS channel title.
+
+  Takes: the page.
+  Returns: the title (string).
+*/ -}}
+{{- $t := .Title -}}
+{{- if eq .Kind "404" -}}
+  {{- with partial "func/t.html" "pageNotFound" }}{{ $t = . }}{{ end -}}
+{{- else if eq .Kind "taxonomy" -}}
+  {{- with .Data.Plural -}}
+    {{- $plural := printf "%v" . -}}
+    {{- if eq $t (title $plural) -}}
+      {{- with partial "func/t.html" $plural }}{{ $t = . }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- else if and (not $t) (eq .Layout "archive") -}}
+  {{- with partial "func/t.html" "archives" }}{{ $t = . }}{{ end -}}
+{{- end -}}
+{{- return $t -}}

@@ -21,7 +21,7 @@
   {{- with .Params.subtitle }}
   <p class="subtitle">{{ . }}</p>
   {{- end }}
-  {{- if ne site.Params.homeIntro false }}
+  {{- if partial "func/flag.html" (dict "value" site.Params.homeIntro "default" true) }}
   {{ partial "tufte/abstract.html" . }}
   {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
   {{- end }}

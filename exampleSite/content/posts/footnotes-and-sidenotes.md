@@ -36,6 +36,13 @@ letters (`footnotestyle = "auto"`), so the two sequences never look alike.
 A footnote can be referenced twice;[^fn-twice] both references link to the
 same item, and its backlinks return to each of them.[^fn-twice]
 
+A citation can go below the text as well. `{{</* cite keys="tufte2006" as="footnote" */>}}`
+puts the full reference in a real footnote,{{< cite keys="tufte2006" as="footnote" >}}
+while a plain `cite` keeps it in the margin.{{< cite "tufte2006" >}}
+The option `citeas: footnote`, in the front matter or under `[params]`, does
+this for every `cite` of the page (or of the site); a single `cite` then
+returns to the margin with `as="sidenote"`.
+
 ## Choosing between them
 
 | Kind of note | Use |

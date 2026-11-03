@@ -8,36 +8,55 @@
   (the tree starts at h1 when the content has one). Margin material and
   Hugo's shortcode placeholders are removed from the heading texts (R27),
   and the ids are cleaned like render-heading.html's (tufte/heading-id.html).
-  A heading with math gets its typeset formula (tufte/toc-text.html).
+  A heading with math gets its typeset formula, and a heading that held a
+  shortcode its rendered text (tufte/toc-text.html).
 
   Takes: a dict with
     page      the chapter page
     headings  a tableofcontents.Headings slice (the walk recurses on it)
     inner     internal: true in the recursive calls (no <ol> wrapper)
+    seen      internal: the Scratch that counts the ids met so far
   Returns: template.HTML ("" when there are no sections).
 */ -}}
 {{- $p := .page -}}
+{{- /* How many headings with each id came before (document order: a
+       preorder walk of the tree, every level), so that the nth heading with
+       an id that several share (headings that differ only by their
+       shortcodes, tufte/heading-id.html) reads its own text. */ -}}
+{{- $seen := .seen | default newScratch -}}
 {{- $items := "" -}}
 {{- range .headings -}}
-  {{- if and (eq .Level 2) .ID -}}
+  {{- $id := "" -}}
+  {{- $nth := 1 -}}
+  {{- with .ID -}}
+    {{- $id = partial "tufte/heading-id.html" . -}}
+    {{- $seen.Add (printf "id:%s" $id) 1 -}}
+    {{- $nth = $seen.Get (printf "id:%s" $id) -}}
+  {{- end -}}
+  {{- if and (eq .Level 2) $id -}}
     {{- $t := string .Title -}}
+    {{- $hasSC := strings.Contains $t "HAHAHUGOSHORTCODE" -}}
     {{- $t = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $t -}}
+    {{- /* a lone toggle: footnotemark (its input is in the footnotetext) */ -}}
+    {{- $t = replaceRE `<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label>` "" $t -}}
     {{- $t = replaceRE `(?s)<span class="(?:sidenote|marginnote)[^"]*"[^>]*>.*?</span><i class="sn-end" hidden></i>` "" $t -}}
     {{- $t = replaceRE `<span class="(?:sidenote|marginnote)[^"]*"[^>]*>[^<]*</span>` "" $t -}}
     {{- $t = replaceRE `<span class="(?:index-anchor|tufte-anchor|tufte-num)[^>]*></span>` "" $t -}}
     {{- $t = replaceRE `<i class="(?:sn-end|cap-end)" hidden></i>` "" $t -}}
     {{- $t = replaceRE `</?a\b[^>]*>` "" $t -}}
     {{- /* Hugo's shortcode placeholders (headings holding a shortcode): the
-           id is cleaned as render-heading.html cleans it. */ -}}
+           id is cleaned as render-heading.html cleans it (above). */ -}}
     {{- $t = replaceRE `\s*HAHAHUGOSHORTCODE[0-9A-Za-z]*?HBHB` "" $t -}}
-    {{- $id := partial "tufte/heading-id.html" .ID -}}
-    {{- /* Math in the heading: the typeset formula (tufte/toc-text.html). */ -}}
-    {{- $t = partial "tufte/toc-text.html" (dict "page" $p "id" $id "text" (strings.TrimSpace $t)) -}}
+    {{- /* Math in the heading: the typeset formula; a heading that held a
+           shortcode: the rendered text, with the words the shortcode
+           prints (tufte/toc-text.html). */ -}}
+    {{- $t = partial "tufte/toc-text.html" (dict "page" $p "id" $id "text" (strings.TrimSpace $t) "shortcode" $hasSC "nth" $nth) -}}
     {{- $items = printf `%s<li><a href="%s#%s">%s</a></li>` $items $p.RelPermalink $id $t -}}
-  {{- else if lt .Level 2 -}}
-    {{- with .Headings -}}
-      {{- $items = printf "%s%s" $items (partial "tufte/book/toc-headings.html" (dict "page" $p "headings" . "inner" true) | string) -}}
-    {{- end -}}
+  {{- end -}}
+  {{- /* Deeper levels: h2 below an h1 are listed; the subheadings of an
+         h2 list nothing but are counted. */ -}}
+  {{- with .Headings -}}
+    {{- $items = printf "%s%s" $items (partial "tufte/book/toc-headings.html" (dict "page" $p "headings" . "inner" true "seen" $seen) | string) -}}
   {{- end -}}
 {{- end -}}
 {{- $out := $items -}}

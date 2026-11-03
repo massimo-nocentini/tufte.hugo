@@ -16,25 +16,54 @@
      anchor, number tokens, index or label anchors, margin toggles, notes
      or links. The math is then the one of the heading (server KaTeX, or
      span.math for the browser's auto-render).
+  3. Shortcodes: Hugo builds those texts before shortcodes run too, and the
+     callers remove the shortcode placeholders, so the words a shortcode
+     prints (the NASA of a smallcaps shortcode, an xref number) would be
+     lost. When the caller says a placeholder was removed (shortcode =
+     true), the rendered heading is used the same way, whatever it holds.
 
   Takes: a dict with
-    page  the page holding the heading
-    id    the heading id (as render-heading.html writes it)
-    text  the entry text from Hugo's TOC, margin material already removed
+    page       the page holding the heading
+    id         the heading id (as render-heading.html writes it)
+    text       the entry text from Hugo's TOC, margin material already removed
+    shortcode  optional: true when the text held a shortcode placeholder
+    nth        optional: which of the headings with this id (default 1)
   Returns: string (HTML).
 */ -}}
 {{- $p := .page -}}
 {{- $text := replaceRE `</?a\b[^>]*>` "" (string .text) -}}
 {{- if and .id $p -}}
   {{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) (or $p.RelPermalink $p.Path) false | string -}}
-  {{- if $p.Store.Get "hasMath" -}}
+  {{- $sc := eq .shortcode true -}}
+  {{- if or $sc ($p.Store.Get "hasMath") -}}
+    {{- /* The nth heading with this id (headings that differ only by
+           their shortcodes share one, tufte/heading-id.html). */ -}}
+    {{- $nth := int (.nth | default 1) -}}
     {{- $parts := split $raw (printf ` id="%s"` .id) -}}
-    {{- if and (ge (len $parts) 2) (findRE `<h[1-6]$` (index $parts 0) 1) -}}
-      {{- $inner := replaceRE `(?s)^[^>]*>(.*?)</h[1-6]>.*$` "$1" (index $parts 1) -}}
-      {{- if findRE `class="(?:katex|math math-inline|math-error)` $inner 1 -}}
+    {{- $after := "" }}{{ $seen := 0 -}}
+    {{- range $i, $part := $parts -}}
+      {{- if and (gt $i 0) (findRE `<h[1-6]$` (index $parts (sub $i 1)) 1) -}}
+        {{- $seen = add $seen 1 -}}
+        {{- if eq $seen $nth }}{{ $after = $part }}{{ break }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if $after -}}
+      {{- $inner := replaceRE `(?s)^[^>]*>(.*?)</h[1-6]>.*$` "$1" $after -}}
+      {{- if or $sc (findRE `class="(?:katex|math math-inline|math-error)` $inner 1) -}}
         {{- $t := $inner -}}
         {{- $t = replaceRE `<a class="heading-anchor"[^>]*>[^<]*</a>` "" $t -}}
+        {{- /* Phase 1 is unresolved: notes, citation blocks and
+               real-footnote markers (span.tufte-fn, whose text may hold
+               paragraphs) go (tufte/strip-notes.html), and xref markers
+               get their text, as in the heading (tufte/resolve-refs.html;
+               the page itself reports undefined keys). */ -}}
+        {{- $t = partial "tufte/strip-notes.html" $t -}}
+        {{- if strings.Contains $t `class="xref"` -}}
+          {{- $t = partial "tufte/resolve-refs.html" (dict "page" $p "html" $t "quiet" true) -}}
+        {{- end -}}
         {{- $t = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $t -}}
+        {{- /* a lone toggle: footnotemark (its input is in the footnotetext) */ -}}
+        {{- $t = replaceRE `<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label>` "" $t -}}
         {{- $t = replaceRE `(?s)<span class="(?:sidenote|marginnote)[^"]*"[^>]*>.*?</span><i class="sn-end" hidden></i>` "" $t -}}
         {{- $t = replaceRE `<span class="(?:sidenote|marginnote)[^"]*"[^>]*>[^<]*</span>` "" $t -}}
         {{- $t = replaceRE `<span class="(?:index-anchor|tufte-anchor|tufte-num)[^>]*>[^<]*</span>` "" $t -}}

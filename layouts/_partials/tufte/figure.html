@@ -38,6 +38,7 @@
     ResPage     the page to look up page resources in (default: Page)
     Src         image path or URL               required unless Body
     Body        pre-rendered HTML that replaces the image (tables, listings, grids)
+    HasBody     bool: a body float even when Body is empty (no image fallback)
     Kind        "figure" (default) | "table" | "listing": counter and caption word
     Alt         alt text (default: plain text of the caption, without notes
                 and toggles; cross-references resolved by postprocess)
@@ -67,13 +68,16 @@
 {{- $resPage := .ResPage | default $page -}}
 {{- $src := printf "%v" (.Src | default "") | strings.TrimSpace -}}
 {{- $body := .Body | default "" -}}
+{{- /* HasBody: a body float (table, listing) even when its Body is empty,
+       so that it never falls back to an image with no src. */ -}}
+{{- $hasBody := or (ne (string $body) "") .HasBody -}}
 {{- $kind := .Kind | default "figure" | lower -}}
 {{- $type := .Type | default "main" | lower -}}
 {{- if not (in (slice "main" "margin" "fullwidth" "inline") $type) -}}
   {{- warnidf "tufte-bad-option" "tufte.hugo: unknown figure type %q for %q, using \"main\" (%s)" $type $src $where -}}
   {{- $type = "main" -}}
 {{- end -}}
-{{- if and $body (eq $type "inline") -}}{{- $type = "main" -}}{{- end -}}
+{{- if and $hasBody (eq $type "inline") -}}{{- $type = "main" -}}{{- end -}}
 
 {{- /* Resolve the source. */ -}}
 {{- $url := $src -}}
@@ -97,14 +101,19 @@
   {{- end -}}
 {{- end -}}
 
-{{- /* Dimensions: as given, else intrinsic ones for decodable raster images. */ -}}
+{{- /* Dimensions: as given, else intrinsic ones for decodable raster images.
+       Hugo reports 0×0 (no warning) for a file it cannot decode, e.g. a JPEG
+       saved as .png (browsers sniff it and show it): then emit no size, as
+       for SVG and remote images, since width="0" would hide the figure. */ -}}
 {{- $width := printf "%v" (.Width | default "") -}}
 {{- $height := printf "%v" (.Height | default "") -}}
 {{- if and (not $width) (not $height) -}}
   {{- with $res -}}
     {{- if and (eq .ResourceType "image") (in (slice "jpeg" "png" "gif" "webp" "bmp" "tiff") .MediaType.SubType) -}}
-      {{- $width = printf "%d" .Width -}}
-      {{- $height = printf "%d" .Height -}}
+      {{- if and (gt .Width 0) (gt .Height 0) -}}
+        {{- $width = printf "%d" .Width -}}
+        {{- $height = printf "%d" .Height -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
@@ -154,45 +163,10 @@
 
 {{- $alt := .Alt | default "" -}}
 {{- if and (not $alt) $caption -}}
-  {{- /* Plain caption text, without what is not part of the caption's
-         wording: KaTeX's MathML copy (the TeX source would show up
-         twice), the toggles (label/input, "⊕") and the nested sidenotes,
-         margin notes, citation blocks and real-footnote markers
-         (span.tufte-fn) (spans balanced, so their own
-         nested spans do not end them early). Cross-reference markers are
-         kept as they are; the img printf escapes them and
-         tufte/postprocess.html replaces the escaped marker with the
-         resolved text ("Table 1"), as in the visible caption. So are
-         nobib citation numbers (cite-num spans, "[2]"): postprocess
-         fills the escaped span as it fills the visible one. */ -}}
-  {{- $buf := "" -}}
-  {{- $depth := 0 -}}
-  {{- $skip := 0 -}}
-  {{- $inLabel := false -}}
-  {{- range $t := findRE `(?s)<a class="xref"[^>]*>[^<]*</a>|<span class="cite-num"[^>]*></span>|<[^>]*>|[^<]+` $caption -}}
-    {{- if strings.HasPrefix $t `<span class="cite-num"` -}}
-      {{- if not (or (gt $skip 0) $inLabel) }}{{ $buf = printf "%s%s" $buf $t }}{{ end -}}
-    {{- else if strings.HasPrefix $t "<span" -}}
-      {{- $depth = add $depth 1 -}}
-      {{- if and (eq $skip 0) (findRE `^<span class="(?:sidenote|marginnote|note-in-note|katex-mathml|citation-block|tufte-fn)[" ]` $t 1) }}{{ $skip = $depth }}{{ end -}}
-    {{- else if eq $t "</span>" -}}
-      {{- if eq $skip $depth }}{{ $skip = 0 }}{{ end -}}
-      {{- $depth = sub $depth 1 -}}
-    {{- else if strings.HasPrefix $t "<label" -}}
-      {{- $inLabel = true -}}
-    {{- else if eq $t "</label>" -}}
-      {{- $inLabel = false -}}
-    {{- else if or (gt $skip 0) $inLabel -}}
-    {{- else if strings.HasPrefix $t `<a class="xref"` -}}
-      {{- $buf = printf "%s%s" $buf $t -}}
-    {{- else if not (strings.HasPrefix $t "<") -}}
-      {{- $buf = printf "%s%s" $buf (htmlUnescape $t) -}}
-    {{- end -}}
-  {{- end -}}
-  {{- /* A shortcode in a Markdown image title is still Hugo's placeholder
-         here (see the caption markers below): it must not reach the
-         attribute, where Hugo would put the shortcode's HTML. */ -}}
-  {{- $alt = $buf | replaceRE `HAHAHUGOSHORTCODE\w*?HBHB` "" | replaceRE `\s+` " " | strings.TrimSpace -}}
+  {{- /* Plain caption text, without notes, toggles, citation blocks and
+         KaTeX's MathML copy; cross-reference markers kept for postprocess
+         (the img printf escapes them). See tufte/plain-caption.html. */ -}}
+  {{- $alt = partial "tufte/plain-caption.html" $caption -}}
 {{- end -}}
 
 {{- /* Extra img attributes, sanitised. */ -}}
@@ -305,16 +279,15 @@
 
 {{- /* The image (or the body). */ -}}
 {{- $img := "" -}}
-{{- if $body -}}
+{{- if $hasBody -}}
   {{- $img = string $body -}}
 {{- else -}}
   {{- $imgClass := "" -}}
   {{- if eq $type "inline" }}{{ $imgClass = $class }}{{ end -}}
   {{- $img = printf `<img src="%s" alt="%s"%s%s%s%s loading="lazy"/>` (htmlEscape $url) (htmlEscape $alt) (cond (ne $width "") (printf ` width="%s"` (htmlEscape $width)) "") (cond (ne $height "") (printf ` height="%s"` (htmlEscape $height)) "") (cond (ne $imgClass "") (printf ` class="%s"` (htmlEscape $imgClass)) "") $extra -}}
   {{- with $link -}}
-    {{- $href := printf "%v" . | strings.TrimSpace -}}
-    {{- /* As html/template would: no script URLs. */ -}}
-    {{- if findRE `(?i)^\s*(javascript|vbscript|data):` $href 1 }}{{ $href = "#ZgotmplZ" }}{{ end -}}
+    {{- /* As html/template would: no script URLs (tufte/safe-url.html). */ -}}
+    {{- $href := partial "tufte/safe-url.html" . -}}
     {{- $img = printf `<a href="%s">%s</a>` (htmlEscape $href) $img -}}
   {{- end -}}
 {{- end -}}
@@ -334,12 +307,23 @@
 {{- if eq $type "inline" -}}
   {{- $out = $img -}}
 {{- else if eq $type "margin" -}}
-  {{- if $body -}}
+  {{- if $hasBody -}}
     {{- $anchorHTML := "" -}}
     {{- with $anchor }}{{ $anchorHTML = printf `<div class="tufte-anchor" id="%s"></div>` (htmlEscape .) }}{{ end -}}
     {{- $capHTML := "" -}}
     {{- with $caption }}{{ $capHTML = printf `<p class="caption">%s</p>` . }}{{ end -}}
-    {{- $out = printf `%s%s<div class="marginnote margin-block margin-%s%s"%s>%s%s</div>` $anchorHTML $toggle $kind (cond (ne $class "") (printf " %s" (htmlEscape $class)) "") $styleAttr $capHTML $img -}}
+    {{- /* One style attribute: the offset and the float's own Style (the
+           --cols of a subfigures grid). A margin table or listing has its
+           caption above the body; a margin figure (a subfigures grid) below
+           it, like every margin figure. */ -}}
+    {{- $mStyle := "" -}}
+    {{- with delimit (slice (strings.TrimRight "; " (string $style)) (strings.TrimRight "; " (printf "%v" (.Style | default ""))) | complement (slice "")) "; " -}}
+      {{- $mStyle = printf ` style="%s"` (htmlEscape .) -}}
+    {{- end -}}
+    {{- $first := $capHTML -}}
+    {{- $second := $img -}}
+    {{- if eq $kind "figure" }}{{ $first = $img }}{{ $second = $capHTML }}{{ end -}}
+    {{- $out = printf `%s%s<div class="marginnote margin-block margin-%s%s"%s>%s%s</div>` $anchorHTML $toggle $kind (cond (ne $class "") (printf " %s" (htmlEscape $class)) "") $mStyle $first $second -}}
   {{- else if .Inline -}}
     {{- /* No <p> for the id: an empty anchor span before the label. The
            attribute order differs from the label shortcode's anchor on

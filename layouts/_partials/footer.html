@@ -10,13 +10,14 @@
   {{- partial "social.html" . }}
   <p class="footer-copyright">
     {{- with site.Params.copyright -}}
-      {{ . | markdownify }}
+      {{- /* Several paragraphs become lines of this one. */ -}}
+      {{ . | markdownify | string | strings.TrimSpace | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | safeHTML }}
     {{- else -}}
       &copy; {{ now.Format "2006" }}
       {{- with $author }} {{ if $authorURL }}<a href="{{ $authorURL }}">{{ . }}</a>{{ else }}{{ . }}{{ end }}{{ end -}}
     {{- end -}}
   </p>
   <p class="footer-copyright">
-    {{- T "poweredBy" (dict "Hugo" `<a href="https://gohugo.io">Hugo</a>` "Theme" `<a href="https://github.com/massimo-nocentini/tufte.hugo">tufte.hugo</a>`) | safeHTML -}}
+    {{- partial "func/t.html" (dict "key" "poweredBy" "data" (dict "Hugo" `<a href="https://gohugo.io">Hugo</a>` "Theme" `<a href="https://github.com/massimo-nocentini/tufte.hugo">tufte.hugo</a>`)) | safeHTML -}}
   </p>
 </footer>

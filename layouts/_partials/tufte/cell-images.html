@@ -1,0 +1,77 @@
+{{- /*
+  Images in a table cell are inline content (render-table.html). Hugo
+  calls the image hook with .IsBlock = true for an image that is the only
+  content of a cell, so the hook made it a figure: a float in a tabular,
+  with a figure number, a List of Figures entry and a margin caption
+  floated out of the table. Each such figure (a linked one too, with the
+  block markers of render-link.html) becomes the plain <img> an inline
+  image gets (func/inline-figures.html), and its title, shown as the
+  caption, goes back to the img's title attribute (a tooltip), as for an
+  image inside a paragraph: plain text, math as its TeX source; its notes,
+  citations and [^x] footnote markers follow the <img>
+  (tufte/img-tip.html). A title holding a shortcode is marked
+  (<i class="tufte-tip" hidden></i>TITLE<i class="tufte-tip-end" hidden></i>
+  after the img) and split by func/content-raw.html, once the shortcode
+  has run.
+
+    <figure …>…<span class="marginnote caption">…Figure N: An icon</span><img …/></figure>
+      → <img … title="An icon"/>
+
+  A cite in such a title inside the table shortcode (a nest token, so the
+  figure's caption already held its HTML) was gathered by tufte/figure.html
+  into the caption's citation block: with the page given, that block
+  becomes a numbered citation sidenote after the img again, as a cite in a
+  cell is (and as the same title gives in a Markdown table).
+
+  Takes: the cell HTML (string or template.HTML), or a dict
+    html  the cell HTML
+    page  the page (for the note id of a citation sidenote)
+  Returns: the HTML string.
+*/ -}}
+{{- $html := "" -}}
+{{- $page := false -}}
+{{- if reflect.IsMap . -}}
+  {{- $html = string (.html | default "") -}}
+  {{- $page = .page -}}
+{{- else -}}
+  {{- $html = string . -}}
+{{- end -}}
+{{- if strings.Contains $html "<figure" -}}
+  {{- $imgRE := `(?s)^((?:<i class="tufte-float"[^>]*></i>)?(?:<a [^>]*>)?)(<img [^>]*?)(/>(?:</a>)?)\s*(.*)$` -}}
+  {{- range findRE `(?s)(?:<i class="tufte-block" hidden></i>)?<figure[^>]*>.*?</figure>(?:<i class="tufte-block-end" hidden></i>)?` $html -}}
+    {{- $new := partial "func/inline-figures.html" . | strings.TrimSpace -}}
+    {{- with findRESubmatch $imgRE $new 1 -}}
+      {{- $m := index . 0 -}}
+      {{- $img := index $m 2 -}}
+      {{- $after := "" -}}
+      {{- with index $m 4 | strings.TrimSpace -}}
+        {{- if strings.Contains . "HAHAHUGOSHORTCODE" -}}
+          {{- /* A shortcode in the title: its output is known only once
+                 Hugo has put it in the page. func/content-raw.html builds
+                 the tooltip then, from the marked title. */ -}}
+          {{- $after = printf `<i class="tufte-tip" hidden></i>%s<i class="tufte-tip-end" hidden></i>` . -}}
+        {{- else -}}
+          {{- $tip := partial "tufte/img-tip.html" . -}}
+          {{- if and $tip.title (not (findRE `\stitle="` $img 1)) -}}
+            {{- $img = printf `%s title="%s"` (strings.TrimRight " " $img) $tip.title -}}
+          {{- end -}}
+          {{- $after = $tip.notes -}}
+          {{- /* The caption's gathered citation block, last of the notes
+                 (its spans balanced, so not one nested in a note). */ -}}
+          {{- if and $page (strings.Contains $after `<span class="citation-block">`) -}}
+            {{- with findRESubmatch `(?s)^(.*)<span class="citation-block">(.*)</span>$` $after 1 -}}
+              {{- $entries := index . 0 2 -}}
+              {{- if eq (len (findRE `<span[\s>]` $entries)) (len (findRE `</span>` $entries)) -}}
+                {{- $id := partial "func/note-id.html" $page -}}
+                {{- $after = printf `%s<label for="sn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote citation">%s</span><i class="sn-end" hidden></i>` (index . 0 1) $id $id $entries -}}
+              {{- end -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $new = printf "%s%s%s%s" (index $m 1) $img (index $m 3) $after -}}
+    {{- end -}}
+    {{- $html = replace $html . $new 1 -}}
+  {{- end -}}
+{{- end -}}
+{{- return $html -}}

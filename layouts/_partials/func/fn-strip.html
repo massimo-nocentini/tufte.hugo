@@ -1,0 +1,70 @@
+{{- /*
+  Removes from Markdown the text where Goldmark never sees a footnote
+  reference or definition, so that the [^label] left are the ones Goldmark
+  numbers (func/fn-order.html). Pure. Callers have already removed fenced
+  code; "inline" expects code spans removed too (a $ in a code span is
+  not math).
+
+  what = "code": indented code blocks. A line indented 4 columns or more
+    (a tab counts 4) after a blank line, or after another such line, when
+    it does not continue a list item or a footnote definition (a
+    container: open at a "- ", "1. " or "[^x]:" line, closed by a
+    non-indented paragraph after a blank line). The line is emptied, so
+    line structure stays. A docs page that shows the footnote syntax
+    ("    The proof[^fn-proof] is below.") would otherwise add a
+    reference.
+  what = "inline": math passthrough spans, with the delimiters README
+    requires ($$…$$, \[…\], \(…\), $…$; an escaped \$ is not one), each
+    replaced by "M" (keeps a line that held only math non-blank), then
+    backslash escapes: \\ and \[, \] (\[^fn-x] is literal text, not a
+    reference), and HTML tags (a [^x] in an attribute is not one).
+
+  Takes a dict: md (string), what ("code" | "inline").
+  Returns: the string.
+  Callers: func/footnotes.html, tufte/render-inner.html
+*/ -}}
+{{- $md := string .md -}}
+{{- if eq .what "code" -}}
+  {{- if findRE `(?m)^(?: {4}|\t| {1,3}\t)` $md 1 -}}
+    {{- $out := slice -}}
+    {{- $prevBlank := true -}}
+    {{- $prevCode := false -}}
+    {{- $cont := false -}}
+    {{- range split $md "\n" -}}
+      {{- $l := . -}}
+      {{- if not (strings.TrimSpace $l) -}}
+        {{- $prevBlank = true -}}
+        {{- $out = $out | append $l -}}
+      {{- else -}}
+        {{- $ind := len (replace (replaceRE `^([ \t]*).*$` "$1" $l) "\t" "    ") -}}
+        {{- $code := false -}}
+        {{- if ge $ind 4 -}}
+          {{- if and (not $cont) (or $prevBlank $prevCode) }}{{ $code = true }}{{ end -}}
+        {{- else if findRE `^ {0,3}(?:[-*+]|[0-9]{1,9}[.)])(?:[ \t]|$)|^ {0,3}\[\^[^\]\n]+\]:` $l 1 -}}
+          {{- $cont = true -}}
+        {{- else if and $prevBlank (eq $ind 0) -}}
+          {{- $cont = false -}}
+        {{- end -}}
+        {{- $out = $out | append (cond $code "" $l) -}}
+        {{- $prevCode = $code -}}
+        {{- $prevBlank = false -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $md = delimit $out "\n" -}}
+  {{- end -}}
+{{- else if eq .what "inline" -}}
+  {{- if or (strings.Contains $md "$") (strings.Contains $md `\`) -}}
+    {{- $md = replace $md `\\` "" -}}
+    {{- $md = replace $md `\$` "" -}}
+    {{- $md = replaceRE `(?s)\$\$.*?\$\$` "M" $md -}}
+    {{- $md = replaceRE `(?s)\\\[.*?\\\]` "M" $md -}}
+    {{- $md = replaceRE `(?s)\\\(.*?\\\)` "M" $md -}}
+    {{- $md = replaceRE `\$(?:[^$\n]|\n[^$\n])+?\$` "M" $md -}}
+    {{- $md = replace $md `\[` "" -}}
+    {{- $md = replace $md `\]` "" -}}
+  {{- end -}}
+  {{- if strings.Contains $md "<" -}}
+    {{- $md = replaceRE `</?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?/?>` "" $md -}}
+  {{- end -}}
+{{- end -}}
+{{- return $md -}}

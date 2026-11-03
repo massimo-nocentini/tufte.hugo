@@ -1,0 +1,12 @@
+{{- /*
+  The id part of a footnotemark / footnotetext name (shared by both
+  shortcodes): letters, digits, - and _ are kept; a name with any other
+  character has them replaced by "-" and gets the first 6 hex digits of the
+  md5 of the name appended, so "x.y" and "x y" stay two names.
+
+  Takes: the name. Returns: the id part ("" for an empty name).
+*/ -}}
+{{- $raw := strings.TrimSpace (printf "%v" .) -}}
+{{- $n := replaceRE `[^a-zA-Z0-9_-]` "-" $raw -}}
+{{- if ne $n $raw }}{{ $n = printf "%s-%s" $n (substr (md5 $raw) 0 6) }}{{ end -}}
+{{- return $n -}}

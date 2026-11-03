@@ -6,6 +6,6 @@
   tufte/book/toc.html.
   Takes: the page.
 */ -}}
-{{- if .Param "toc" -}}
+{{- if partial "func/flag.html" (dict "value" (.Param "toc") "default" false) -}}
 {{ partial "tufte/page-toc.html" . }}
 {{- end -}}

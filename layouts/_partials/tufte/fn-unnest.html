@@ -1,0 +1,111 @@
+{{- /*
+  Moves real-footnote markers out of other real-footnote markers
+  (SPEC-LATEX §11; called by tufte/fn-split.html when markers nest).
+
+  A footnote can hold a footnote: a footnote shortcode with a [^x] in its
+  text, a Markdown footnote kept as a footnote whose definition holds a
+  footnote shortcode or references another footnote, a footnote in a
+  sidenote or a caption that holds one. The markers
+
+    <span class="tufte-fn" …>outer <span class="tufte-fn" …>inner</span> text</span>
+
+  then nest, which tufte/fn-split.html cannot read. Each inner marker
+  (with its fn-end marker) is moved, at any depth, to just after the
+  outermost marker that holds it (and its fn-end marker), in document
+  order:
+
+    <span class="tufte-fn" …>outer  text</span><span class="tufte-fn" …>inner</span>
+
+  so the inner footnote's mark follows the outer mark in the text and its
+  item follows the outer item in the list. A marker repeated for a later
+  reference to the same footnote (data-md, or data-key) keeps no inner
+  markers: only the first copy's text reaches the list.
+
+  Takes: the HTML (string). Returns: the HTML (string), unchanged when its
+  spans do not balance.
+*/ -}}
+{{- $html := string . -}}
+{{- $open := `<span class="tufte-fn"` -}}
+{{- $endM := `<i class="fn-end" hidden></i>` -}}
+{{- $res := $html -}}
+{{- if strings.Contains $html $open -}}
+  {{- $parts := split $html $open -}}
+  {{- $head := index $parts 0 -}}
+  {{- $rest := printf "%s%s" $open (delimit (after 1 $parts) $open) -}}
+  {{- /* Tags at odd indexes, text at even ones. */ -}}
+  {{- $pieces := split (replaceRE `(<span[\s>][^>]*>|</span>)` "\x1f$1\x1f" $rest) "\x1f" -}}
+  {{- $S := newScratch -}}
+  {{- $S.Set "buf" dict -}}
+  {{- $stack := slice -}}
+  {{- $fns := slice -}}
+  {{- $main := slice -}}
+  {{- $next := 0 -}}
+  {{- $hoist := slice -}}
+  {{- $eat := "" -}}
+  {{- $flush := false -}}
+  {{- $seen := dict -}}
+  {{- range $i, $pc := $pieces -}}
+    {{- if eq (mod $i 2) 0 -}}
+      {{- $t := $pc -}}
+      {{- if and $eat (strings.HasPrefix $endM $t) -}}
+        {{- $S.SetInMap "buf" $eat (printf "%s%s" (index ($S.Get "buf") $eat) $endM) -}}
+        {{- $t = strings.TrimPrefix $endM $t -}}
+      {{- end -}}
+      {{- $eat = "" -}}
+      {{- if $flush -}}
+        {{- /* The outermost marker closed: it, then the markers it held. */ -}}
+        {{- $o := index ($S.Get "buf") "outer" -}}
+        {{- $main = $main | append (index ($S.Get "buf") $o) -}}
+        {{- $tag := replaceRE `(?s)^(<span[^>]*>).*$` "$1" (index ($S.Get "buf") $o) -}}
+        {{- $ident := "" -}}
+        {{- with findRESubmatch `data-md="([^"]*)"` $tag 1 }}{{ $ident = printf "md:%s" (index (index . 0) 1) }}{{ else }}{{ with findRESubmatch `data-key="([^"]*)"` $tag 1 }}{{ $ident = printf "key:%s" (index (index . 0) 1) }}{{ end }}{{ end -}}
+        {{- if not (and $ident (isset $seen $ident)) -}}
+          {{- range sort $hoist }}{{ $main = $main | append (index ($S.Get "buf") (string .)) }}{{ end -}}
+        {{- end -}}
+        {{- with $ident }}{{ $seen = merge $seen (dict . true) }}{{ end -}}
+        {{- $flush = false -}}
+        {{- $hoist = slice -}}
+      {{- end -}}
+      {{- if $fns -}}
+        {{- $k := index $fns (sub (len $fns) 1) -}}
+        {{- $S.SetInMap "buf" $k (printf "%s%s" (index ($S.Get "buf") $k) $t) -}}
+      {{- else -}}
+        {{- $main = $main | append $t -}}
+      {{- end -}}
+    {{- else if strings.HasPrefix $pc $open -}}
+      {{- $k := string $next -}}
+      {{- if not $fns }}{{ $S.SetInMap "buf" "outer" $k }}{{ end -}}
+      {{- $next = add $next 1 -}}
+      {{- $S.SetInMap "buf" $k $pc -}}
+      {{- $stack = $stack | append $k -}}
+      {{- $fns = $fns | append $k -}}
+    {{- else if eq $pc "</span>" -}}
+      {{- $top := "" -}}
+      {{- with $stack }}{{ $top = index . (sub (len .) 1) }}{{ $stack = first (sub (len .) 1) . }}{{ end -}}
+      {{- if and $top (ne $top "s") -}}
+        {{- $S.SetInMap "buf" $top (printf "%s</span>" (index ($S.Get "buf") $top)) -}}
+        {{- $fns = first (sub (len $fns) 1) $fns -}}
+        {{- $eat = $top -}}
+        {{- if $fns }}{{ $hoist = $hoist | append (int $top) }}{{ else }}{{ $flush = true }}{{ end -}}
+      {{- else if $fns -}}
+        {{- $k := index $fns (sub (len $fns) 1) -}}
+        {{- $S.SetInMap "buf" $k (printf "%s</span>" (index ($S.Get "buf") $k)) -}}
+      {{- else -}}
+        {{- $main = $main | append "</span>" -}}
+      {{- end -}}
+    {{- else -}}
+      {{- /* Another span opens. */ -}}
+      {{- $stack = $stack | append "s" -}}
+      {{- if $fns -}}
+        {{- $k := index $fns (sub (len $fns) 1) -}}
+        {{- $S.SetInMap "buf" $k (printf "%s%s" (index ($S.Get "buf") $k) $pc) -}}
+      {{- else -}}
+        {{- $main = $main | append $pc -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $fns -}}
+    {{- $res = printf "%s%s" $head (delimit $main "") -}}
+  {{- end -}}
+{{- end -}}
+{{- return $res -}}

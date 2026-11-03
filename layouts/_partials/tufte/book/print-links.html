@@ -4,12 +4,21 @@
 
     href="CHAPTER/#x"  → href="#tufte-cM-x"      href="CHAPTER/" → href="#tufte-cM"
     href="PART/"       → href="#tufte-pK"
+    href="ROOT/#x"     → href="#x"           href="ROOT/"    → href="#tufte-landing"
 
-  Both root-relative links (/books/b/ch2/, as the theme's generators and
-  render hooks write them) and relative links (../ch2/#x, as authors write
-  them; resolved against the page they appear on) are handled. Relative
-  links to other pages become root-relative, since the print document
-  lives at another URL (…/print.html).
+  (the landing body keeps its own ids, so a link into it only loses its
+  path; tufte-landing is the id of its article in list.print.html.)
+
+  Root-relative links (/books/b/ch2/, as the theme's generators and
+  render hooks write them), absolute links to this site
+  (https://example.org/books/b/ch2/, as Hugo's ref shortcode and absURL
+  write them) and relative links (../ch2/#x, as authors write them;
+  resolved against the page they appear on) are handled. Relative links
+  to other pages become root-relative, since the print document lives at
+  another URL (…/print.html); absolute links to other pages stay as they
+  are. For the same reason, relative src=, poster= and srcset= URLs
+  (an image next to a chapter that is not a bundle, a raw <img>) become
+  root-relative too.
 
   Takes: a dict with
     html  the HTML string
@@ -24,17 +33,28 @@
 {{- $targets := partialCached "tufte/book/print-targets.html" $root (or $root.RelPermalink $root.Path) -}}
 {{- $base := $p.RelPermalink -}}
 {{- if not (strings.HasSuffix $base "/") }}{{ $base = printf "%s/" (path.Dir $base) }}{{ end -}}
-{{- range uniq (findRE `href="[^"#?:]*(?:#[^"]*)?"` $html) -}}
+{{- /* The scheme and host of this site's absolute URLs ("" when the
+       permalinks are not absolute). */ -}}
+{{- $origin := strings.TrimSuffix $root.RelPermalink $root.Permalink -}}
+{{- if not (findRE `^[A-Za-z][A-Za-z0-9+.-]*://[^/]+$` $origin 1) }}{{ $origin = "" }}{{ end -}}
+{{- range uniq (findRE `href="(?:[A-Za-z][A-Za-z0-9+.-]*://[^"/#?]+)?[^"#?:]*(?:#[^"]*)?"` $html) -}}
   {{- $url := replaceRE `^href="(.*)"$` "$1" . -}}
-  {{- $pathPart := replaceRE `#.*$` "" $url -}}
+  {{- $local := $url -}}
+  {{- if findRE `^[A-Za-z][A-Za-z0-9+.-]*://` $url 1 -}}
+    {{- /* An absolute URL: a page of this site is looked up by its
+           root-relative path; any other URL is left alone. */ -}}
+    {{- if and $origin (strings.HasPrefix $url (printf "%s/" $origin)) }}{{ $local = strings.TrimPrefix $origin $url }}{{ else }}{{ continue }}{{ end -}}
+  {{- end -}}
+  {{- $pathPart := replaceRE `#.*$` "" $local -}}
   {{- $frag := "" -}}
-  {{- if strings.Contains $url "#" }}{{ $frag = replaceRE `^[^#]*#` "" $url }}{{ end -}}
+  {{- if strings.Contains $local "#" }}{{ $frag = replaceRE `^[^#]*#` "" $local }}{{ end -}}
   {{- if $pathPart -}}
     {{- $abs := $pathPart -}}
     {{- if not (strings.HasPrefix $abs "/") }}{{ $abs = printf "%s%s" $base $abs }}{{ end -}}
     {{- $abs = path.Clean $abs -}}
     {{- with index $targets $abs -}}
       {{- $new := cond (ne $frag "") (printf `href="#%s-%s"` . $frag) (printf `href="#%s"` .) -}}
+      {{- if and (eq . "tufte-landing") (ne $frag "") }}{{ $new = printf `href="#%s"` $frag }}{{ end -}}
       {{- $html = replace $html (printf `href="%s"` $url) $new -}}
     {{- else -}}
       {{- /* Another page: a relative link must not be resolved against
@@ -44,6 +64,53 @@
         {{- with $frag }}{{ $abs = printf "%s#%s" $abs . }}{{ end -}}
         {{- $html = replace $html (printf `href="%s"` $url) (printf `href="%s"` $abs) -}}
       {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Relative media URLs (src="x.svg", poster=, srcset= entries):
+       resolved against the page, as relative links are above. */ -}}
+{{- range uniq (findRE ` (?:src|poster)="[^"#:/?][^"#:?]*` $html) -}}
+  {{- $m := . -}}
+  {{- $attr := replaceRE `^ ([a-z]+)=".*$` "$1" $m -}}
+  {{- $rel := replaceRE `^ [a-z]+="` "" $m -}}
+  {{- $abs := path.Join $base $rel -}}
+  {{- range slice `"` `?` `#` -}}
+    {{- $html = replace $html (printf `%s%s` $m .) (printf ` %s="%s%s` $attr $abs .) -}}
+  {{- end -}}
+{{- end -}}
+{{- /* canonifyURLs with a base path: a poster= made root-relative above
+       needs it too (tufte/canon-poster.html). */ -}}
+{{- $html = partial "tufte/canon-poster.html" $html -}}
+{{- range uniq (findRE ` srcset="[^"]*"` $html) -}}
+  {{- $set := replaceRE `^ srcset="(.*)"$` "$1" . -}}
+  {{- $out := slice -}}
+  {{- range split $set "," -}}
+    {{- $c := strings.TrimSpace . -}}
+    {{- $u := index (split $c " ") 0 -}}
+    {{- if findRE `^[^#:/?][^:]*$` $u 1 }}{{ $c = printf "%s%s" (path.Join $base $u) (strings.TrimPrefix $u $c) }}{{ end -}}
+    {{- $out = $out | append $c -}}
+  {{- end -}}
+  {{- $html = replace $html . (printf ` srcset="%s"` (delimit $out ", ")) -}}
+{{- end -}}
+{{- /* A link to a page that is never rendered has no URL: it is written
+       <a[ class="xref"] data-tufte-path="PATH"[ data-tufte-anchor="X"]>
+       (the xrefs of tufte/resolve-refs.html; the lists of figures, the
+       index and the contents through tufte/page-link.html). A chapter or
+       part of this book is still in the document: link it by its page
+       path. Other targets stay placeholder links (plain text). */ -}}
+{{- if strings.Contains $html ` data-tufte-path="` -}}
+  {{- range uniq (findRE `<a(?: class="[^"]*")? data-tufte-path="[^"]*"(?: data-tufte-anchor="[^"]*")?>` $html) -}}
+    {{- $tag := . -}}
+    {{- $tp := replaceRE `^.* data-tufte-path="([^"]*)".*$` "$1" $tag | htmlUnescape -}}
+    {{- with index $targets (printf "page:%s" $tp) -}}
+      {{- $href := printf "#%s" . -}}
+      {{- if strings.Contains $tag ` data-tufte-anchor="` -}}
+        {{- $a := replaceRE `^.* data-tufte-anchor="([^"]*)".*$` "$1" $tag | htmlUnescape -}}
+        {{- $href = cond (eq . "tufte-landing") (printf "#%s" $a) (printf "#%s-%s" . $a) -}}
+      {{- end -}}
+      {{- $cls := "" -}}
+      {{- with findRESubmatch `^<a( class="[^"]*")` $tag 1 }}{{ $cls = index (index . 0) 1 }}{{ end -}}
+      {{- $html = replace $html $tag (printf `<a%s href="%s">` $cls (htmlEscape $href)) -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}

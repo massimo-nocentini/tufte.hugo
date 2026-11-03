@@ -1,0 +1,30 @@
+{{- /*
+  One line of inline Markdown, made safe for RenderString.
+
+  RenderString parses its text as a Markdown document, so an inline text
+  that starts like a block ("1869. Minard's map", "- (minus)", "> x",
+  "# hash", "***", "```", "[x]: y") would become a list, quote, heading,
+  rule, code block or link definition, and lose its marker (or all its
+  text); a heading would also bring an id into the page. Line breaks
+  become spaces (no setext heading, lazy list or second paragraph), and
+  the leading marker is backslash-escaped, so Goldmark reads the text as
+  a paragraph and prints the marker as written (tufte-latex prints
+  \caption[1869. …] and \index{1984. Orwell} as written).
+
+  Used by tufte/title-html.html (titles), tufte/index/render.html (index
+  display, see and see-also texts) and tufte/labels.html (short captions).
+  Shortcode inner texts go through tufte/render-inner.html, which applies
+  the same escapes line by line.
+
+  Takes: the Markdown text (any value; printed with %v).
+  Returns: the escaped Markdown source (string).
+*/ -}}
+{{- $src := printf "%v" . -}}
+{{- $src = replaceRE `[ \t]*\r?\n[ \t\r\n]*` " " $src | strings.TrimSpace -}}
+{{- $src = replaceRE `^([0-9]{1,9})([.)])(\s|$)` `${1}\${2}${3}` $src -}}
+{{- $src = replaceRE `^([-+*]|#{1,6})(\s|$)` `\${1}${2}` $src -}}
+{{- $src = replaceRE `^(>|~~~)` `\${1}` $src -}}
+{{- $src = replaceRE "^(```[^`]*)$" `\${1}` $src -}}
+{{- $src = replaceRE `^(\[[^\]]*\]:)` `\${1}` $src -}}
+{{- if findRE `^(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$` $src 1 }}{{ $src = printf `\%s` $src }}{{ end -}}
+{{- return $src -}}
