@@ -1,0 +1,18 @@
+name = "tufte.hugo"
+license = "MIT"
+licenselink = "https://github.com/massimo-nocentini/tufte.hugo/blob/master/LICENSE"
+description = "A Hugo theme that renders Markdown into the exact markup expected by Tufte CSS: sidenotes, margin notes, margin and full-width figures, epigraphs and ET Book typography."
+homepage = "https://github.com/massimo-nocentini/tufte.hugo"
+tags = ["blog", "minimal", "responsive", "typography", "academic", "technical", "light", "dark", "syntax-highlighting", "multilingual", "disqus", "google-analytics", "katex"]
+features = ["sidenotes", "margin notes", "footnotes as sidenotes", "margin figures", "full-width figures", "epigraphs", "server-side KaTeX math", "table of contents", "dark mode", "syntax highlighting", "giscus and Disqus comments", "self-hosted video figures", "i18n", "language switcher"]
+min_version = "0.146.0"
+
+[author]
+  name = "Massimo Nocentini"
+  homepage = "https://github.com/massimo-nocentini"
+
+# Port of an existing design
+[original]
+  author = "Dave Liepmann and contributors"
+  homepage = "https://edwardtufte.github.io/tufte-css/"
+  repo = "https://github.com/edwardtufte/tufte-css"

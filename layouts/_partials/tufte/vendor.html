@@ -1,0 +1,44 @@
+{{- /*
+  Emits a <link rel="stylesheet"> (.css URLs) or a <script> for a
+  third-party asset, with its SRI hash.
+
+  Takes a dict:
+    url        the CDN URL                                         required
+    integrity  its SRI hash ("" = no integrity attribute)
+    dir        publish directory with params.selfHosted (default "vendor")
+    defer      bool, scripts only
+
+  By default the tag points at the CDN. With params.selfHosted = true the
+  file is fetched once at build time with resources.GetRemote, checked
+  against the hash, fingerprinted and served from the site (Hugo keeps it
+  in the getresource file cache).
+*/ -}}
+{{- $url := printf "%v" (.url | default "") -}}
+{{- $integrity := printf "%v" (.integrity | default "") -}}
+{{- if not $url -}}
+  {{- errorf "tufte.hugo: tufte/vendor.html needs a url" -}}
+{{- end -}}
+{{- $href := $url -}}
+{{- if site.Params.selfHosted -}}
+  {{- with try (resources.GetRemote $url) -}}
+    {{- with .Err -}}
+      {{- errorf "tufte.hugo: cannot fetch %s (params.selfHosted): %s" $url . -}}
+    {{- else -}}
+      {{- with .Value -}}
+        {{- $r := . | resources.Copy (path.Join ($.dir | default "vendor") (path.Base $url)) | fingerprint "sha384" -}}
+        {{- if and $integrity (ne $r.Data.Integrity $integrity) -}}
+          {{- errorf "tufte.hugo: %s does not match its SRI hash %s (got %s)" $url $integrity $r.Data.Integrity -}}
+        {{- end -}}
+        {{- $href = $r.RelPermalink -}}
+        {{- $integrity = $r.Data.Integrity -}}
+      {{- else -}}
+        {{- errorf "tufte.hugo: cannot fetch %s (params.selfHosted)" $url -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if eq (path.Ext $url) ".css" }}
+<link rel="stylesheet" href="{{ $href }}"{{ with $integrity }} integrity="{{ . }}"{{ end }} crossorigin="anonymous">
+{{- else }}
+<script{{ if .defer }} defer{{ end }} src="{{ $href }}"{{ with $integrity }} integrity="{{ . }}"{{ end }} crossorigin="anonymous"></script>
+{{- end -}}

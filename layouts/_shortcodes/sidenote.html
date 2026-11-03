@@ -1,0 +1,30 @@
+{{- /*
+  Numbered sidenote (inline). Use inside a paragraph, right after the
+  word it annotates, with no space before it:
+
+    Sidenotes are great{{< sidenote >}}This is a *sidenote*.{{< /sidenote >}} for asides.
+
+  The inner text is inline Markdown. A one-line form also works:
+  {{< sidenote "This is a sidenote." />}} or {{< sidenote text="…" />}}.
+
+  Output (Tufte CSS):
+    <label for="sn-ID" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-ID" class="margin-toggle"/><span class="sidenote">TEXT</span>
+*/ -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- if not $text -}}
+  {{- if .IsNamedParams -}}
+    {{- $text = .Get "text" | default "" -}}
+  {{- else -}}
+    {{- $text = .Get 0 | default "" -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $text -}}
+  {{- warnf "sidenote shortcode: empty sidenote in %s" .Position -}}
+{{- end -}}
+{{- /* Inline Markdown; the HTML of nested shortcodes is kept as is. */ -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "text" $text "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+{{- /* A span cannot hold paragraphs: turn paragraph breaks into <br>. */ -}}
+{{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- $id := partial "func/note-id.html" .Page -}}
+<label for="sn-{{ $id }}" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-{{ $id }}" class="margin-toggle"/><span class="sidenote">{{ $html | safeHTML }}</span>
+{{- /* no trailing newline */ -}}

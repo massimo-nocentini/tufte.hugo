@@ -1,0 +1,26 @@
+{{- /*
+  Full-width block (block): lets its content use the whole article width.
+  Put it on its own lines; the inner text is block Markdown (a table, a
+  code block, paragraphs, …):
+
+    {{< fullwidth >}}
+    | A | B |
+    |---|---|
+    | 1 | 2 |
+    {{< /fullwidth >}}
+
+  Params: class (optional, extra classes).
+
+  Output (Tufte CSS): <div class="fullwidth">…</div>
+*/ -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- /* Block Markdown; the HTML of nested shortcodes is kept as is. */ -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "text" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+{{- $class := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $class = .Get "class" | default "" -}}
+{{- end -}}
+<div class="fullwidth{{ with $class }} {{ . }}{{ end }}">
+{{ $html | safeHTML }}
+</div>
+{{- /* no trailing newline */ -}}

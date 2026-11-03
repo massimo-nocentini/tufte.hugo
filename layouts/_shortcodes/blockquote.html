@@ -1,0 +1,57 @@
+{{- /*
+  Block quote with an optional attribution footer (block). Put it on its
+  own lines; the inner text is block Markdown:
+
+    {{< blockquote author="Edward Tufte" cite="forum post" url="https://…" >}}
+    [It is] notable that the Feynman lectures …
+    {{< /blockquote >}}
+
+  Params (all optional):
+    author  attribution, inline Markdown
+    cite    title of the work, rendered in <cite>, after the author
+    url     source URL: the blockquote cite attribute; also links the footer
+    footer  full footer, inline Markdown (replaces author/cite)
+    class   extra classes for the blockquote
+
+  Output (Tufte CSS):
+    <blockquote cite="URL"><p>…</p><footer>Author, <cite>Work</cite></footer></blockquote>
+*/ -}}
+{{- $p := .Page -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- /* Block Markdown; the HTML of nested shortcodes is kept as is. */ -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" $p "text" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+{{- $author := "" -}}{{- $cite := "" -}}{{- $url := "" -}}{{- $footerRaw := "" -}}{{- $class := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $author = .Get "author" | default "" -}}
+  {{- $cite = .Get "cite" | default "" -}}
+  {{- $url = .Get "url" | default "" -}}
+  {{- $footerRaw = .Get "footer" | default "" -}}
+  {{- $class = .Get "class" | default "" -}}
+{{- end -}}
+{{- /* Footer: "Author, <cite>Work</cite>", or the footer param. */ -}}
+{{- $footer := "" -}}
+{{- with $footerRaw -}}
+  {{- $footer = $p.RenderString . | string -}}
+{{- else -}}
+  {{- with $author -}}
+    {{- $footer = $p.RenderString . | string -}}
+  {{- end -}}
+  {{- with $cite -}}
+    {{- $c := printf "<cite>%s</cite>" ($p.RenderString .) -}}
+    {{- if $footer -}}
+      {{- $footer = printf "%s, %s" $footer $c -}}
+    {{- else -}}
+      {{- $footer = $c -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Footer link: the anchor is built by html/template so that the URL is
+     filtered (javascript:, vbscript:, … become #ZgotmplZ), as in the link hook. */ -}}
+{{- $link := and $footer $url (not (strings.Contains $footer "<a ")) -}}
+<blockquote{{ with $class }} class="{{ . }}"{{ end }}{{ with $url }} cite="{{ . }}"{{ end }}>
+{{ $html | safeHTML }}
+{{- with $footer }}
+<footer>{{ if $link }}<a href="{{ $url }}">{{ . | safeHTML }}</a>{{ else }}{{ . | safeHTML }}{{ end }}</footer>
+{{- end }}
+</blockquote>
+{{- /* no trailing newline */ -}}

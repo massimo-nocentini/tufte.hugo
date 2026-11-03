@@ -1,0 +1,105 @@
+{{- /*
+  Renders the inner text of a shortcode as Markdown while keeping the HTML
+  that is already in it (the output of nested shortcodes, e.g. a sidenote
+  inside a blockquote, or a figure inside fullwidth).
+
+  With {{< >}} nesting, .Inner holds the rendered HTML of the nested
+  shortcodes. Rendered as is, Goldmark would drop that HTML when
+  markup.goldmark.renderer.unsafe = false. So every balanced run of HTML
+  tags (from an opening tag to its matching closing tag) is swapped for a
+  token, the rest is rendered with .Page.RenderString, and the tokens are
+  swapped back. Tags inside code spans and fenced code blocks are left
+  alone; autolinks (<https://…>, <me@example.com>) are not tags. A run that
+  starts with a block element (figure, div, blockquote, table, …) is put
+  in a paragraph of its own in block mode, and that paragraph is unwrapped
+  afterwards, so no <p><figure> is produced. In inline mode, a figure made
+  by the image render hook (an image alone in the text) is turned back into
+  a plain <img> by func/inline-figures.html.
+
+  Takes a dict:
+    page     the page (required)
+    text     the Markdown text (string)
+    display  "inline" (default) or "block", passed to RenderString
+    where    optional position, used in the warning below
+
+  Returns: the HTML string.
+*/ -}}
+{{- $page := .page -}}
+{{- $text := .text | default "" | string -}}
+{{- $display := .display | default "inline" -}}
+{{- $isBlock := eq $display "block" -}}
+{{- $where := .where | default "" -}}
+{{- $void := slice "area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr" -}}
+{{- $blockTags := slice "address" "article" "aside" "blockquote" "details" "div" "dl" "fieldset" "figure" "footer" "form" "h1" "h2" "h3" "h4" "h5" "h6" "header" "hr" "nav" "ol" "p" "pre" "section" "table" "ul" -}}
+{{- $nameRE := `(?s)^</?([a-zA-Z][a-zA-Z0-9-]*).*$` -}}
+
+{{- $md := $text -}}
+{{- $saved := slice -}}
+{{- if strings.Contains $text "<" -}}
+  {{- $md = "" -}}
+  {{- /* Split the text into code (left alone), tags, plain text and single
+         characters; the pieces concatenate back to the whole text. */ -}}
+  {{- $parts := findRE "(?s)```.*?```|~~~.*?~~~|`[^`\\n]*`|</?[a-zA-Z][a-zA-Z0-9-]*(?:\\s[^<>]*)?/?>|[^<`~]+|." $text -}}
+  {{- $run := "" -}}
+  {{- $depth := 0 -}}
+  {{- $runIsBlock := false -}}
+  {{- range $parts -}}
+    {{- $isTag := and (gt (len .) 1) (strings.HasPrefix . "<") (strings.HasSuffix . ">") -}}
+    {{- if $isTag -}}
+      {{- $name := replaceRE $nameRE "$1" . | lower -}}
+      {{- if eq $depth 0 -}}
+        {{- $run = "" -}}
+        {{- $runIsBlock = in $blockTags $name -}}
+      {{- end -}}
+      {{- $run = printf "%s%s" $run . -}}
+      {{- if strings.HasPrefix . "</" -}}
+        {{- if gt $depth 0 -}}
+          {{- $depth = sub $depth 1 -}}
+        {{- end -}}
+      {{- else if not (or (strings.HasSuffix . "/>") (in $void $name)) -}}
+        {{- $depth = add $depth 1 -}}
+      {{- end -}}
+      {{- if eq $depth 0 -}}
+        {{- $tok := printf "%%%%TUFTEHTML%d%%%%" (len $saved) -}}
+        {{- $saved = $saved | append $run -}}
+        {{- if and $isBlock $runIsBlock -}}
+          {{- $md = printf "%s\n\n%s\n\n" $md $tok -}}
+        {{- else -}}
+          {{- $md = printf "%s%s" $md $tok -}}
+        {{- end -}}
+        {{- $run = "" -}}
+      {{- end -}}
+    {{- else if gt $depth 0 -}}
+      {{- $run = printf "%s%s" $run . -}}
+    {{- else -}}
+      {{- $md = printf "%s%s" $md . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* An unclosed tag: do not protect it, keep that text as Markdown. */ -}}
+  {{- if gt $depth 0 -}}
+    {{- $md = printf "%s%s" $md $run -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $html := "" -}}
+{{- with strings.TrimSpace $md -}}
+  {{- $html = $page.RenderString (dict "display" $display) . | string -}}
+{{- end -}}
+{{- /* Inline mode: an image alone in the text still reaches the image hook
+       as a block and becomes a <figure>, which cannot sit in the span of a
+       note or caption. Turn it back into a plain <img>. Only the Markdown
+       output is touched; the HTML of nested shortcodes is restored below. */ -}}
+{{- if not $isBlock -}}
+  {{- $html = partial "func/inline-figures.html" $html -}}
+{{- end -}}
+{{- range $i, $h := $saved -}}
+  {{- $tok := printf "%%%%TUFTEHTML%d%%%%" $i -}}
+  {{- if in $blockTags (replaceRE $nameRE "$1" $h | lower) -}}
+    {{- $html = replace $html (printf "<p>%s</p>" $tok) $h -}}
+  {{- end -}}
+  {{- $html = replace $html $tok $h -}}
+{{- end -}}
+{{- if and $where (strings.Contains $html "raw HTML omitted") -}}
+  {{- warnf "tufte.hugo: raw HTML in the inner text was dropped by Goldmark (markup.goldmark.renderer.unsafe = false): %s" $where -}}
+{{- end -}}
+{{- return $html -}}

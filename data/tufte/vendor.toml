@@ -1,0 +1,32 @@
+# Third-party assets used by tufte.hugo (read by layouts/_partials/tufte/vendor.html).
+#
+# url        CDN link, pinned to an exact version
+# integrity  its SRI hash (sha384); bump url, version and integrity together
+# version    the version in the url (params.math.katexVersion is compared to it)
+# dir        where the file is published with params.selfHosted = true
+#
+# With params.selfHosted = true the theme downloads each file at build time
+# (resources.GetRemote), checks it against the hash and serves it from the
+# site. The KaTeX stylesheet loads its fonts from "fonts/" next to itself, so
+# a self-hosted site must copy KaTeX's dist/fonts/ to static/katex/fonts/.
+#
+# Hashes computed with:
+#   curl -sL URL | openssl dgst -sha384 -binary | openssl base64 -A
+
+[katex-css]
+url = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+integrity = "sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+"
+version = "0.16.11"
+dir = "katex"
+
+[katex-js]
+url = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+integrity = "sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"
+version = "0.16.11"
+dir = "katex"
+
+[katex-auto-render]
+url = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+integrity = "sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk"
+version = "0.16.11"
+dir = "katex"

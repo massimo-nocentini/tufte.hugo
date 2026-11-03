@@ -1,0 +1,38 @@
+{{- /*
+  Emits the single theme stylesheet. In order: ET Book @font-face rules
+  (when Params.etBook is not false), tufte.css, theme.css, syntax.css and
+  every path listed in Params.customCSS (resolved in the site's assets/).
+  The bundle is published as css/tufte-hugo.<hash>.css, so the relative
+  font URLs in et-book.css (../et-book/...) resolve against static/et-book/.
+  Minified in production builds only, always fingerprinted with SRI.
+*/ -}}
+{{- $paths := slice -}}
+{{- if ne site.Params.etBook false -}}
+  {{- $paths = $paths | append "css/et-book.css" -}}
+{{- end -}}
+{{- $paths = $paths | append "css/tufte.css" -}}
+{{- $paths = $paths | append "css/theme.css" -}}
+{{- $paths = $paths | append "css/syntax.css" -}}
+{{- $resources := slice -}}
+{{- range $paths -}}
+  {{- with resources.Get . -}}
+    {{- $resources = $resources | append . -}}
+  {{- else -}}
+    {{- errorf "tufte.hugo: theme stylesheet %q not found in assets/" . -}}
+  {{- end -}}
+{{- end -}}
+{{- range site.Params.customCSS -}}
+  {{- with resources.Get . -}}
+    {{- $resources = $resources | append . -}}
+  {{- else -}}
+    {{- warnf "tufte.hugo: customCSS %q not found in assets/, skipped" . -}}
+  {{- end -}}
+{{- end -}}
+{{- with $resources -}}
+  {{- $css := . | resources.Concat "css/tufte-hugo.css" -}}
+  {{- if hugo.IsProduction -}}
+    {{- $css = $css | minify -}}
+  {{- end -}}
+  {{- $css = $css | fingerprint }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}" crossorigin="anonymous">
+{{- end -}}

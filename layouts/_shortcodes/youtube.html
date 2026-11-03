@@ -1,0 +1,41 @@
+{{- /*
+  YouTube video (block), privacy-enhanced (youtube-nocookie.com), in the
+  Tufte CSS iframe-wrapper; overrides Hugo's built-in youtube shortcode.
+  Put it on its own line:
+
+    {{< youtube YslQ2625TR4 >}}
+    {{< youtube id="YslQ2625TR4" title="Edward Tufte on …" start="30" >}}
+
+  Params:
+    id     video id (required; or the first positional param)
+    title  accessible title of the iframe (default "YouTube video")
+    start  start time in seconds
+    end    end time in seconds
+    class  extra classes for the figure
+
+  Output (Tufte CSS):
+    <figure class="iframe-wrapper"><iframe src="https://www.youtube-nocookie.com/embed/ID" …></iframe></figure>
+*/ -}}
+{{- $id := "" -}}{{- $title := "" -}}{{- $start := "" -}}{{- $end := "" -}}{{- $class := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $id = .Get "id" | default "" -}}
+  {{- $title = .Get "title" | default "" -}}
+  {{- $start = .Get "start" | default "" -}}
+  {{- $end = .Get "end" | default "" -}}
+  {{- $class = .Get "class" | default "" -}}
+{{- else -}}
+  {{- $id = .Get 0 | default "" -}}
+{{- end -}}
+{{- $id = printf "%v" $id | strings.TrimSpace -}}
+{{- if not $id -}}
+  {{- errorf "youtube shortcode: the video id is required (%s)" .Position -}}
+{{- end -}}
+{{- $q := slice -}}
+{{- with $start }}{{ $q = $q | append (printf "start=%s" (urlquery (printf "%v" .))) }}{{ end -}}
+{{- with $end }}{{ $q = $q | append (printf "end=%s" (urlquery (printf "%v" .))) }}{{ end -}}
+{{- $src := printf "https://www.youtube-nocookie.com/embed/%s" (urlquery $id) -}}
+{{- with $q }}{{ $src = printf "%s?%s" $src (delimit . "&") }}{{ end -}}
+<figure class="iframe-wrapper{{ with $class }} {{ . }}{{ end }}">
+<iframe src="{{ $src }}" title="{{ $title | default "YouTube video" }}" frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+</figure>
+{{- /* no trailing newline */ -}}

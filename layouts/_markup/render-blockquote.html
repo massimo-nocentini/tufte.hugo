@@ -1,0 +1,78 @@
+{{- /*
+  Blockquote render hook.
+
+  - Regular block quotes render as Tufte CSS expects. An attribution can be
+    given with block attributes ([markup.goldmark.parser.attribute]
+    block = true), on the line right after the quote:
+
+      > For a successful technology, reality must take precedence …
+      {author="Richard P. Feynman" cite="What Do You Care What Other People Think?" url="https://…"}
+
+      → <blockquote cite="URL"><p>…</p><footer><a href="URL">Richard P. Feynman, <cite>…</cite></a></footer></blockquote>
+
+    author: inline Markdown; cite: title of the work, in <cite>;
+    url: the blockquote cite attribute (links the footer);
+    footer: full footer, inline Markdown (replaces author/cite).
+    Other attributes (class, id, …) go on the blockquote.
+
+  - GitHub-style alerts (> [!NOTE], [!TIP], [!IMPORTANT], [!WARNING],
+    [!CAUTION]) render as
+      <blockquote class="alert alert-note"><p class="alert-title">Note</p>…</blockquote>
+    with an optional custom title: > [!TIP] My title
+*/ -}}
+{{- $p := .Page -}}
+{{- $author := "" -}}{{- $cite := "" -}}{{- $url := "" -}}{{- $footerRaw := "" -}}{{- $class := "" -}}
+{{- $extra := "" -}}
+{{- range $k, $v := .Attributes -}}
+  {{- $val := printf "%v" $v -}}
+  {{- if eq $k "author" -}}{{- $author = $val -}}
+  {{- else if eq $k "cite" -}}{{- $cite = $val -}}
+  {{- else if eq $k "url" -}}{{- $url = $val -}}
+  {{- else if eq $k "footer" -}}{{- $footerRaw = $val -}}
+  {{- else if eq $k "class" -}}{{- $class = $val -}}
+  {{- else if and $val (findRE `^[a-zA-Z][a-zA-Z0-9_:.-]*$` $k 1) (not (strings.HasPrefix (lower $k) "on")) -}}
+    {{- $extra = printf `%s %s="%s"` $extra $k (htmlEscape $val) -}}
+  {{- end -}}
+{{- end -}}
+{{- if eq .Type "alert" -}}
+  {{- $type := lower .AlertType -}}
+  {{- $title := .AlertTitle -}}
+  {{- if not $title -}}
+    {{- /* i18n keys alertNote, alertTip, alertImportant, alertWarning,
+           alertCaution; other alert types use their capitalised name. */ -}}
+    {{- if in (slice "note" "tip" "important" "warning" "caution") $type -}}
+      {{- $title = i18n (printf "alert%s" (title $type)) -}}
+    {{- end -}}
+    {{- $title = $title | default (title $type) -}}
+  {{- end -}}
+<blockquote class="alert alert-{{ $type }}{{ with $class }} {{ . }}{{ end }}"{{ $extra | safeHTMLAttr }}>
+<p class="alert-title">{{ $title }}</p>
+{{ .Text }}
+</blockquote>
+{{- else -}}
+  {{- $footer := "" -}}
+  {{- with $footerRaw -}}
+    {{- $footer = $p.RenderString . | string -}}
+  {{- else -}}
+    {{- with $author -}}
+      {{- $footer = $p.RenderString . | string -}}
+    {{- end -}}
+    {{- with $cite -}}
+      {{- $c := printf "<cite>%s</cite>" ($p.RenderString .) -}}
+      {{- if $footer -}}
+        {{- $footer = printf "%s, %s" $footer $c -}}
+      {{- else -}}
+        {{- $footer = $c -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Footer link: the anchor is built by html/template so that the URL is
+       filtered (javascript:, vbscript:, … become #ZgotmplZ), as in the link hook. */ -}}
+  {{- $link := and $footer $url (not (strings.Contains $footer "<a ")) -}}
+<blockquote{{ with $class }} class="{{ . }}"{{ end }}{{ with $url }} cite="{{ . }}"{{ end }}{{ $extra | safeHTMLAttr }}>
+{{ .Text }}
+{{- with $footer }}
+<footer>{{ if $link }}<a href="{{ $url }}">{{ . | safeHTML }}</a>{{ else }}{{ . | safeHTML }}{{ end }}</footer>
+{{- end }}
+</blockquote>
+{{- end -}}

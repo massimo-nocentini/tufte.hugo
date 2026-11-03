@@ -1,0 +1,16 @@
+{{- /*
+  Table of contents of a single page, when the "toc" param (front matter,
+  else site params) is true and the page has headings. Hugo wraps the list
+  in <nav id="TableOfContents">; that wrapper is dropped so the list sits
+  directly in nav.toc. Heading levels follow markup.tableOfContents.
+  Takes: the page.
+*/ -}}
+{{- if .Param "toc" -}}
+  {{- $toc := .TableOfContents -}}
+  {{- if findRE `<li>` $toc 1 }}
+<nav class="toc" aria-label="{{ T "tableOfContents" }}">
+  <p class="sans">{{ T "tableOfContents" }}</p>
+  {{ replaceRE `</?nav[^>]*>` "" $toc | strings.TrimSpace | safeHTML }}
+</nav>
+  {{- end -}}
+{{- end -}}

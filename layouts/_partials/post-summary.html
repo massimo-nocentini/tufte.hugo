@@ -1,0 +1,19 @@
+{{- /*
+  One entry of a list page. A div (not an article: tufte.css pads every
+  article) holding a <section>, so the summary paragraphs are direct children
+  of a section and get the text column width and working sidenotes.
+  Takes: the listed page.
+*/ -}}
+<div class="post-summary">
+  <section>
+    <h2 class="post-summary-title"><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></h2>
+    {{- with .Params.subtitle }}
+    <p class="subtitle">{{ . }}</p>
+    {{- end }}
+    {{ partial "post-meta.html" . }}
+    {{ partial "func/content.html" (dict "page" . "summary" true) }}
+    {{- if and .Truncated (ne site.Params.readMore false) }}
+    <p class="read-more"><a href="{{ .RelPermalink }}">{{ T "readMore" }}&nbsp;&rarr;</a></p>
+    {{- end }}
+  </section>
+</div>

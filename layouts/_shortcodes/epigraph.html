@@ -1,0 +1,78 @@
+{{- /*
+  Chapter epigraph (block). Put it on its own lines. Two forms:
+
+  1. One quote, attribution from params, inner text is block Markdown:
+
+       {{< epigraph author="Richard P. Feynman" cite="“What Do You Care What Other People Think?”" >}}
+       For a successful technology, reality must take precedence over public relations …
+       {{< /epigraph >}}
+
+  2. Several quotes: the inner text holds Markdown block quotes (attribution
+     via block attributes, see the blockquote render hook) or nested
+     blockquote shortcodes:
+
+       {{< epigraph >}}
+       > The English language … foolish thoughts.
+       {author="George Orwell" cite="Politics and the English Language"}
+
+       > For a successful technology, reality must take precedence …
+       {author="Richard P. Feynman"}
+       {{< /epigraph >}}
+
+  Params (form 1, all optional): author, cite (work title, in <cite>),
+  url (blockquote cite attribute; links the footer), footer (full footer,
+  inline Markdown), class (extra classes for the div). In form 2 only
+  class applies; author/cite/url/footer are ignored with a warning.
+
+  Output (Tufte CSS):
+    <div class="epigraph"><blockquote><p>…</p><footer>Author, <cite>Work</cite></footer></blockquote></div>
+*/ -}}
+{{- $p := .Page -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- /* Block Markdown; the HTML of nested shortcodes is kept as is. */ -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" $p "text" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+{{- $author := "" -}}{{- $cite := "" -}}{{- $url := "" -}}{{- $footerRaw := "" -}}{{- $class := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $author = .Get "author" | default "" -}}
+  {{- $cite = .Get "cite" | default "" -}}
+  {{- $url = .Get "url" | default "" -}}
+  {{- $footerRaw = .Get "footer" | default "" -}}
+  {{- $class = .Get "class" | default "" -}}
+{{- end -}}
+{{- /* Form 2 when the content already is (a list of) block quotes. */ -}}
+{{- $multi := or (strings.HasPrefix $text ">") (strings.HasPrefix (string $html) "<blockquote") -}}
+{{- if and $multi (or $author $cite $url $footerRaw) -}}
+  {{- warnf "epigraph shortcode: the content is block quotes, so the author, cite, url and footer params are ignored; put {author=\"…\" cite=\"…\"} or {footer=\"…\"} on the line after each quote, or drop the leading > (%s)" .Position -}}
+{{- end -}}
+<div class="epigraph{{ with $class }} {{ . }}{{ end }}">
+{{- if $multi }}
+{{ $html | safeHTML }}
+{{- else -}}
+  {{- $footer := "" -}}
+  {{- with $footerRaw -}}
+    {{- $footer = $p.RenderString . | string -}}
+  {{- else -}}
+    {{- with $author -}}
+      {{- $footer = $p.RenderString . | string -}}
+    {{- end -}}
+    {{- with $cite -}}
+      {{- $c := printf "<cite>%s</cite>" ($p.RenderString .) -}}
+      {{- if $footer -}}
+        {{- $footer = printf "%s, %s" $footer $c -}}
+      {{- else -}}
+        {{- $footer = $c -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Footer link: the anchor is built by html/template so that the URL is
+       filtered (javascript:, vbscript:, … become #ZgotmplZ), as in the link hook. */ -}}
+  {{- $link := and $footer $url (not (strings.Contains $footer "<a ")) }}
+<blockquote{{ with $url }} cite="{{ . }}"{{ end }}>
+{{ $html | safeHTML }}
+{{- with $footer }}
+<footer>{{ if $link }}<a href="{{ $url }}">{{ . | safeHTML }}</a>{{ else }}{{ . | safeHTML }}{{ end }}</footer>
+{{- end }}
+</blockquote>
+{{- end }}
+</div>
+{{- /* no trailing newline */ -}}

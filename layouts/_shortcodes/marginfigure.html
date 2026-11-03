@@ -1,0 +1,43 @@
+{{- /*
+  Margin figure: the image and its caption go in the margin as a margin
+  note. Two ways to place it:
+
+  1. At the start of a paragraph, ON THE SAME LINE as its text, with
+     inline="true" (no wrapping <p>; the note becomes part of that
+     paragraph, as in the Tufte CSS demo):
+
+       {{< marginfigure inline="true" src="rhino.png" alt="A rhinoceros" caption="F.J. Cole, …" >}} But tight integration of graphics with text …
+
+  2. Alone in its own paragraph (blank lines before and after), without
+     inline: the output is wrapped in its own <p>.
+
+  Never put it (without inline="true") on the line right before the text
+  or inside a sentence: the paragraph would contain a nested <p>, which
+  browsers break apart, and the text would lose the paragraph styles.
+
+  Params: as for the figure shortcode, without type, plus inline.
+
+  Rendering is done by the partial tufte/figure.html.
+*/ -}}
+{{- if not .IsNamedParams -}}
+  {{- errorf "marginfigure shortcode: use named parameters, e.g. src=\"image.png\" caption=\"…\" (%s)" .Position -}}
+{{- end -}}
+{{- $src := .Get "src" | default "" -}}
+{{- if not $src -}}
+  {{- errorf "marginfigure shortcode: the src parameter is required (%s)" .Position -}}
+{{- end -}}
+{{- partial "tufte/figure.html" (dict
+  "Page" .Page
+  "Src" $src
+  "Alt" (.Get "alt" | default "")
+  "Caption" (.Get "caption" | default "")
+  "Title" (.Get "title" | default "")
+  "Attr" (.Get "attr" | default "")
+  "AttrLink" (.Get "attrlink" | default "")
+  "Link" (.Get "link" | default "")
+  "Type" ("margin")
+  "Width" (.Get "width" | default "")
+  "Height" (.Get "height" | default "")
+  "Class" (.Get "class" | default "")
+  "Inline" (in (slice "true" "1" "yes") (printf "%v" (.Get "inline")))
+) -}}

@@ -1,0 +1,16 @@
+{{- /*
+  Sans-serif text (inline):
+
+    {{< sans >}}Some *sans-serif* text{{< /sans >}}
+
+  The inner text is inline Markdown; nested inline shortcodes (e.g. a
+  sidenote) are kept.
+
+  Output (Tufte CSS): <span class="sans">TEXT</span>
+*/ -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- /* Inline Markdown; the HTML of nested shortcodes is kept as is. */ -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "text" $text "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+{{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+<span class="sans">{{ $html | safeHTML }}</span>
+{{- /* no trailing newline */ -}}

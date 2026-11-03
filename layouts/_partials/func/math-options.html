@@ -1,0 +1,118 @@
+{{- /*
+  KaTeX settings for a page, from [params.math] and front matter mathMacros.
+
+  Takes a dict:
+    Page     the page                                     required
+    Display  bool: options for display math (server engine)
+
+  Returns a dict:
+    engine      "server" (default) | "client"
+    server      options for transform.ToMath (output htmlAndMathml,
+                displayMode, throwOnError false, errorColor, fleqn, leqno,
+                minRuleThickness, strict, macros)
+    client      the same options for KaTeX in the browser (no output,
+                no displayMode)
+    errorColor  params.math.errorColor as set by the site ("" if unset)
+    sentinel    the errorColor KaTeX actually gets (both engines): KaTeX
+                colours an undefined control sequence (a typo, a missing
+                macro) with errorColor and no katex-error class, so
+                render-passthrough and tufte/katex.html look for this
+                colour to catch it
+
+  Macros: params.math.macros, then the page's mathMacros (which win). Both
+  accept two forms:
+    a map           macros = { "\\half" = "\\frac{1}{2}" }
+    a list of pairs macros = [ ["\\RR", "\\mathbb{R}"], ["\\abs", "\\left|#1\\right|"] ]
+  Hugo lowercases the keys of maps in the configuration and in front
+  matter, so a map entry "\\RR" becomes "\\rr": use the list of pairs
+  (or a list of {name = "…", value = "…"} tables) for any macro name with
+  capital letters.
+*/ -}}
+{{- $page := .Page -}}
+{{- $display := eq .Display true -}}
+{{- $cfg := site.Params.math | default (dict) -}}
+
+{{- $engine := lower (printf "%v" (index $cfg "engine" | default "server")) -}}
+{{- if not (in (slice "server" "client") $engine) -}}
+  {{- warnf "tufte.hugo: params.math.engine must be \"server\" or \"client\", not %q; using \"server\"" $engine -}}
+  {{- $engine = "server" -}}
+{{- end -}}
+
+{{- /* Macros: a Scratch map keeps the keys exactly as written (merge and
+       site params are case-insensitive). */ -}}
+{{- $s := newScratch -}}
+{{- range $src := slice (index $cfg "macros") (index $page.Params "mathmacros") -}}
+  {{- if reflect.IsMap $src -}}
+    {{- range $k, $v := $src -}}
+      {{- $s.SetInMap "macros" (printf "%v" $k) (printf "%v" $v) -}}
+    {{- end -}}
+  {{- else if reflect.IsSlice $src -}}
+    {{- range $src -}}
+      {{- if and (reflect.IsSlice .) (eq (len .) 2) -}}
+        {{- $s.SetInMap "macros" (printf "%v" (index . 0)) (printf "%v" (index . 1)) -}}
+      {{- else if and (reflect.IsMap .) (index . "name") -}}
+        {{- $s.SetInMap "macros" (printf "%v" (index . "name")) (printf "%v" (index . "value" | default "")) -}}
+      {{- else -}}
+        {{- warnf "tufte.hugo: ignoring math macro %v (expected [\"\\\\name\", \"expansion\"]) in %s" . $page.Path -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $macros := $s.Get "macros" | default (dict) -}}
+
+{{- $errorColor := printf "%v" (index $cfg "errorcolor" | default "") -}}
+{{- $fleqn := eq (index $cfg "fleqn") true -}}
+{{- $leqno := eq (index $cfg "leqno") true -}}
+{{- $minRule := 0.04 -}}
+{{- with index $cfg "minrulethickness" -}}
+  {{- $minRule = float . -}}
+{{- end -}}
+{{- $strict := lower (printf "%v" (index $cfg "strict" | default "error")) -}}
+{{- if not (in (slice "error" "ignore" "warn") $strict) -}}
+  {{- warnf "tufte.hugo: params.math.strict must be \"error\", \"ignore\" or \"warn\", not %q; using \"error\"" $strict -}}
+  {{- $strict = "error" -}}
+{{- end -}}
+
+{{- /* Distinctive (and still red, should it ever be shown) colour. */ -}}
+{{- $sentinel := "#cc0001" -}}
+{{- /* transform.ToMath knows "strict" from Hugo 0.147.6, and its "warn"
+       value from 0.147.7: older versions keep KaTeX's default ("error").
+       The dict is built in one go (merge would lowercase the macro names). */ -}}
+{{- $server := dict -}}
+{{- if or (ge hugo.Version "0.147.7") (and (ge hugo.Version "0.147.6") (ne $strict "warn")) -}}
+  {{- $server = dict
+    "output" "htmlAndMathml"
+    "displayMode" $display
+    "throwOnError" false
+    "errorColor" $sentinel
+    "fleqn" $fleqn
+    "leqno" $leqno
+    "minRuleThickness" $minRule
+    "strict" $strict
+    "macros" $macros
+  -}}
+{{- else -}}
+  {{- $server = dict
+    "output" "htmlAndMathml"
+    "displayMode" $display
+    "throwOnError" false
+    "errorColor" $sentinel
+    "fleqn" $fleqn
+    "leqno" $leqno
+    "minRuleThickness" $minRule
+    "macros" $macros
+  -}}
+{{- end -}}
+{{- /* Client: the sentinel too; tufte/katex.html replaces it with the
+       .katex-error class (the theme's colour, adapted to dark mode) plus
+       the site's errorColor, if any, inline. */ -}}
+{{- $client := dict
+  "throwOnError" false
+  "errorColor" $sentinel
+  "fleqn" $fleqn
+  "leqno" $leqno
+  "minRuleThickness" $minRule
+  "strict" $strict
+  "macros" $macros
+-}}
+{{- return (dict "engine" $engine "server" $server "client" $client "errorColor" $errorColor "sentinel" $sentinel) -}}

@@ -1,0 +1,24 @@
+{{- /*
+  Creates (or retrieves) the paginator of a list page (home or section).
+
+  Hugo keeps one paginator per page and the first .Paginate call wins, so
+  head.html (which inspects the listed pages for math) and the body must ask
+  for the same collection. Every call goes through this partial.
+
+  - Home: the regular pages of the main sections: the legacy
+    params.mainSections when set, else site.MainSections (the top-level
+    mainSections key, which Hugo computes from the section with the most
+    pages when unset).
+  - Section: the section's own pages.
+  The page size is Hugo's pagination.pagerSize.
+
+  Takes: the list page.
+  Returns: the paginator.
+*/ -}}
+{{- $pages := .Pages -}}
+{{- if .IsHome -}}
+  {{- $main := site.Params.mainSections | default site.MainSections -}}
+  {{- $pages = where site.RegularPages "Type" "in" $main -}}
+{{- end -}}
+{{- $paginator := .Paginate $pages -}}
+{{- return $paginator -}}

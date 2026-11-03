@@ -1,0 +1,261 @@
+/* tufte.hugo — syntax.css
+ *
+ * Chroma syntax highlighting for Hugo's class-based output
+ * (markup.highlight.noClasses = false). A quiet, ink-on-paper palette in
+ * keeping with Tufte CSS: no block background, muted hues, italic comments.
+ * Light and dark palettes follow prefers-color-scheme, or data-theme on <html>.
+ *
+ * Every colour is a custom property, so a site can retune the palette from
+ * a customCSS file, e.g.  :root { --syn-keyword: #000; }
+ * Layout of code blocks (width, indent, line-number tables) lives in theme.css.
+ */
+
+:root {
+    --syn-bg: transparent;
+    --syn-fg: currentColor;
+    --syn-hl: #f1efd8;
+    --syn-linenumber: #8a8a80;
+    --syn-keyword: #8b1e1e;
+    --syn-keyword-type: #8b1e1e;
+    --syn-name-attr: #7a5200;
+    --syn-name-builtin: #5e3a87;
+    --syn-name-class: #1f4e79;
+    --syn-name-const: #7a5200;
+    --syn-name-decorator: #5e3a87;
+    --syn-name-entity: #7a5200;
+    --syn-name-exception: #8b1e1e;
+    --syn-name-function: #1f4e79;
+    --syn-name-label: #5e3a87;
+    --syn-name-namespace: #1f4e79;
+    --syn-name-tag: #1f4e79;
+    --syn-name-variable: #444;
+    --syn-string: #2e5e2e;
+    --syn-string-escape: #7a5200;
+    --syn-string-regex: #2e5e2e;
+    --syn-number: #7a5200;
+    --syn-operator: #555;
+    --syn-punctuation: #555;
+    --syn-comment: #6e6e66;
+    --syn-preproc: #5e3a87;
+    --syn-deleted: #8b1e1e;
+    --syn-deleted-bg: #f8e6e2;
+    --syn-inserted: #2e5e2e;
+    --syn-inserted-bg: #e6f1df;
+    --syn-heading: #1f4e79;
+    --syn-subheading: #5e3a87;
+    --syn-output: #6e6e66;
+    --syn-prompt: #6e6e66;
+    --syn-error: #b00020;
+    --syn-whitespace: #bbb;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --syn-hl: #2a2a22;
+        --syn-linenumber: #6f6f6a;
+        --syn-keyword: #e39a8f;
+        --syn-keyword-type: #e39a8f;
+        --syn-name-attr: #d9b26f;
+        --syn-name-builtin: #c4a6e3;
+        --syn-name-class: #94b9de;
+        --syn-name-const: #d9b26f;
+        --syn-name-decorator: #c4a6e3;
+        --syn-name-entity: #d9b26f;
+        --syn-name-exception: #e39a8f;
+        --syn-name-function: #94b9de;
+        --syn-name-label: #c4a6e3;
+        --syn-name-namespace: #94b9de;
+        --syn-name-tag: #94b9de;
+        --syn-name-variable: #c8c8c8;
+        --syn-string: #a3c99a;
+        --syn-string-escape: #d9b26f;
+        --syn-string-regex: #a3c99a;
+        --syn-number: #d9b26f;
+        --syn-operator: #b0b0b0;
+        --syn-punctuation: #b0b0b0;
+        --syn-comment: #8c8c84;
+        --syn-preproc: #c4a6e3;
+        --syn-deleted: #f0aaa0;
+        --syn-deleted-bg: #3a1f1c;
+        --syn-inserted: #b5dba9;
+        --syn-inserted-bg: #1d3320;
+        --syn-heading: #94b9de;
+        --syn-subheading: #c4a6e3;
+        --syn-output: #8c8c84;
+        --syn-prompt: #8c8c84;
+        --syn-error: #ff7a7a;
+        --syn-whitespace: #4a4a4a;
+    }
+}
+
+:root[data-theme="dark"] {
+    --syn-hl: #2a2a22;
+    --syn-linenumber: #6f6f6a;
+    --syn-keyword: #e39a8f;
+    --syn-keyword-type: #e39a8f;
+    --syn-name-attr: #d9b26f;
+    --syn-name-builtin: #c4a6e3;
+    --syn-name-class: #94b9de;
+    --syn-name-const: #d9b26f;
+    --syn-name-decorator: #c4a6e3;
+    --syn-name-entity: #d9b26f;
+    --syn-name-exception: #e39a8f;
+    --syn-name-function: #94b9de;
+    --syn-name-label: #c4a6e3;
+    --syn-name-namespace: #94b9de;
+    --syn-name-tag: #94b9de;
+    --syn-name-variable: #c8c8c8;
+    --syn-string: #a3c99a;
+    --syn-string-escape: #d9b26f;
+    --syn-string-regex: #a3c99a;
+    --syn-number: #d9b26f;
+    --syn-operator: #b0b0b0;
+    --syn-punctuation: #b0b0b0;
+    --syn-comment: #8c8c84;
+    --syn-preproc: #c4a6e3;
+    --syn-deleted: #f0aaa0;
+    --syn-deleted-bg: #3a1f1c;
+    --syn-inserted: #b5dba9;
+    --syn-inserted-bg: #1d3320;
+    --syn-heading: #94b9de;
+    --syn-subheading: #c4a6e3;
+    --syn-output: #8c8c84;
+    --syn-prompt: #8c8c84;
+    --syn-error: #ff7a7a;
+    --syn-whitespace: #4a4a4a;
+}
+
+/* Print: ink on white paper whatever the screen scheme. Every token is reset
+   here, so no pale dark-mode colour survives onto paper. */
+@media print {
+    :root,
+    :root[data-theme="dark"],
+    :root:not([data-theme="light"]) {
+        --syn-bg: transparent;
+        --syn-fg: #000;
+        --syn-hl: #eee;
+        --syn-linenumber: #888;
+        --syn-keyword: #000;
+        --syn-keyword-type: #000;
+        --syn-name-attr: #333;
+        --syn-name-builtin: #000;
+        --syn-name-class: #000;
+        --syn-name-const: #333;
+        --syn-name-decorator: #333;
+        --syn-name-entity: #333;
+        --syn-name-exception: #000;
+        --syn-name-function: #000;
+        --syn-name-label: #333;
+        --syn-name-namespace: #000;
+        --syn-name-tag: #000;
+        --syn-name-variable: #000;
+        --syn-string: #333;
+        --syn-string-escape: #333;
+        --syn-string-regex: #333;
+        --syn-number: #333;
+        --syn-operator: #333;
+        --syn-punctuation: #333;
+        --syn-comment: #555;
+        --syn-preproc: #333;
+        --syn-deleted: #000;
+        --syn-deleted-bg: #eee;
+        --syn-inserted: #000;
+        --syn-inserted-bg: #eee;
+        --syn-heading: #000;
+        --syn-subheading: #333;
+        --syn-output: #555;
+        --syn-prompt: #555;
+        --syn-error: #000;
+        --syn-whitespace: #bbb;
+    }
+}
+
+/* Background */ .bg { background-color: var(--syn-bg); }
+/* PreWrapper */ .chroma { background-color: var(--syn-bg); color: var(--syn-fg); -webkit-text-size-adjust: none; }
+/* Error */ .chroma .err { color: var(--syn-error); }
+/* LineLink */ .chroma .lnlinks { text-decoration: none; color: inherit; }
+/* LineTableTD */ .chroma .lntd { vertical-align: top; padding: 0; margin: 0; border: 0; }
+/* LineTable */ .chroma .lntable { border-spacing: 0; padding: 0; margin: 0; border: 0; }
+/* LineHighlight */ .chroma .hl { background-color: var(--syn-hl); }
+/* LineNumbersTable */ .chroma .lnt { white-space: pre; -webkit-user-select: none; user-select: none; margin-right: 0.4em; padding: 0 0.4em 0 0.4em; color: var(--syn-linenumber); }
+/* LineNumbers */ .chroma .ln { white-space: pre; -webkit-user-select: none; user-select: none; margin-right: 0.4em; padding: 0 0.4em 0 0.4em; color: var(--syn-linenumber); }
+/* Line */ .chroma .line { display: flex; }
+
+/* Keyword */ .chroma .k { color: var(--syn-keyword); }
+/* KeywordConstant */ .chroma .kc { color: var(--syn-keyword); }
+/* KeywordDeclaration */ .chroma .kd { color: var(--syn-keyword); }
+/* KeywordNamespace */ .chroma .kn { color: var(--syn-keyword); }
+/* KeywordPseudo */ .chroma .kp { color: var(--syn-keyword); }
+/* KeywordReserved */ .chroma .kr { color: var(--syn-keyword); }
+/* KeywordType */ .chroma .kt { color: var(--syn-keyword-type); }
+
+/* NameAttribute */ .chroma .na { color: var(--syn-name-attr); }
+/* NameBuiltin */ .chroma .nb { color: var(--syn-name-builtin); }
+/* NameBuiltinPseudo */ .chroma .bp { color: var(--syn-name-builtin); }
+/* NameClass */ .chroma .nc { color: var(--syn-name-class); }
+/* NameConstant */ .chroma .no { color: var(--syn-name-const); }
+/* NameDecorator */ .chroma .nd { color: var(--syn-name-decorator); }
+/* NameEntity */ .chroma .ni { color: var(--syn-name-entity); }
+/* NameException */ .chroma .ne { color: var(--syn-name-exception); }
+/* NameFunction */ .chroma .nf { color: var(--syn-name-function); }
+/* NameFunctionMagic */ .chroma .fm { color: var(--syn-name-function); }
+/* NameLabel */ .chroma .nl { color: var(--syn-name-label); }
+/* NameNamespace */ .chroma .nn { color: var(--syn-name-namespace); }
+/* NameProperty */ .chroma .py { color: var(--syn-name-attr); }
+/* NameTag */ .chroma .nt { color: var(--syn-name-tag); }
+/* NameVariable */ .chroma .nv { color: var(--syn-name-variable); }
+/* NameVariableClass */ .chroma .vc { color: var(--syn-name-variable); }
+/* NameVariableGlobal */ .chroma .vg { color: var(--syn-name-variable); }
+/* NameVariableInstance */ .chroma .vi { color: var(--syn-name-variable); }
+/* NameVariableMagic */ .chroma .vm { color: var(--syn-name-variable); }
+
+/* Literal */ .chroma .l { color: var(--syn-number); }
+/* LiteralDate */ .chroma .ld { color: var(--syn-number); }
+
+/* LiteralString */ .chroma .s { color: var(--syn-string); }
+/* LiteralStringAffix */ .chroma .sa { color: var(--syn-string); }
+/* LiteralStringBacktick */ .chroma .sb { color: var(--syn-string); }
+/* LiteralStringChar */ .chroma .sc { color: var(--syn-string); }
+/* LiteralStringDelimiter */ .chroma .dl { color: var(--syn-string); }
+/* LiteralStringDoc */ .chroma .sd { color: var(--syn-comment); font-style: italic; }
+/* LiteralStringDouble */ .chroma .s2 { color: var(--syn-string); }
+/* LiteralStringEscape */ .chroma .se { color: var(--syn-string-escape); }
+/* LiteralStringHeredoc */ .chroma .sh { color: var(--syn-string); }
+/* LiteralStringInterpol */ .chroma .si { color: var(--syn-string-escape); }
+/* LiteralStringOther */ .chroma .sx { color: var(--syn-string); }
+/* LiteralStringRegex */ .chroma .sr { color: var(--syn-string-regex); }
+/* LiteralStringSingle */ .chroma .s1 { color: var(--syn-string); }
+/* LiteralStringSymbol */ .chroma .ss { color: var(--syn-name-const); }
+
+/* LiteralNumber */ .chroma .m { color: var(--syn-number); }
+/* LiteralNumberBin */ .chroma .mb { color: var(--syn-number); }
+/* LiteralNumberFloat */ .chroma .mf { color: var(--syn-number); }
+/* LiteralNumberHex */ .chroma .mh { color: var(--syn-number); }
+/* LiteralNumberInteger */ .chroma .mi { color: var(--syn-number); }
+/* LiteralNumberIntegerLong */ .chroma .il { color: var(--syn-number); }
+/* LiteralNumberOct */ .chroma .mo { color: var(--syn-number); }
+
+/* Operator */ .chroma .o { color: var(--syn-operator); }
+/* OperatorWord */ .chroma .ow { color: var(--syn-keyword); }
+/* Punctuation */ .chroma .p { color: var(--syn-punctuation); }
+
+/* Comment */ .chroma .c { color: var(--syn-comment); font-style: italic; }
+/* CommentHashbang */ .chroma .ch { color: var(--syn-comment); font-style: italic; }
+/* CommentMultiline */ .chroma .cm { color: var(--syn-comment); font-style: italic; }
+/* CommentSingle */ .chroma .c1 { color: var(--syn-comment); font-style: italic; }
+/* CommentSpecial */ .chroma .cs { color: var(--syn-comment); font-style: italic; font-weight: bold; }
+/* CommentPreproc */ .chroma .cp { color: var(--syn-preproc); }
+/* CommentPreprocFile */ .chroma .cpf { color: var(--syn-string); }
+
+/* GenericDeleted */ .chroma .gd { color: var(--syn-deleted); background-color: var(--syn-deleted-bg); }
+/* GenericEmph */ .chroma .ge { font-style: italic; }
+/* GenericError */ .chroma .gr { color: var(--syn-error); }
+/* GenericHeading */ .chroma .gh { color: var(--syn-heading); font-weight: bold; }
+/* GenericInserted */ .chroma .gi { color: var(--syn-inserted); background-color: var(--syn-inserted-bg); }
+/* GenericOutput */ .chroma .go { color: var(--syn-output); }
+/* GenericPrompt */ .chroma .gp { color: var(--syn-prompt); -webkit-user-select: none; user-select: none; }
+/* GenericStrong */ .chroma .gs { font-weight: bold; }
+/* GenericSubheading */ .chroma .gu { color: var(--syn-subheading); }
+/* GenericTraceback */ .chroma .gt { color: var(--syn-error); }
+/* GenericUnderline */ .chroma .gl { text-decoration: underline; }
+/* TextWhitespace */ .chroma .w { color: var(--syn-whitespace); }

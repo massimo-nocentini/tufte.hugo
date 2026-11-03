@@ -1,0 +1,44 @@
+{{- /*
+  Link render hook. Tufte CSS styles plain <a> elements, so the markup is
+  unchanged; destinations are resolved like Hugo's embedded link hook:
+  a relative destination that names a page (e.g. "../other-post.md" or
+  "/about") or a page/global resource is replaced by its relative
+  permalink, keeping any query and fragment. Fragment-only links ("#x"),
+  absolute URLs and unresolved paths are left as written.
+*/ -}}
+{{- $href := .Destination -}}
+{{- $u := "" -}}
+{{- with try (urls.Parse .Destination) -}}
+  {{- if not .Err -}}{{- $u = .Value -}}{{- end -}}
+{{- end -}}
+{{- $safe := true -}}
+{{- with $u -}}
+  {{- if in (slice "javascript" "vbscript" "data" "file") (lower .Scheme) -}}
+    {{- $safe = false -}}
+  {{- end -}}
+  {{- if and .Path (not .IsAbs) (not .Host) -}}
+    {{- $path := strings.TrimPrefix "./" .Path -}}
+    {{- $target := "" -}}
+    {{- with $.PageInner.GetPage $path -}}
+      {{- $target = .RelPermalink -}}
+    {{- else -}}
+      {{- with $.PageInner.Resources.Get $path -}}
+        {{- $target = .RelPermalink -}}
+      {{- else -}}
+        {{- with resources.Get (strings.TrimPrefix "/" $path) -}}
+          {{- $target = .RelPermalink -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- with $target -}}
+      {{- $href = . -}}
+      {{- with $u.RawQuery -}}{{- $href = printf "%s?%s" $href . -}}{{- end -}}
+      {{- with $u.Fragment -}}{{- $href = printf "%s#%s" $href . -}}{{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- else -}}
+  {{- $safe = false -}}
+{{- end -}}
+{{- /* Dangerous schemes (javascript:, …) are left to html/template, which neutralises them. */ -}}
+<a href="{{ if $safe }}{{ $href | safeURL }}{{ else }}{{ $href }}{{ end }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text }}</a>
+{{- /* no trailing newline */ -}}

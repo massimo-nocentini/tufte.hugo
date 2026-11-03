@@ -1,0 +1,48 @@
+{{- /*
+  Turns the figures that the image render hook produced inside inline text
+  back into plain images, so that the text can sit in a <span> (sidenote,
+  margin note, figure caption, footnote turned sidenote).
+
+  With wrapStandAloneImageWithinParagraph = false, an image that is the only
+  content of a note reaches render-image.html with .IsBlock = true, even in
+  .RenderString's inline mode, and becomes a <figure>. A <figure> inside a
+  <span> closes the paragraph around it in the browser, so:
+
+    <figure><img …/></figure>                          → <img …/>
+    <figure><label …/><input …/><span class="marginnote">CAPTION</span><img …/></figure>
+                                                       → <img …/> CAPTION
+    <figure class="fullwidth"><img …/><figcaption>CAPTION</figcaption></figure>
+                                                       → <img …/> CAPTION
+    a margin figure ({.margin}): label, input and span.marginnote around
+    the image, with or without its <p>                 → <img …/> CAPTION
+
+  A linked image keeps its <a>. Figures of any other shape (for example an
+  iframe wrapper) are left alone.
+
+  Takes: the HTML (string or template.HTML).
+  Returns: the HTML string.
+*/ -}}
+{{- $html := string . -}}
+{{- $img := `((?:<a [^>]*>)?<img [^>]*/>(?:</a>)?)` -}}
+{{- $note := `<label for="mn-[^"]*" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-[^"]*" class="margin-toggle"/><span class="marginnote[^"]*">` -}}
+{{- if strings.Contains $html "<figure" -}}
+  {{- /* Groups: 1 margin-note caption, 2 image, 3 figcaption. */ -}}
+  {{- $figRE := printf `(?s)^<figure[^>]*>(?:%s(.*)</span>)?%s(?:<figcaption>(.*)</figcaption>)?</figure>$` $note $img -}}
+  {{- range findRE `(?s)<figure[^>]*>.*?</figure>` $html -}}
+    {{- with findRESubmatch $figRE . 1 -}}
+      {{- $m := index . 0 -}}
+      {{- $new := index $m 2 -}}
+      {{- with strings.TrimSpace (printf "%s%s" (index $m 1) (index $m 3)) -}}
+        {{- $new = printf "%s %s" $new . -}}
+      {{- end -}}
+      {{- $html = replace $html (index $m 0) $new 1 -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if strings.Contains $html `class="marginnote` -}}
+  {{- /* Margin figure: in its <p>, or alone (the <p> already trimmed). */ -}}
+  {{- $html = replaceRE (printf `(?s)<p[^>]*>%s%s(.*?)</span></p>` $note $img) "$1 $2" $html -}}
+  {{- $html = replaceRE (printf `(?s)^\s*%s%s(.*)</span>\s*$` $note $img) "$1 $2" $html -}}
+  {{- $html = strings.TrimSpace $html -}}
+{{- end -}}
+{{- return $html -}}

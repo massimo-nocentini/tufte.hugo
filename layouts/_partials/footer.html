@@ -1,0 +1,22 @@
+{{- /* Site footer: social links, copyright, credits. Site additions go in
+       footer_custom.html, rendered right after this element. */ -}}
+{{- $author := "" -}}
+{{- $authorURL := "" -}}
+{{- with site.Params.author -}}
+  {{- $author = .name -}}
+  {{- $authorURL = .url -}}
+{{- end -}}
+<footer class="site-footer">
+  {{- partial "social.html" . }}
+  <p class="footer-copyright">
+    {{- with site.Params.copyright -}}
+      {{ . | markdownify }}
+    {{- else -}}
+      &copy; {{ now.Format "2006" }}
+      {{- with $author }} {{ if $authorURL }}<a href="{{ $authorURL }}">{{ . }}</a>{{ else }}{{ . }}{{ end }}{{ end -}}
+    {{- end -}}
+  </p>
+  <p class="footer-copyright">
+    {{- T "poweredBy" (dict "Hugo" `<a href="https://gohugo.io">Hugo</a>` "Theme" `<a href="https://github.com/massimo-nocentini/tufte.hugo">tufte.hugo</a>`) | safeHTML -}}
+  </p>
+</footer>

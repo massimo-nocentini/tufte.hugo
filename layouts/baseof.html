@@ -1,0 +1,24 @@
+{{- /* hugo.toml [module.hugoVersion] only warns; this stops the build. */ -}}
+{{- if lt hugo.Version "0.146.0" -}}
+  {{- errorf "tufte.hugo requires Hugo 0.146.0 or later (found %s)" hugo.Version -}}
+{{- end -}}
+{{- /* Locale and text direction of the site language (func/lang.html hides
+       the Hugo 0.158 renames of the Language methods). */ -}}
+{{- $l := partial "func/lang.html" site.Language -}}
+<!DOCTYPE html>
+<html lang="{{ $l.locale }}"{{ with $l.dir }} dir="{{ . }}"{{ end }}>
+<head>
+{{ partial "head.html" . }}
+</head>
+<body>
+<a class="skip-link" href="#main">{{ T "skipToContent" }}</a>
+{{ partial "header.html" . }}
+<main id="main">
+{{ block "main" . }}{{ end }}
+</main>
+{{ partial "footer.html" . }}
+{{ partial "footer_custom.html" . }}
+{{ partial "js.html" . }}
+{{ partial "scripts_custom.html" . }}
+</body>
+</html>

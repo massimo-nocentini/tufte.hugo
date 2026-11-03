@@ -1,0 +1,48 @@
+{{- /*
+  Figure (block); overrides Hugo's built-in figure shortcode. Put it on its
+  own line:
+
+    {{< figure src="exports-imports.png" alt="Exports and imports" caption="From *The Visual Display of Quantitative Information*, page 92." >}}
+
+  Params (named):
+    src      image: page resource, assets/ resource, static path or URL  (required)
+    alt      alt text (default: the caption as plain text)
+    caption  caption, inline Markdown
+    title    shown in bold before the caption
+    attr     attribution appended to the caption; attrlink links it
+    link     URL the image links to
+    type     "main" (default: main column, caption as a margin note)
+             | "margin" (the image goes in the margin, see marginfigure)
+             | "fullwidth" (full width, caption in a figcaption, see fullwidthfigure)
+    width, height  img attributes (default: intrinsic size of raster resources)
+    class    extra classes
+    inline   "true" (margin type only): leave out the wrapping <p>, for use
+             inside a paragraph (start the paragraph with the shortcode, on
+             the same line as the text). Without it a margin figure must be
+             a paragraph of its own (blank line before and after), or the
+             nested <p> breaks the surrounding paragraph apart.
+
+  Rendering is done by the partial tufte/figure.html.
+*/ -}}
+{{- if not .IsNamedParams -}}
+  {{- errorf "figure shortcode: use named parameters, e.g. src=\"image.png\" caption=\"…\" (%s)" .Position -}}
+{{- end -}}
+{{- $src := .Get "src" | default "" -}}
+{{- if not $src -}}
+  {{- errorf "figure shortcode: the src parameter is required (%s)" .Position -}}
+{{- end -}}
+{{- partial "tufte/figure.html" (dict
+  "Page" .Page
+  "Src" $src
+  "Alt" (.Get "alt" | default "")
+  "Caption" (.Get "caption" | default "")
+  "Title" (.Get "title" | default "")
+  "Attr" (.Get "attr" | default "")
+  "AttrLink" (.Get "attrlink" | default "")
+  "Link" (.Get "link" | default "")
+  "Type" (.Get "type" | default "main")
+  "Width" (.Get "width" | default "")
+  "Height" (.Get "height" | default "")
+  "Class" (.Get "class" | default "")
+  "Inline" (in (slice "true" "1" "yes") (printf "%v" (.Get "inline")))
+) -}}

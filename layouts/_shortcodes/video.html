@@ -1,0 +1,116 @@
+{{- /*
+  Self-hosted video (block), as a Tufte CSS figure. Put it on its own line:
+
+    {{< video src="flow.mp4" poster="flow.jpg" caption="Water flow, *slowed down*." >}}
+    {{< video src="/media/flow.webm" type="fullwidth" loop="true" muted="true" autoplay="true" >}}
+
+  Params (named):
+    src       video file: page resource, assets/ resource, static path or URL (required)
+    poster    image shown before playback (same resolution as src)
+    caption   caption, inline Markdown: a margin note (main) or a
+              figcaption (fullwidth)
+    title     accessible label of the video (default: the caption as plain text)
+    type      "main" (default, main text column) | "fullwidth"
+    controls  default true; "false" hides the player controls
+    autoplay, loop, muted, playsinline   "true" to set (autoplay implies
+              muted and playsinline, as browsers require)
+    width, height   video attributes
+    class     extra classes for the figure
+
+  Output (Tufte CSS):
+    <figure class="video"><label for="mn-ID" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-ID" class="margin-toggle"/><span class="marginnote">CAPTION</span><video …></video></figure>
+    <figure class="video fullwidth"><video …></video><figcaption>CAPTION</figcaption></figure>
+*/ -}}
+{{- if not .IsNamedParams -}}
+  {{- errorf "video shortcode: use named parameters, e.g. src=\"clip.mp4\" caption=\"…\" (%s)" .Position -}}
+{{- end -}}
+{{- $p := .Page -}}
+{{- $yes := slice "true" "1" "yes" -}}
+
+{{- /* Resolve src and poster: page resource, assets/ resource, then URL. */ -}}
+{{- $urls := dict -}}
+{{- $mime := "" -}}
+{{- range $key := slice "src" "poster" -}}
+  {{- $v := printf "%v" ($.Get $key | default "") | strings.TrimSpace -}}
+  {{- $u := $v -}}
+  {{- $remote := or (strings.HasPrefix $v "http://") (strings.HasPrefix $v "https://") (strings.HasPrefix $v "//") (strings.HasPrefix $v "data:") -}}
+  {{- if and $v (not $remote) -}}
+    {{- $path := strings.TrimPrefix "./" $v -}}
+    {{- $res := "" -}}
+    {{- with $p.Resources.Get $path -}}
+      {{- $res = . -}}
+    {{- else -}}
+      {{- with resources.Get (strings.TrimPrefix "/" $path) -}}
+        {{- $res = . -}}
+      {{- end -}}
+    {{- end -}}
+    {{- with $res -}}
+      {{- $u = .RelPermalink -}}
+      {{- if eq $key "src" }}{{ $mime = .MediaType.Type }}{{ end -}}
+    {{- else -}}
+      {{- if strings.HasPrefix $v "/" -}}
+        {{- $u = strings.TrimPrefix "/" $v | relURL -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $urls = merge $urls (dict $key $u) -}}
+{{- end -}}
+{{- $src := index $urls "src" -}}
+{{- if not $src -}}
+  {{- errorf "video shortcode: the src parameter is required (%s)" .Position -}}
+{{- end -}}
+
+{{- $type := lower (printf "%v" (.Get "type" | default "main")) -}}
+{{- if not (in (slice "main" "fullwidth") $type) -}}
+  {{- warnf "video shortcode: unknown type %q, using \"main\" (%s)" $type .Position -}}
+  {{- $type = "main" -}}
+{{- end -}}
+
+{{- /* Caption: inline Markdown, never block elements (it may sit in a span). */ -}}
+{{- $caption := "" -}}
+{{- with .Get "caption" -}}
+  {{- $html := partial "tufte/render-inner.html" (dict "page" $p "text" (printf "%v" .)) -}}
+  {{- $caption = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- end -}}
+{{- $label := printf "%v" (.Get "title" | default "") -}}
+{{- if and (not $label) $caption -}}
+  {{- $label = $caption | plainify | htmlUnescape | strings.TrimSpace -}}
+{{- end -}}
+
+{{- $controls := not (in (slice "false" "0" "no") (printf "%v" (.Get "controls"))) -}}
+{{- $autoplay := in $yes (printf "%v" (.Get "autoplay")) -}}
+{{- $loop := in $yes (printf "%v" (.Get "loop")) -}}
+{{- $muted := or $autoplay (in $yes (printf "%v" (.Get "muted"))) -}}
+{{- $inline := or $autoplay (in $yes (printf "%v" (.Get "playsinline"))) -}}
+{{- $width := printf "%v" (.Get "width" | default "") -}}
+{{- $height := printf "%v" (.Get "height" | default "") -}}
+{{- $class := printf "%v" (.Get "class" | default "") | strings.TrimSpace -}}
+{{- $figClass := "video" -}}
+{{- if eq $type "fullwidth" }}{{ $figClass = printf "%s fullwidth" $figClass }}{{ end -}}
+{{- with $class }}{{ $figClass = printf "%s %s" $figClass . }}{{ end -}}
+{{- $id := "" -}}
+{{- if and (eq $type "main") $caption -}}
+  {{- $id = partial "func/note-id.html" $p -}}
+{{- end -}}
+<figure class="{{ $figClass }}">
+{{- if $id -}}
+<label for="mn-{{ $id }}" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-{{ $id }}" class="margin-toggle"/><span class="marginnote">{{ $caption | safeHTML }}</span>
+{{- end -}}
+<video preload="metadata"
+  {{- if $controls }} controls{{ end }}
+  {{- if $autoplay }} autoplay{{ end }}
+  {{- if $loop }} loop{{ end }}
+  {{- if $muted }} muted{{ end }}
+  {{- if $inline }} playsinline{{ end }}
+  {{- with index $urls "poster" }} poster="{{ . }}"{{ end }}
+  {{- with $width }} width="{{ . }}"{{ end }}
+  {{- with $height }} height="{{ . }}"{{ end }}
+  {{- with $label }} aria-label="{{ . }}"{{ end }}>
+<source src="{{ $src }}"{{ with $mime }} type="{{ . }}"{{ end }}>
+<a href="{{ $src }}">{{ $src | path.Base }}</a>
+</video>
+{{- if and (eq $type "fullwidth") $caption -}}
+<figcaption>{{ $caption | safeHTML }}</figcaption>
+{{- end -}}
+</figure>
+{{- /* no trailing newline */ -}}

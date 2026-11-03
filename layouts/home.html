@@ -1,0 +1,24 @@
+{{ define "main" }}
+{{- /* Home page: optional title (only when content/_index.md sets one that
+       differs from the site title, which the header already shows), the _index.md content as an
+       introduction (Params.homeIntro, default true), then paginated summaries
+       of the posts in the main sections. */ -}}
+<article>
+  {{- with .Params.title }}
+  {{- if ne . site.Title }}
+  <h1>{{ . }}</h1>
+  {{- end }}
+  {{- end }}
+  {{- with .Params.subtitle }}
+  <p class="subtitle">{{ . }}</p>
+  {{- end }}
+  {{- if ne site.Params.homeIntro false }}
+  {{ partial "func/content.html" . }}
+  {{- end }}
+  {{- $pag := partial "func/paginate.html" . }}
+  {{- range $pag.Pages }}
+  {{ partial "post-summary.html" . }}
+  {{- end }}
+  {{ partial "paginator.html" . }}
+</article>
+{{ end }}

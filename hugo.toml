@@ -1,0 +1,78 @@
+# tufte.hugo — theme configuration (defaults).
+#
+# Hugo merges only some sections of a theme configuration into the site
+# configuration: [params] are merged deeply and site values always win;
+# [menus] are merged shallowly (this theme defines none). [markup],
+# [taxonomies], [pagination] and [services] are NOT merged by default, so the
+# Goldmark settings this theme relies on must live in the site configuration
+# (see README.md and exampleSite/hugo.toml); a site can opt in to merging with
+# `_merge = "deep"` under its [markup].
+
+[module]
+  [module.hugoVersion]
+    min = "0.146.0"
+    extended = false # no SCSS, no WebP encoding: the standard edition is enough
+
+[params]
+  subtitle = ""                 # shown under the site title on the home page
+  description = ""              # last fallback <meta name="description"> (after page description, subtitle, summary)
+  dateFormat = "January 2, 2006"
+  sections = "h2"               # "h2" | "none" — wrap content in <section> at each h2 (front matter `sections` overrides)
+  footnotes = "sidenotes"       # "sidenotes" | "endnotes" (front matter `footnotes` overrides)
+  etBook = true                 # load the bundled ET Book web fonts
+  showReadingTime = true
+  showWordCount = false
+  showPostNav = true            # previous / next links at the end of posts
+  toc = false                   # table of contents (front matter `toc` overrides)
+  readMore = true               # "Read more" link under summaries
+  homeIntro = true              # render content/_index.md above the home list
+  customCSS = []                # paths under the site's assets/, appended to the CSS bundle
+  copyright = ""                # footer text; default "© YEAR Author"
+  selfHosted = false            # true: download third-party files (KaTeX) at build time and serve them from the site
+
+  [params.author]
+    name = ""
+    email = ""
+    url = ""
+
+  [params.social]
+    github = ""
+    gitlab = ""
+    mastodon = ""
+    bluesky = ""
+    twitter = ""
+    linkedin = ""
+    orcid = ""
+    email = ""
+    rss = true
+
+  # Math is typeset with KaTeX. URLs and SRI hashes: data/tufte/vendor.toml.
+  [params.math]
+    enable = "auto"             # "auto" (only pages that contain math) | true | false
+    engine = "server"           # "server" (build-time KaTeX, no JS) | "client" (KaTeX JS in the browser)
+    fleqn = false               # display math flush left
+    leqno = false               # equation tags (\tag) on the left
+    errorColor = ""             # colour of invalid TeX ("" = the theme's red, adapted to dark mode)
+    strict = "error"            # KaTeX strict mode: "error" | "ignore" | "warn"
+    minRuleThickness = 0.04     # minimum fraction-line thickness, in em
+    katexVersion = "0.16.11"    # another version needs katexIntegrity, katexJSIntegrity, katexAutoRenderIntegrity too
+    katexCSS = ""               # optional: another KaTeX stylesheet URL (with katexIntegrity)
+    katexIntegrity = ""
+    katexJSIntegrity = ""
+    katexAutoRenderIntegrity = ""
+    # Macros, merged with front matter `mathMacros` (the page wins). Hugo
+    # lowercases map keys, so names with capitals need the list form:
+    #   macros = [["\\RR", "\\mathbb{R}"], ["\\abs", "\\left|#1\\right|"]]
+    macros = []
+
+  [params.giscus]               # enabled only when repo, repoId, category and categoryId are all set
+    repo = ""
+    repoId = ""
+    category = ""
+    categoryId = ""
+    mapping = "pathname"
+    theme = "preferred_color_scheme"
+    lang = ""                   # giscus interface language ("" = the site language)
+
+  [params.comments]
+    enable = true               # front matter `comments` overrides

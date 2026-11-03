@@ -1,0 +1,23 @@
+{{- /*
+  Formats a date with the site "dateFormat" param (default "January 2, 2006").
+  Any Go time layout or Hugo localized token (":date_long", ":date_medium")
+  works; month and day names follow the site language.
+
+  Takes: a time.Time value, or a dict with
+    "date"   - the time.Time value,
+    "format" - optional layout overriding the "dateFormat" param.
+  Returns: the formatted string, or "" for a zero or missing date.
+*/ -}}
+{{- $date := . -}}
+{{- $format := site.Params.dateFormat | default "January 2, 2006" -}}
+{{- if reflect.IsMap . -}}
+  {{- $date = .date -}}
+  {{- with .format }}{{ $format = . }}{{ end -}}
+{{- end -}}
+{{- $out := "" -}}
+{{- with $date -}}
+  {{- if not .IsZero -}}
+    {{- $out = time.Format $format . -}}
+  {{- end -}}
+{{- end -}}
+{{- return $out -}}

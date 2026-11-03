@@ -1,0 +1,48 @@
+{{- /*
+  Comments for regular pages that belong to a section (posts), through
+  giscus (Params.giscus) and/or Disqus (services.disqus.shortname).
+  Params.comments.enable (default true) switches them off site-wide; front
+  matter "comments: true|false" overrides it for one page (true also enables
+  comments on pages outside sections).
+  Takes: the page.
+*/ -}}
+{{- $enabled := true -}}
+{{- with site.Params.comments -}}
+  {{- if isset . "enable" }}{{ $enabled = .enable }}{{ end -}}
+{{- end -}}
+{{- if not .Section }}{{ $enabled = false }}{{ end -}}
+{{- if isset .Params "comments" }}{{ $enabled = .Params.comments }}{{ end -}}
+{{- $giscus := false -}}
+{{- with site.Params.giscus -}}
+  {{- if and .repo .repoId .category .categoryId }}{{ $giscus = . }}
+  {{- else if or .repo .repoId .category .categoryId }}
+    {{- warnf "tufte.hugo: giscus comments are off: params.giscus needs repo, repoId, category and categoryId all set" -}}
+  {{- end -}}
+{{- end -}}
+{{- $disqus := site.Config.Services.Disqus.Shortname -}}
+{{- $lang := (partial "func/lang.html" site.Language).name -}}
+{{- if and $enabled .IsPage (or $giscus $disqus) }}
+<section class="comments" id="comments">
+  <h2>{{ T "comments" }}</h2>
+  {{- with $giscus }}
+  <script src="https://giscus.app/client.js"
+    data-repo="{{ .repo }}"
+    data-repo-id="{{ .repoId }}"
+    data-category="{{ .category }}"
+    data-category-id="{{ .categoryId }}"
+    data-mapping="{{ .mapping | default "pathname" }}"
+    data-strict="0"
+    data-reactions-enabled="1"
+    data-emit-metadata="0"
+    data-input-position="bottom"
+    data-theme="{{ .theme | default "preferred_color_scheme" }}"
+    data-lang="{{ .lang | default $lang }}"
+    data-loading="lazy"
+    crossorigin="anonymous"
+    async></script>
+  {{- end }}
+  {{- if $disqus }}
+  {{ partial "disqus.html" . }}
+  {{- end }}
+</section>
+{{- end -}}

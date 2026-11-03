@@ -1,0 +1,18 @@
+# Hugo build output and caches
+/public/
+/resources/_gen/
+exampleSite/public/
+exampleSite/resources/_gen/
+.hugo_build.lock
+exampleSite/.hugo_build.lock
+
+# Themes directory if someone clones the theme inside the example site
+exampleSite/themes/
+
+# Editors and operating systems
+*.swp
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

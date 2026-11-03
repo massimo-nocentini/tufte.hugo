@@ -1,0 +1,101 @@
+{{- /* Everything inside <head>. Site additions go in head_custom.html. */ -}}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{- if .IsHome }}
+<title>{{ site.Title }}</title>
+{{- else }}
+<title>{{ with .Title }}{{ . }} | {{ end }}{{ site.Title }}</title>
+{{- end }}
+
+{{- /* Description: front matter, then subtitle, then the summary of a
+       regular page, then the site description. */ -}}
+{{- $description := .Description | default .Params.subtitle -}}
+{{- if and (not $description) .IsPage -}}
+  {{- $description = .Summary | plainify | htmlUnescape | strings.TrimSpace | truncate 160 -}}
+{{- end -}}
+{{- $description = $description | default site.Params.description -}}
+{{- with $description }}
+<meta name="description" content="{{ . }}">
+{{- end }}
+{{- /* Author: front matter author (a string or a list), else
+       params.author.name, as in post-meta.html. */ -}}
+{{- $author := "" -}}
+{{- with .Params.author -}}
+  {{- if reflect.IsSlice . }}{{ $author = delimit . ", " }}{{ else }}{{ $author = . }}{{ end -}}
+{{- else -}}
+  {{- with site.Params.author }}{{ $author = .name }}{{ end -}}
+{{- end -}}
+{{- with $author }}
+<meta name="author" content="{{ . }}">
+{{- end }}
+{{- /* Canonical: every pager of a list renders from the same page, whose
+       .Permalink is the first pager; later pagers point to themselves. */ -}}
+{{- $canonical := .Permalink -}}
+{{- if or .IsHome (eq .Kind "section") -}}
+  {{- with partial "func/paginate.html" . -}}
+    {{- if gt .PageNumber 1 }}{{ $canonical = .URL | absURL }}{{ end -}}
+  {{- end -}}
+{{- end }}
+<link rel="canonical" href="{{ $canonical }}">
+{{- with .OutputFormats.Get "rss" }}
+<link rel="{{ .Rel }}" type="{{ .MediaType.Type }}" href="{{ .RelPermalink }}" title="{{ site.Title }}">
+{{- else }}
+{{- with site.Home.OutputFormats.Get "rss" }}
+<link rel="{{ .Rel }}" type="{{ .MediaType.Type }}" href="{{ .RelPermalink }}" title="{{ site.Title }}">
+{{- end }}
+{{- end }}
+{{- /* Multilingual sites: every translation of this page, itself included. */ -}}
+{{- if .IsTranslated }}
+{{- range .AllTranslations }}
+{{- $l := partial "func/lang.html" .Language }}
+<link rel="alternate" hreflang="{{ $l.locale }}" href="{{ .Permalink }}">
+{{- end }}
+{{- end }}
+{{- if fileExists "static/favicon.ico" }}
+<link rel="icon" href="{{ "favicon.ico" | relURL }}" sizes="any">
+{{- end }}
+{{- if fileExists "static/favicon.svg" }}
+<link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">
+{{- end }}
+{{ hugo.Generator }}
+{{ partial "opengraph.html" . }}
+{{ partial "twitter_cards.html" . }}
+{{ partial "schema.html" . }}
+{{ partial "css.html" . }}
+
+{{- /* KaTeX stylesheet, only when needed. The passthrough render hook sets
+       Store "hasMath" while the content renders; the head is written before
+       the body, so .WordCount forces that render first. List pages check the
+       pages they summarize. Params.math.enable: "auto" (default), true, false.
+       Front matter "math: true" always loads it, "math: false" never. */ -}}
+{{- $enable := "auto" -}}
+{{- with site.Params.math -}}
+  {{- if isset . "enable" }}{{ $enable = .enable }}{{ end -}}
+{{- end -}}
+{{- $math := false -}}
+{{- if or (eq $enable true) (eq $enable "true") -}}
+  {{- $math = true -}}
+{{- else if or (eq $enable false) (eq $enable "false") -}}
+  {{- $math = false -}}
+{{- else -}}
+  {{- $noop := .WordCount -}}
+  {{- if .Store.Get "hasMath" }}{{ $math = true }}{{ end -}}
+  {{- if or .IsHome (eq .Kind "section") -}}
+    {{- range (partial "func/paginate.html" .).Pages -}}
+      {{- $noop = .WordCount -}}
+      {{- if or (.Store.Get "hasMath") (eq .Params.math true) }}{{ $math = true }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if isset .Params "math" -}}
+  {{- $math = eq .Params.math true -}}
+{{- end -}}
+{{- /* KaTeX CSS, plus the KaTeX scripts with params.math.engine = "client";
+       URLs and SRI hashes from data/tufte/vendor.toml. */ -}}
+{{- if $math }}
+{{ partial "tufte/katex.html" . }}
+{{- end }}
+{{- if hugo.IsProduction }}
+{{ partial "google_analytics.html" . }}
+{{- end }}
+{{ partial "head_custom.html" . }}

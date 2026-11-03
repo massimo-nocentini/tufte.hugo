@@ -1,0 +1,79 @@
+{{- /*
+  Converts Goldmark footnotes into Tufte sidenotes.
+
+  Goldmark renders a reference as
+    <sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup>
+  (repeated references get ids such as fnref1:1, fnref2:1) and appends
+    <div class="footnotes" role="doc-endnotes"><hr><ol><li id="fn:1"><p>Text&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p></li>...</ol></div>
+  at the end of the content.
+
+  Each reference becomes the sidenote markup expected by tufte.css:
+    <label for="sn-ID" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-ID" class="margin-toggle"/><span class="sidenote">TEXT</span>
+  where ID comes from partial "func/note-id.html" (unique per rendered page).
+  The note text loses its back-reference links, and its paragraphs are joined
+  with <br> because a sidenote is an inline <span>. The endnotes block is
+  removed. Ids are not assumed to be numeric, so prefixed ids (Goldmark's
+  enableAutoIDPrefix) and word labels work too.
+
+  Takes a dict:
+    "page"    - the page the content belongs to (passed to func/note-id.html),
+    "content" - the HTML to convert (the page .Content or .Summary),
+    "source"  - optional HTML holding the footnote definitions; defaults to
+                "content". A summary passes the full .Content here, since the
+                endnotes block is not part of .Summary.
+  Returns: template.HTML.
+
+  Known limitation: block elements inside a footnote (lists, code blocks) stay
+  as they are and break the inline span; keep footnotes to inline markup.
+  A figure made by the image render hook (an image alone in the note) is
+  turned back into a plain <img> by func/inline-figures.html.
+*/ -}}
+{{- $page := .page -}}
+{{- $content := string .content -}}
+{{- $source := $content -}}
+{{- with .source }}{{ $source = string . }}{{ end -}}
+{{- /* Greedy on purpose: the endnotes block is the last element of the
+       content, so its closing tag is the last </div>, even when a note
+       contains nested divs (for example highlighted code). */ -}}
+{{- $divRE := `(?s)<div class="footnotes"[^>]*>.*</div>` -}}
+{{- $refRE := `<sup [^>]*>\s*<a [^>]*class="footnote-ref"[^>]*>[^<]*</a>\s*</sup>` -}}
+{{- $out := $content -}}
+{{- if strings.Contains $content "footnote-ref" -}}
+  {{- /* Collect the note texts by target id. */ -}}
+  {{- $notes := newScratch -}}
+  {{- with findRE $divRE $source 1 -}}
+    {{- $block := index . 0 -}}
+    {{- range after 1 (split $block `<li id="`) -}}
+      {{- $id := replaceRE `(?s)^([^"]*)".*$` "$1" . -}}
+      {{- $text := replaceRE `(?s)^[^"]*"[^>]*>` "" . -}}
+      {{- $text = replaceRE `(?s)</li>\s*(</ol>\s*</div>\s*)?$` "" $text -}}
+      {{- $text = replaceRE `(?s)(&#160;|&nbsp;|\s)*<a [^>]*class="footnote-backref"[^>]*>.*?</a>` "" $text -}}
+      {{- $text = strings.TrimSpace $text -}}
+      {{- /* An image alone in the note became a <figure>: make it a plain
+             <img> again, since the note becomes a span. */ -}}
+      {{- $text = partial "func/inline-figures.html" $text -}}
+      {{- $text = replaceRE `</p>\s*<p>` "<br>" $text -}}
+      {{- $text = replaceRE `</?p>` "" $text -}}
+      {{- $text = strings.TrimSpace $text -}}
+      {{- if $id -}}
+        {{- $notes.SetInMap "notes" $id $text -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Remove the endnotes block, then replace every reference. */ -}}
+  {{- $out = replaceRE $divRE "" $out -}}
+  {{- with $notes.Get "notes" -}}
+    {{- $map := . -}}
+    {{- range findRE $refRE $out -}}
+      {{- $ref := . -}}
+      {{- $target := replaceRE `(?s)^.*href="#([^"]+)".*$` "$1" $ref -}}
+      {{- with index $map $target -}}
+        {{- $id := partial "func/note-id.html" $page -}}
+        {{- $sidenote := printf `<label for="sn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote">%s</span>` $id $id . -}}
+        {{- $out = replace $out $ref $sidenote 1 -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $out = $out | safeHTML -}}
+{{- return $out -}}

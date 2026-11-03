@@ -1,0 +1,16 @@
+{{- /*
+  Previous / next links between the regular pages of a section, unless
+  Params.showPostNav (front matter, else site params) is false. Pages at the
+  root of content/ (such as an About page) get no navigation.
+  Takes: the page.
+*/ -}}
+{{- if and .Section (ne (.Param "showPostNav") false) (or .PrevInSection .NextInSection) }}
+<nav class="post-nav" aria-label="{{ T "previousPost" }} / {{ T "nextPost" }}">
+  {{- with .PrevInSection }}
+  <a class="prev" href="{{ .RelPermalink }}" rel="prev"><span class="sans">&larr;&nbsp;{{ T "previousPost" }}</span> {{ .LinkTitle }}</a>
+  {{- end }}
+  {{- with .NextInSection }}
+  <a class="next" href="{{ .RelPermalink }}" rel="next"><span class="sans">{{ T "nextPost" }}&nbsp;&rarr;</span> {{ .LinkTitle }}</a>
+  {{- end }}
+</nav>
+{{- end -}}

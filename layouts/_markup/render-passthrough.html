@@ -1,0 +1,92 @@
+{{- /*
+  Passthrough render hook: math kept by the Goldmark passthrough extension
+  is typeset with KaTeX. Requires the extension in the site configuration:
+
+    [markup.goldmark.extensions.passthrough]
+      enable = true
+      [markup.goldmark.extensions.passthrough.delimiters]
+        block  = [['\[', '\]'], ['$$', '$$']]
+        inline = [['\(', '\)'], ['$', '$']]
+
+  Sets Store "hasMath" on the page, so the head loads the KaTeX stylesheet
+  (and, with the client engine, the KaTeX scripts): see tufte/katex.html.
+
+  params.math.engine = "server" (default): rendered at build time with
+  transform.ToMath (no JavaScript). Options come from func/math-options.html:
+  throwOnError = false, errorColor, fleqn, leqno, minRuleThickness, strict,
+  and the macros of params.math.macros merged with front matter mathMacros.
+    inline   KaTeX HTML+MathML
+    display  <span class="math-display">…KaTeX display HTML…</span>
+  (a span, so it is valid even inside a paragraph; theme.css makes it a
+  block in the 55% text column, full width inside .fullwidth).
+  Invalid TeX never fails the build: Hugo prints a warning with the page
+  position and the source is shown as <code class="math-error">TeX</code>.
+  This covers parse errors and undefined control sequences (a typo, a
+  missing macro), which KaTeX does not mark with a class but colours with
+  errorColor: KaTeX gets a sentinel colour (func/math-options.html) that
+  the hook looks for.
+
+  params.math.engine = "client": the TeX is kept, escaped, for KaTeX in the
+  browser (the head loads katex.min.js and auto-render with the same
+  options and macros):
+    inline   <span class="math math-inline">\(TeX\)</span>
+    display  <span class="math math-display">\[TeX\]</span>
+*/ -}}
+{{- $block := eq .Type "block" -}}
+{{- $m := partial "func/math-options.html" (dict "Page" .Page "Display" $block) -}}
+{{- .Page.Store.Set "hasMath" true -}}
+{{- if eq $m.engine "client" -}}
+  {{- if $block -}}
+    <span class="math math-display">\[{{ .Inner }}\]</span>
+  {{- else -}}
+    <span class="math math-inline">\({{ .Inner }}\)</span>
+  {{- end -}}
+{{- else -}}
+  {{- $html := "" -}}
+  {{- $err := "" -}}
+  {{- with try (transform.ToMath .Inner $m.server) -}}
+    {{- with .Err -}}
+      {{- $err = printf "%v" . -}}
+    {{- else -}}
+      {{- $html = .Value -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* With throwOnError = false KaTeX reports a parse error as
+         <span class="katex-error" title="ParseError: …">…</span>. */ -}}
+  {{- if and (not $err) (strings.Contains (string $html) `class="katex-error"`) -}}
+    {{- $err = "KaTeX parse error" -}}
+    {{- with findRESubmatch `class="katex-error"[^>]*?\stitle="([^"]*)"` (string $html) 1 -}}
+      {{- $err = index . 0 1 | htmlUnescape -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* An undefined control sequence becomes text in the errorColor
+         (HTML style "color:…", MathML mathcolor="…"), with no class. */ -}}
+  {{- if and (not $err) $m.sentinel (strings.Contains (lower (string $html)) (lower $m.sentinel)) -}}
+    {{- $err = "undefined control sequence (a typo, or a macro that is not defined?)" -}}
+    {{- with findRESubmatch (printf `mathcolor="%s"[^>]*>\s*<mtext>([^<]*)</mtext>` $m.sentinel) (string $html) 1 -}}
+      {{- $err = printf "undefined control sequence %s (a typo, or a macro that is not defined?)" (index . 0 1 | htmlUnescape) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $err -}}
+    {{- warnf "tufte.hugo: KaTeX could not render %q: %s (%s)" .Inner $err .Position -}}
+    {{- $code := "" -}}
+    {{- with $m.errorColor -}}
+      {{- $code = printf `<code class="math-error" style="color: %s" title="%s">%s</code>` (htmlEscape .) (htmlEscape $err) (htmlEscape $.Inner) -}}
+    {{- else -}}
+      {{- $code = printf `<code class="math-error" title="%s">%s</code>` (htmlEscape $err) (htmlEscape $.Inner) -}}
+    {{- end -}}
+    {{- if $block -}}
+      <span class="math-display">{{ $code | safeHTML }}</span>
+    {{- else -}}
+      {{- $code | safeHTML -}}
+    {{- end -}}
+  {{- else if $block -}}
+    {{- /* KaTeX adds the katex-display wrapper in display mode; add it if missing. */ -}}
+    {{- if not (strings.Contains (string $html) "katex-display") -}}
+      {{- $html = printf `<span class="katex-display">%s</span>` $html | safeHTML -}}
+    {{- end -}}
+    <span class="math-display">{{ $html }}</span>
+  {{- else -}}
+    {{- $html -}}
+  {{- end -}}
+{{- end -}}

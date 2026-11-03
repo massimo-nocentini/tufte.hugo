@@ -1,0 +1,18 @@
+{{ define "main" }}
+{{- /* Section pages (and the fallback for other list pages): title, the
+       _index.md content as introduction, then paginated post summaries. */ -}}
+<article>
+  <h1>{{ .Title }}</h1>
+  {{- with .Params.subtitle }}
+  <p class="subtitle">{{ . }}</p>
+  {{- end }}
+  {{ partial "before_content.html" . }}
+  {{ partial "func/content.html" . }}
+  {{- $pag := partial "func/paginate.html" . }}
+  {{- range $pag.Pages }}
+  {{ partial "post-summary.html" . }}
+  {{- end }}
+  {{ partial "paginator.html" . }}
+  {{ partial "after_content.html" . }}
+</article>
+{{ end }}

@@ -1,0 +1,36 @@
+{{- /*
+  Describes a language, hiding the Hugo 0.158 renames (Lang → Name,
+  LanguageName → Label, LanguageCode → Locale, LanguageDirection →
+  Direction). Methods are resolved at run time, so only the branch that
+  runs must exist in the Hugo version at hand.
+
+  Takes: a language (site.Language, or .Language of a page).
+  Returns: a dict
+    name    the language key, e.g. "en"
+    label   the display name (languageName / label; default: the key)
+    locale  the BCP 47 tag for lang/hreflang (languageCode / locale;
+            default: the key)
+    dir     "ltr", "rtl" or "" (not configured)
+*/ -}}
+{{- $l := . -}}
+{{- $out := dict "name" "" "label" "" "locale" "" "dir" "" -}}
+{{- with $l -}}
+  {{- if ge hugo.Version "0.158.0" -}}
+    {{- $name := printf "%v" .Name -}}
+    {{- $out = dict
+      "name" $name
+      "label" (printf "%v" (.Label | default $name))
+      "locale" (printf "%v" (.Locale | default $name))
+      "dir" (printf "%v" (.Direction | default ""))
+    -}}
+  {{- else -}}
+    {{- $name := printf "%v" .Lang -}}
+    {{- $out = dict
+      "name" $name
+      "label" (printf "%v" (.LanguageName | default $name))
+      "locale" (printf "%v" (.LanguageCode | default $name))
+      "dir" (printf "%v" (.LanguageDirection | default ""))
+    -}}
+  {{- end -}}
+{{- end -}}
+{{- return $out -}}

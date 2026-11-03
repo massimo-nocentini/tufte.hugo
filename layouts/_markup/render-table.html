@@ -1,0 +1,53 @@
+{{- /*
+  Table render hook: Tufte CSS expects tables inside <div class="table-wrapper">
+  (horizontal scrolling on narrow screens). Header, body and column
+  alignment are reproduced as in Hugo's default table rendering.
+
+  A full-width table, with block attributes enabled
+  ([markup.goldmark.parser.attribute] block = true):
+
+    | A | B |
+    |---|--:|
+    | 1 | 2 |
+    {.fullwidth}
+
+  → <div class="table-wrapper fullwidth"><table class="fullwidth">…</table></div>
+*/ -}}
+{{- $fullwidth := false -}}
+{{- $extra := "" -}}
+{{- range $k, $v := .Attributes -}}
+  {{- $val := printf "%v" $v -}}
+  {{- if and (eq $k "class") (findRE `(^|\s)fullwidth(\s|$)` $val 1) -}}
+    {{- $fullwidth = true -}}
+  {{- end -}}
+  {{- if and $val (findRE `^[a-zA-Z][a-zA-Z0-9_:.-]*$` $k 1) (not (strings.HasPrefix (lower $k) "on")) -}}
+    {{- $extra = printf `%s %s="%s"` $extra $k (htmlEscape $val) -}}
+  {{- end -}}
+{{- end -}}
+<div class="table-wrapper{{ if $fullwidth }} fullwidth{{ end }}">
+<table{{ $extra | safeHTMLAttr }}>
+{{- with .THead }}
+<thead>
+  {{- range . }}
+<tr>
+    {{- range . }}
+<th{{ with .Alignment }} style="text-align: {{ . | safeCSS }}"{{ end }}>{{ .Text }}</th>
+    {{- end }}
+</tr>
+  {{- end }}
+</thead>
+{{- end }}
+{{- with .TBody }}
+<tbody>
+  {{- range . }}
+<tr>
+    {{- range . }}
+<td{{ with .Alignment }} style="text-align: {{ . | safeCSS }}"{{ end }}>{{ .Text }}</td>
+    {{- end }}
+</tr>
+  {{- end }}
+</tbody>
+{{- end }}
+</table>
+</div>
+{{- /* no trailing newline */ -}}

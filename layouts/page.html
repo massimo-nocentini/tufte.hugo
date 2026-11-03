@@ -1,0 +1,15 @@
+{{ define "main" }}
+<article>
+  <h1>{{ .Title }}</h1>
+  {{- with .Params.subtitle }}
+  <p class="subtitle">{{ . }}</p>
+  {{- end }}
+  {{ partial "post-meta.html" . }}
+  {{ partial "toc.html" . }}
+  {{ partial "before_content.html" . }}
+  {{ partial "func/content.html" . }}
+  {{ partial "after_content.html" . }}
+  {{ partial "post-nav.html" . }}
+  {{ partial "comments.html" . }}
+</article>
+{{ end }}

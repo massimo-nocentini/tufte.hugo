@@ -1,0 +1,13 @@
+{{- /*
+  The theme is CSS-only and ships no JavaScript. If the site (or a fork)
+  adds files under assets/js/*.js, they are concatenated in name order into
+  one deferred bundle, minified in production, fingerprinted with SRI.
+*/ -}}
+{{- with resources.Match "js/*.js" -}}
+  {{- $js := . | resources.Concat "js/tufte-hugo.js" -}}
+  {{- if hugo.IsProduction -}}
+    {{- $js = $js | minify -}}
+  {{- end -}}
+  {{- $js = $js | fingerprint }}
+<script src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" crossorigin="anonymous" defer></script>
+{{- end -}}

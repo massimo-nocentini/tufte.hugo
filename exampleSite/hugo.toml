@@ -1,0 +1,133 @@
+# Example site for the tufte.hugo theme.
+#
+# Build it from this directory with:
+#
+#   hugo server --themesDir ../..
+#
+# (themesDir is also set below, so a plain `hugo server` works too.)
+
+baseURL = "https://example.org/"
+# `locale` replaces `languageCode` (deprecated) from Hugo 0.158. Older Hugo
+# ignores it, and the theme then uses the language key ("en") for <html lang>.
+locale = "en-US"
+defaultContentLanguage = "en"
+title = "Tufte Hugo"
+theme = "tufte.hugo"
+themesDir = "../.."
+enableRobotsTXT = true
+# Sections listed on the home page and the archives (Hugo's top-level key;
+# the theme still honours the legacy params.mainSections).
+mainSections = ["posts"]
+
+[pagination]
+  pagerSize = 5
+
+[taxonomies]
+  tag = "tags"
+  category = "categories"
+
+[params]
+  subtitle = "Sidenotes, margin figures and careful typography for Hugo"
+  description = "A Hugo theme built on Tufte CSS: sidenotes, margin notes, margin and full-width figures, epigraphs and ET Book."
+  dateFormat = "January 2, 2006"
+  sections = "h2"
+  footnotes = "sidenotes"
+  etBook = true
+  showReadingTime = true
+  showWordCount = false
+  showPostNav = true
+  toc = false
+  readMore = true
+  homeIntro = true
+  copyright = ""
+
+  [params.author]
+    name = "Massimo Nocentini"
+    email = ""
+    url = "https://github.com/massimo-nocentini"
+
+  [params.social]
+    github = "massimo-nocentini"
+    rss = true
+
+  [params.math]
+    enable = "auto"
+    engine = "server"   # build-time KaTeX; "client" renders in the browser
+    # Site-wide KaTeX macros. A list of pairs keeps capital letters (Hugo
+    # lowercases the keys of maps). Pages add their own with `mathMacros`.
+    macros = [
+      ["\\RR", "\\mathbb{R}"],
+      ["\\NN", "\\mathbb{N}"],
+      ["\\abs", "\\left\\lvert #1 \\right\\rvert"],
+    ]
+
+  [params.comments]
+    enable = false
+
+# Hugo does not merge [markup] from a theme by default (a site could opt in
+# with `_merge = "deep"`), and the theme defines no menus: these settings
+# live in the site configuration.
+[markup]
+  [markup.goldmark]
+    # The theme never needs raw HTML in content: every Tufte construct has a
+    # shortcode or a render hook.
+    [markup.goldmark.renderer]
+      unsafe = false
+    [markup.goldmark.parser]
+      # Required: lets the image render hook see stand-alone images as blocks
+      # (.IsBlock) and render them as <figure> instead of <p><img></p>.
+      wrapStandAloneImageWithinParagraph = false
+      [markup.goldmark.parser.attribute]
+        # {.sans}, {.fullwidth} and {cite="…" author="…"} on blocks.
+        block = true
+        title = true
+    [markup.goldmark.extensions]
+      # Footnotes are on by default in Hugo; the theme turns them into
+      # sidenotes (params.footnotes = "sidenotes"). The typographer extension
+      # (curly quotes, dashes, ellipses) is on by default as well.
+      [markup.goldmark.extensions.passthrough]
+        # Keeps LaTeX away from Goldmark; render-passthrough.html renders it
+        # with KaTeX at build time (transform.ToMath).
+        enable = true
+        [markup.goldmark.extensions.passthrough.delimiters]
+          block = [['\[', '\]'], ['$$', '$$']]
+          inline = [['\(', '\)'], ['$', '$']]
+  [markup.highlight]
+    # Class-based Chroma output, coloured by the theme's syntax.css
+    # (light and dark palettes).
+    noClasses = false
+    codeFences = true
+    guessSyntax = false
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+    ordered = false
+
+[[menu.main]]
+  name = "Home"
+  pageRef = "/"
+  weight = 1
+
+[[menu.main]]
+  name = "Posts"
+  pageRef = "/posts"
+  weight = 2
+
+[[menu.main]]
+  name = "Tags"
+  pageRef = "/tags"
+  weight = 3
+
+[[menu.main]]
+  name = "Archives"
+  pageRef = "/archives"
+  weight = 4
+
+[[menu.main]]
+  name = "About"
+  pageRef = "/about"
+  weight = 5
+
+[outputs]
+  home = ["HTML", "RSS"]
+  section = ["HTML", "RSS"]

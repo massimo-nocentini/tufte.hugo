@@ -1,0 +1,123 @@
+{{- /*
+  KaTeX assets for a page that has math (called from head.html, which
+  decides whether the page needs them).
+
+  - Always: the KaTeX stylesheet (fonts and layout).
+  - params.math.engine = "client": also katex.min.js and
+    contrib/auto-render.min.js (deferred, with SRI), and a small inline
+    script that renders every .math element produced by
+    render-passthrough.html with the page's options and macros (on the home
+    and section pages, plus the mathMacros of every page in the pager, whose
+    summaries are typeset there). On a page
+    without such elements (a site that cannot enable the passthrough
+    extension, with math: true in front matter) auto-render scans the
+    article for $…$, $$…$$, \(…\) and \[…\].
+
+  URLs and SRI hashes come from data/tufte/vendor.toml (entries katex-css,
+  katex-js, katex-auto-render). params.math.katexVersion may name another
+  KaTeX version only together with its hashes: params.math.katexIntegrity
+  (CSS), katexJSIntegrity and, for the client engine,
+  katexAutoRenderIntegrity. params.math.katexCSS replaces the stylesheet
+  URL (with katexIntegrity as its hash). params.selfHosted = true serves the
+  files from the site (see tufte/vendor.html).
+
+  Takes: the page.
+*/ -}}
+{{- $page := . -}}
+{{- $cfg := site.Params.math | default (dict) -}}
+{{- $m := partial "func/math-options.html" (dict "Page" $page "Display" false) -}}
+{{- /* Client engine, list pages (home, section): the summaries keep their
+       TeX for the browser, so the macros of every page in the current
+       pager are added to the list page's own (a Scratch map keeps the
+       keys' case). Two pages defining the same macro differently: the
+       later one in the pager wins. */ -}}
+{{- $macros := $m.client.macros | default (dict) -}}
+{{- if and (eq $m.engine "client") (or $page.IsHome (eq $page.Kind "section")) -}}
+  {{- $ms := newScratch -}}
+  {{- range $k, $v := $macros }}{{ $ms.SetInMap "macros" $k $v }}{{ end -}}
+  {{- range (partial "func/paginate.html" $page).Pages -}}
+    {{- $pm := partial "func/math-options.html" (dict "Page" . "Display" false) -}}
+    {{- range $k, $v := $pm.client.macros }}{{ $ms.SetInMap "macros" $k $v }}{{ end -}}
+  {{- end -}}
+  {{- $macros = $ms.Get "macros" | default (dict) -}}
+{{- end -}}
+{{- $vendor := partial "func/vendor-data.html" . -}}
+{{- $version := printf "%v" (index $cfg "katexversion" | default "") -}}
+{{- $items := slice (dict "name" "katex-css" "key" "katexintegrity" "defer" false) -}}
+{{- if eq $m.engine "client" -}}
+  {{- $items = $items | append (dict "name" "katex-js" "key" "katexjsintegrity" "defer" true) (dict "name" "katex-auto-render" "key" "katexautorenderintegrity" "defer" true) -}}
+{{- end -}}
+{{- range $it := $items -}}
+  {{- with $e := index $vendor $it.name -}}
+    {{- $url := printf "%v" $e.url -}}
+    {{- $integrity := printf "%v" ($e.integrity | default "") -}}
+    {{- $ver := printf "%v" ($e.version | default "") -}}
+    {{- if and $version $ver (ne $version $ver) -}}
+      {{- $url = replace $url (printf "@%s/" $ver) (printf "@%s/" $version) -}}
+      {{- $integrity = printf "%v" (index $cfg $it.key | default "") -}}
+      {{- if not $integrity -}}
+        {{- errorf "tufte.hugo: params.math.katexVersion = %q differs from the bundled KaTeX %s: set params.math.%s to the SRI hash of %s as well" $version $ver $it.key $url -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if eq $it.name "katex-css" -}}
+      {{- with index $cfg "katexcss" -}}
+        {{- if ne (printf "%v" .) $url -}}
+          {{- $url = printf "%v" . -}}
+          {{- $integrity = printf "%v" (index $cfg "katexintegrity" | default "") -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end }}
+{{ partial "tufte/vendor.html" (dict "url" $url "integrity" $integrity "defer" $it.defer "dir" ($e.dir | default "katex")) }}
+  {{- else -}}
+    {{- errorf "tufte.hugo: %q is missing from data/tufte/vendor.toml" $it.name -}}
+  {{- end -}}
+{{- end -}}
+{{- if eq $m.engine "client" }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (typeof katex === "undefined") { return; }
+  var opts = {{ $m.client | jsonify | safeJS }};
+  opts.macros = {{ $macros | jsonify | safeJS }};
+  var nodes = document.querySelectorAll(".math.math-inline, .math.math-display");
+  if (nodes.length) {
+    nodes.forEach(function (el) {
+      var tex = el.textContent.trim();
+      var open = tex.slice(0, 2);
+      if (open === "\\(" || open === "\\[") { tex = tex.slice(2, -2); }
+      var o = Object.assign({}, opts, { displayMode: el.classList.contains("math-display") });
+      try {
+        katex.render(tex, el, o);
+      } catch (err) {
+        el.classList.add("math-error");
+        if (window.console) { console.warn("KaTeX:", err); }
+      }
+    });
+  } else if (typeof renderMathInElement === "function") {
+    renderMathInElement(document.querySelector("article") || document.body, Object.assign({}, opts, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "\\[", right: "\\]", display: true },
+        { left: "\\(", right: "\\)", display: false },
+        { left: "$", right: "$", display: false }
+      ]
+    }));
+  }
+  /* KaTeX colours invalid TeX (span.katex-error) and undefined control
+     sequences (a typo, a missing macro: no class at all) with the sentinel
+     errorColor of func/math-options.html. Mark both with .katex-error,
+     whose theme colour adapts to dark mode, or use params.math.errorColor. */
+  var probe = document.createElement("span");
+  probe.style.color = {{ $m.sentinel }};
+  var sentinel = probe.style.color;
+  var errorColor = {{ $m.errorColor }};
+  document.querySelectorAll(".katex-error, .katex [style]").forEach(function (e) {
+    if (e.style.color !== sentinel) { return; }
+    var nested = e.parentElement && e.parentElement.closest(".katex-error");
+    e.style.removeProperty("color");
+    e.classList.add("katex-error");
+    if (errorColor) { e.style.color = errorColor; }
+    if (!nested && window.console) { console.warn("KaTeX could not render:", e.getAttribute("title") || e.textContent); }
+  });
+});
+</script>
+{{- end -}}

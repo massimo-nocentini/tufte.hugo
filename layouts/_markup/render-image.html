@@ -1,0 +1,82 @@
+{{- /*
+  Image render hook.
+
+  - Inline images (inside a paragraph) become a plain <img loading="lazy">.
+  - Block images (on their own line) become figures, rendered by the
+    partial tufte/figure.html:
+      ![Alt](exports-imports.png "Caption, *Markdown* allowed")
+        → <figure> with the title as a margin-note caption
+      ![Alt](quilt.png)
+        → <figure><img …/></figure>
+    A class attribute picks the figure type (needs block attributes):
+      ![Alt](napoleons-march.png "Caption")
+      {.fullwidth}                    → <figure class="fullwidth"> … <figcaption>
+      {.margin}                       → margin figure (image in a margin note)
+
+  Block images are recognised through .IsBlock, which requires
+    [markup.goldmark.parser]
+      wrapStandAloneImageWithinParagraph = false
+  and Markdown attributes ({.fullwidth}, {width=300}) require
+    [markup.goldmark.parser.attribute]
+      block = true
+  Without the first setting every image is rendered inline.
+
+  The source is resolved as a page resource, then an assets/ resource,
+  then a plain URL (paths starting with "/" are static/ paths).
+*/ -}}
+{{- $attrs := dict -}}
+{{- $classes := slice -}}
+{{- $width := "" -}}
+{{- $height := "" -}}
+{{- range $k, $v := .Attributes -}}
+  {{- if eq $k "class" -}}
+    {{- /* Split on whitespace (findRE returns every match). */ -}}
+    {{- $classes = findRE `\S+` (printf "%v" $v) -}}
+  {{- else if eq $k "width" -}}
+    {{- $width = $v -}}
+  {{- else if eq $k "height" -}}
+    {{- $height = $v -}}
+  {{- else -}}
+    {{- $attrs = merge $attrs (dict $k $v) -}}
+  {{- end -}}
+{{- end -}}
+{{- if .IsBlock -}}
+  {{- $type := "main" -}}
+  {{- $rest := slice -}}
+  {{- range $classes -}}
+    {{- if eq . "fullwidth" -}}
+      {{- $type = "fullwidth" -}}
+    {{- else if in (slice "margin" "marginfigure" "marginnote") . -}}
+      {{- $type = "margin" -}}
+    {{- else -}}
+      {{- $rest = $rest | append . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- partial "tufte/figure.html" (dict
+    "Page" .Page
+    "ResPage" .PageInner
+    "Src" .Destination
+    "Alt" .PlainText
+    "Caption" .Title
+    "Type" $type
+    "Width" $width
+    "Height" $height
+    "Class" (delimit $rest " ")
+    "Attrs" $attrs
+  ) -}}
+{{- else -}}
+  {{- with .Title -}}
+    {{- $attrs = merge $attrs (dict "title" .) -}}
+  {{- end -}}
+  {{- partial "tufte/figure.html" (dict
+    "Page" .Page
+    "ResPage" .PageInner
+    "Src" .Destination
+    "Alt" .PlainText
+    "Type" "inline"
+    "Width" $width
+    "Height" $height
+    "Class" (delimit $classes " ")
+    "Attrs" $attrs
+  ) -}}
+{{- end -}}

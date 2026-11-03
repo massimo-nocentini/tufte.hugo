@@ -1,0 +1,86 @@
+name: Build example site
+
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        hugo: ["0.146.0", "latest"]
+    defaults:
+      run:
+        # exampleSite/hugo.toml uses theme = "tufte.hugo" and themesDir = "../..",
+        # so the theme must be checked out in a directory named tufte.hugo.
+        working-directory: tufte.hugo/exampleSite
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: tufte.hugo
+
+      - name: Setup Hugo ${{ matrix.hugo }}
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: ${{ matrix.hugo }}
+          extended: false # the theme needs only the standard edition
+
+      - name: Hugo version
+        run: hugo version
+
+      - name: Build (defaults)
+        run: hugo --gc --panicOnWarning --destination public
+
+      - name: Check Tufte markup
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          need() { [ -f "$1" ] || fail "missing $1"; }
+
+          P=public/posts/tufte-css/index.html
+          need "$P"
+          grep -q 'class="margin-toggle sidenote-number"' "$P" || fail "no sidenote in $P"
+          grep -q 'class="marginnote"' "$P" || fail "no margin note in $P"
+          grep -q '<section' "$P" || fail "no <section> in $P"
+          grep -q 'class="epigraph"' "$P" || fail "no epigraph in $P"
+
+          F=public/posts/footnotes-as-sidenotes/index.html
+          need "$F"
+          grep -q 'class="sidenote"' "$F" || fail "footnotes not converted to sidenotes in $F"
+          if grep -q 'class="footnotes"' "$F"; then fail "endnote list left in $F"; fi
+
+          M=public/posts/math-and-code/index.html
+          need "$M"
+          grep -q 'class="katex' "$M" || fail "no KaTeX output in $M"
+          grep -q 'katex.min.css' "$M" || fail "KaTeX stylesheet not loaded in $M"
+          if grep -q 'class="math-error"' "$M"; then fail "invalid TeX (math-error) in $M"; fi
+          # KaTeX renders \tag as <span class="tag">; post-meta tag links use class "post-tag".
+          grep -q '<span class="tag">' "$M" || fail "no equation \\tag in $M"
+
+          # Note ids must be unique per page, also on list pages with several summaries.
+          for f in "$P" "$F" public/index.html public/posts/index.html; do
+            need "$f"
+            dups=$(grep -o ' id="[^"]*"' "$f" | sort | uniq -d || true)
+            [ -z "$dups" ] || fail "duplicate ids in $f: $dups"
+          done
+
+      # Exercises the other code paths: HTML minification, no sectioning and
+      # Goldmark endnotes (pages may still override both in front matter).
+      - name: Build (minified, sections = none, footnotes = endnotes)
+        env:
+          HUGO_PARAMS_SECTIONS: none
+          HUGO_PARAMS_FOOTNOTES: endnotes
+        run: hugo --gc --minify --panicOnWarning --destination public-variant

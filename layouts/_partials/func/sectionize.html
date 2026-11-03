@@ -1,0 +1,46 @@
+{{- /*
+  Wraps rendered content in <section> elements, starting a new section at
+  every top-level <h2>. tufte.css sets the text column width only on direct
+  children of a section (section > p, section > ul, ...), so article content
+  must live inside sections.
+
+  Content before the first <h2> gets a section of its own; empty sections are
+  never produced. Split points are every "<h2" tag, wherever it sits on a
+  line (block render hooks trim their trailing newline, so a heading can
+  directly follow "</div>" or "</table>"), that is not nested in an open
+  container element: an <h2> inside a blockquote, list, div, table or figure
+  (for example "> ## Heading") does not start a section.
+
+  Takes: the HTML (string or template.HTML).
+  Returns: template.HTML.
+*/ -}}
+{{- $html := string . -}}
+{{- $marker := "<!--tufte-hugo:section-->" -}}
+{{- $openRE := `<(blockquote|div|ul|ol|li|table|figure|details|aside)[\s>]` -}}
+{{- $closeRE := `</(blockquote|div|ul|ol|li|table|figure|details|aside)>` -}}
+{{- /* A literal "<h2" cannot occur in text or code (Goldmark escapes "<"). */ -}}
+{{- $html = replaceRE `<h2([\s>])` (printf "%s<h2$1" $marker) $html -}}
+{{- $sections := slice -}}
+{{- $current := "" -}}
+{{- range $i, $part := split $html $marker -}}
+  {{- if eq $i 0 -}}
+    {{- $current = $part -}}
+  {{- else if eq (len (findRE $openRE $current)) (len (findRE $closeRE $current)) -}}
+    {{- /* Every container opened so far is closed: start a new section. */ -}}
+    {{- $sections = $sections | append $current -}}
+    {{- $current = $part -}}
+  {{- else -}}
+    {{- /* Nested heading: keep it in the current section. */ -}}
+    {{- $current = printf "%s%s" $current $part -}}
+  {{- end -}}
+{{- end -}}
+{{- $sections = $sections | append $current -}}
+{{- $out := "" -}}
+{{- range $sections -}}
+  {{- $s := strings.TrimSpace . -}}
+  {{- if $s -}}
+    {{- $out = printf "%s<section>\n%s\n</section>\n" $out $s -}}
+  {{- end -}}
+{{- end -}}
+{{- $out = $out | safeHTML -}}
+{{- return $out -}}

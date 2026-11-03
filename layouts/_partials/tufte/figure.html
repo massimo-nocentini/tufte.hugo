@@ -1,0 +1,170 @@
+{{- /*
+  Shared figure renderer, used by the figure, marginfigure and
+  fullwidthfigure shortcodes and by the image render hook.
+
+  Output, matching the Tufte CSS demo:
+
+    main       <figure>
+                 <label for="mn-ID" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-ID" class="margin-toggle"/><span class="marginnote">CAPTION</span>
+                 <img …/>
+               </figure>
+               (no caption: <figure><img …/></figure>)
+    fullwidth  <figure class="fullwidth"><img …/><figcaption>CAPTION</figcaption></figure>
+    margin     <p><label …>&#8853;</label><input …/><span class="marginnote"><img …/>CAPTION</span></p>
+               (with Inline = true the wrapping <p> is left out, for use inside a paragraph)
+    inline     <img …/> only (used by the image render hook for inline images)
+
+  The source is resolved as a page resource (page bundle), then as a global
+  resource under assets/, then used as a plain URL: a path that starts with
+  "/" is a static/ path made relative to baseURL; remote URLs pass through.
+  Raster resources get their intrinsic width and height unless given.
+
+  Takes a dict:
+    Page     the page being rendered (note ids, markdown rendering)  required
+    ResPage  the page to look up page resources in (default: Page)
+    Src      image path or URL                                       required
+    Alt      alt text (default: plain text of the caption)
+    Caption  caption, inline Markdown
+    Title    optional title, shown in bold before the caption
+    Attr     optional attribution appended to the caption; AttrLink links it
+    Link     URL the image links to
+    Type     "main" (default) | "margin" | "fullwidth" | "inline"
+    Width    width attribute of the img
+    Height   height attribute of the img
+    Class    extra classes (figure; for margin figures the wrapping p, or
+             the span.marginnote when Inline = true)
+    Inline   bool, margin figures only: omit the wrapping <p>
+    Attrs    map of extra attributes for the img (e.g. from Markdown attributes)
+*/ -}}
+{{- $page := .Page -}}
+{{- $resPage := .ResPage | default $page -}}
+{{- $src := printf "%v" (.Src | default "") | strings.TrimSpace -}}
+{{- $type := .Type | default "main" | lower -}}
+{{- if not (in (slice "main" "margin" "fullwidth" "inline") $type) -}}
+  {{- warnf "tufte/figure.html: unknown figure type %q for %q, using \"main\"" $type $src -}}
+  {{- $type = "main" -}}
+{{- end -}}
+
+{{- /* Resolve the source. */ -}}
+{{- $url := $src -}}
+{{- $res := "" -}}
+{{- $remote := or (strings.HasPrefix $src "http://") (strings.HasPrefix $src "https://") (strings.HasPrefix $src "//") (strings.HasPrefix $src "data:") -}}
+{{- if and $src (not $remote) -}}
+  {{- $path := strings.TrimPrefix "./" $src -}}
+  {{- with $resPage.Resources.Get $path -}}
+    {{- $res = . -}}
+  {{- else -}}
+    {{- with resources.Get (strings.TrimPrefix "/" $path) -}}
+      {{- $res = . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $res -}}
+    {{- $url = .RelPermalink -}}
+  {{- else -}}
+    {{- if strings.HasPrefix $src "/" -}}
+      {{- $url = strings.TrimPrefix "/" $src | relURL -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* Dimensions: as given, else intrinsic ones for decodable raster images. */ -}}
+{{- $width := printf "%v" (.Width | default "") -}}
+{{- $height := printf "%v" (.Height | default "") -}}
+{{- if and (not $width) (not $height) -}}
+  {{- with $res -}}
+    {{- if and (eq .ResourceType "image") (in (slice "jpeg" "png" "gif" "webp" "bmp" "tiff") .MediaType.SubType) -}}
+      {{- $width = printf "%d" .Width -}}
+      {{- $height = printf "%d" .Height -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* Caption: inline Markdown, never block elements (it sits in a span). */ -}}
+{{- $raw := "" -}}
+{{- with .Title -}}
+  {{- $raw = printf "**%s**" (strings.TrimSpace (printf "%v" .)) -}}
+{{- end -}}
+{{- with .Caption -}}
+  {{- $raw = strings.TrimSpace (printf "%s %s" $raw (strings.TrimSpace (printf "%v" .))) -}}
+{{- end -}}
+{{- with .Attr -}}
+  {{- $a := strings.TrimSpace (printf "%v" .) -}}
+  {{- with $.AttrLink -}}
+    {{- $a = printf "[%s](%s)" $a . -}}
+  {{- end -}}
+  {{- $raw = strings.TrimSpace (printf "%s %s" $raw $a) -}}
+{{- end -}}
+{{- $caption := "" -}}
+{{- with $raw -}}
+  {{- /* Inline Markdown; HTML in the caption is kept as is (Goldmark would
+         drop it with markup.goldmark.renderer.unsafe = false). */ -}}
+  {{- $html := partial "tufte/render-inner.html" (dict "page" $page "text" .) -}}
+  {{- $caption = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace | safeHTML -}}
+{{- end -}}
+
+{{- $alt := .Alt | default "" -}}
+{{- if and (not $alt) $caption -}}
+  {{- $alt = $caption | plainify | htmlUnescape | strings.TrimSpace -}}
+{{- end -}}
+
+{{- /* Extra img attributes, sanitised. */ -}}
+{{- $extra := "" -}}
+{{- range $k, $v := .Attrs -}}
+  {{- if and (findRE `^[a-zA-Z][a-zA-Z0-9_:.-]*$` $k 1) (not (strings.HasPrefix (lower $k) "on")) (not (in (slice "src" "alt" "width" "height" "loading") (lower $k))) -}}
+    {{- with printf "%v" $v -}}
+      {{- $extra = printf `%s %s="%s"` $extra $k (htmlEscape .) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $class := printf "%v" (.Class | default "") | strings.TrimSpace -}}
+{{- $link := .Link | default "" -}}
+{{- $id := "" -}}
+{{- if or (eq $type "margin") (and (eq $type "main") $caption) -}}
+  {{- $id = partial "func/note-id.html" $page -}}
+{{- end -}}
+
+{{- if eq $type "inline" -}}
+  {{- with $link }}<a href="{{ . }}">{{ end -}}
+  <img src="{{ $url | safeURL }}" alt="{{ $alt }}"
+    {{- with $width }} width="{{ . }}"{{ end }}
+    {{- with $height }} height="{{ . }}"{{ end }}
+    {{- with $class }} class="{{ . }}"{{ end }}
+    {{- $extra | safeHTMLAttr }} loading="lazy"/>
+  {{- with $link }}</a>{{ end -}}
+{{- else -}}
+  {{- if eq $type "margin" -}}
+    {{- /* Class goes on the wrapping <p>; with Inline there is no <p>, so it
+           goes on the margin note span instead. */ -}}
+    {{- $spanClass := "marginnote" -}}
+    {{- if .Inline -}}
+      {{- $spanClass = printf "marginnote %s" $class | strings.TrimSpace -}}
+    {{- end -}}
+    {{- if not .Inline }}<p{{ with $class }} class="{{ . }}"{{ end }}>{{ end -}}
+    <label for="mn-{{ $id }}" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-{{ $id }}" class="margin-toggle"/><span class="{{ $spanClass }}">
+  {{- else -}}
+    {{- $figClass := $class -}}
+    {{- if eq $type "fullwidth" -}}
+      {{- $figClass = printf "fullwidth %s" $class | strings.TrimSpace -}}
+    {{- end -}}
+    <figure{{ with $figClass }} class="{{ . }}"{{ end }}>
+    {{- if and (eq $type "main") $caption -}}
+      <label for="mn-{{ $id }}" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-{{ $id }}" class="margin-toggle"/><span class="marginnote">{{ $caption }}</span>
+    {{- end -}}
+  {{- end -}}
+  {{- with $link }}<a href="{{ . }}">{{ end -}}
+  <img src="{{ $url | safeURL }}" alt="{{ $alt }}"
+    {{- with $width }} width="{{ . }}"{{ end }}
+    {{- with $height }} height="{{ . }}"{{ end }}
+    {{- $extra | safeHTMLAttr }} loading="lazy"/>
+  {{- with $link }}</a>{{ end -}}
+  {{- if eq $type "margin" -}}
+    {{- $caption }}</span>
+    {{- if not .Inline }}</p>{{ end -}}
+  {{- else -}}
+    {{- if and (eq $type "fullwidth") $caption -}}
+      <figcaption>{{ $caption }}</figcaption>
+    {{- end -}}
+    </figure>
+  {{- end -}}
+{{- end -}}

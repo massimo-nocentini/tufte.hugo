@@ -1,0 +1,17 @@
+{{- /*
+  Pager links for home and section pages, shown only when there is more than
+  one pager. Takes: the list page (its paginator comes from func/paginate.html,
+  so it is the same one the list was built from).
+*/ -}}
+{{- $pag := partial "func/paginate.html" . -}}
+{{- if gt $pag.TotalPages 1 }}
+<nav class="pagination" aria-label="{{ T "page" }}">
+  {{- with $pag.Prev }}
+  <a class="pagination-prev" href="{{ .URL }}" rel="prev">&larr;&nbsp;{{ T "newerPosts" }}</a>
+  {{- end }}
+  <span class="pagination-current">{{ T "page" }} {{ $pag.PageNumber }} {{ T "of" }} {{ $pag.TotalPages }}</span>
+  {{- with $pag.Next }}
+  <a class="pagination-next" href="{{ .URL }}" rel="next">{{ T "olderPosts" }}&nbsp;&rarr;</a>
+  {{- end }}
+</nav>
+{{- end -}}

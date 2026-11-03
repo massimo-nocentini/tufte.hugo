@@ -1,0 +1,61 @@
+{{- /*
+  Returns the final article HTML of a page, in the shape tufte.css expects.
+
+  1. Footnotes: when the "footnotes" param (front matter, else site params)
+     is "sidenotes" (the default), Goldmark footnotes become sidenotes via
+     func/footnotes.html. With "endnotes" they are left as Goldmark renders
+     them, except in summaries, where the refs lose their id and link to
+     the endnotes on the post page.
+  2. Sections: when the "sections" param is "h2" (the default), the content
+     is split into <section> elements at each <h2> via func/sectionize.html.
+     With "none" the whole content goes into one <section>.
+
+  Takes: a page, or a dict with
+    "page"    - the page,
+    "summary" - true to process .Summary instead of .Content. A summary is
+                not wrapped in sections: the caller (post-summary.html)
+                places it inside its own <section>. Headings are removed
+                from it: Hugo's automatic summary can run past the first
+                <h2>, and on a list page those headings (with their ids and
+                #anchors) would read as list-level titles and could clash.
+  Returns: template.HTML (empty when the page has no content).
+*/ -}}
+{{- $page := . -}}
+{{- $summary := false -}}
+{{- if reflect.IsMap . -}}
+  {{- $page = .page -}}
+  {{- $summary = .summary | default false -}}
+{{- end -}}
+{{- $footnotes := "sidenotes" -}}
+{{- with $page.Param "footnotes" }}{{ $footnotes = . }}{{ end -}}
+{{- $sections := "h2" -}}
+{{- with $page.Param "sections" }}{{ $sections = . }}{{ end -}}
+{{- $html := "" -}}
+{{- if $summary -}}
+  {{- $html = string $page.Summary -}}
+  {{- $html = replaceRE `(?s)<h[1-6][\s>].*?</h[1-6]>\s*` "" $html -}}
+{{- else -}}
+  {{- $html = string $page.Content -}}
+{{- end -}}
+{{- if and (eq $footnotes "sidenotes") (strings.Contains $html "footnote-ref") -}}
+  {{- $html = partial "func/footnotes.html" (dict "page" $page "content" $html "source" (string $page.Content)) -}}
+{{- else if and $summary (strings.Contains $html "footnote-ref") -}}
+  {{- /* Endnotes mode on a list page: the endnote list belongs to the post,
+         so drop it from the summary (a short post's summary can be the
+         whole content), point each reference at the post's endnote and drop
+         the ref's id, which several summaries on one list page could share. */ -}}
+  {{- $html = replaceRE `(?s)<div class="footnotes"[^>]*>.*</div>` "" $html -}}
+  {{- $base := replace $page.RelPermalink "$" "$$" -}}
+  {{- $html = replaceRE `<sup id="[^"]*">(\s*<a href=")#` (printf "<sup>${1}%s#" $base) $html -}}
+{{- end -}}
+{{- if not $summary -}}
+  {{- if eq $sections "none" -}}
+    {{- with strings.TrimSpace $html -}}
+      {{- $html = printf "<section>\n%s\n</section>\n" . -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $html = partial "func/sectionize.html" $html -}}
+  {{- end -}}
+{{- end -}}
+{{- $html = $html | safeHTML -}}
+{{- return $html -}}

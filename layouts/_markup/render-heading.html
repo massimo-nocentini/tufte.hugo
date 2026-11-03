@@ -1,0 +1,20 @@
+{{- /*
+  Heading render hook: keeps the heading text as rendered and adds a small
+  anchor link, shown on hover by theme.css:
+
+    <h2 id="figures">Figures<a class="heading-anchor" href="#figures" aria-hidden="true" tabindex="-1">#</a></h2>
+
+  Tufte CSS styles h1 (title), h2 (sections) and h3; deeper levels are
+  rendered but not specially styled.
+*/ -}}
+{{- $extra := "" -}}
+{{- range $k, $v := .Attributes -}}
+  {{- $val := printf "%v" $v -}}
+  {{- if and $val (ne $k "id") (findRE `^[a-zA-Z][a-zA-Z0-9_:.-]*$` $k 1) (not (strings.HasPrefix (lower $k) "on")) -}}
+    {{- $extra = printf `%s %s="%s"` $extra $k (htmlEscape $val) -}}
+  {{- end -}}
+{{- end -}}
+<h{{ .Level }}{{ with .Anchor }} id="{{ . }}"{{ end }}{{ $extra | safeHTMLAttr }}>{{ .Text }}
+{{- with .Anchor }}<a class="heading-anchor" href="#{{ . }}" aria-hidden="true" tabindex="-1">#</a>{{ end -}}
+</h{{ .Level }}>
+{{- /* no trailing newline */ -}}

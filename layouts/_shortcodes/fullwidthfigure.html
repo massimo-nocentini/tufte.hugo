@@ -1,0 +1,32 @@
+{{- /*
+  Full-width figure (block): spans the whole article width, caption in a
+  figcaption. Put it on its own line:
+
+    {{< fullwidthfigure src="napoleons-march.png" alt="Napoleon's March" >}}
+
+  Params: as for the figure shortcode, without type.
+
+  Rendering is done by the partial tufte/figure.html.
+*/ -}}
+{{- if not .IsNamedParams -}}
+  {{- errorf "fullwidthfigure shortcode: use named parameters, e.g. src=\"image.png\" caption=\"…\" (%s)" .Position -}}
+{{- end -}}
+{{- $src := .Get "src" | default "" -}}
+{{- if not $src -}}
+  {{- errorf "fullwidthfigure shortcode: the src parameter is required (%s)" .Position -}}
+{{- end -}}
+{{- partial "tufte/figure.html" (dict
+  "Page" .Page
+  "Src" $src
+  "Alt" (.Get "alt" | default "")
+  "Caption" (.Get "caption" | default "")
+  "Title" (.Get "title" | default "")
+  "Attr" (.Get "attr" | default "")
+  "AttrLink" (.Get "attrlink" | default "")
+  "Link" (.Get "link" | default "")
+  "Type" ("fullwidth")
+  "Width" (.Get "width" | default "")
+  "Height" (.Get "height" | default "")
+  "Class" (.Get "class" | default "")
+  "Inline" (in (slice "true" "1" "yes") (printf "%v" (.Get "inline")))
+) -}}

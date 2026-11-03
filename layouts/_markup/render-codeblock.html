@@ -1,0 +1,36 @@
+{{- /*
+  Code block render hook.
+
+  - Fenced code with a language is highlighted as usual with Chroma
+    (transform.HighlightCodeBlock, honouring the [markup.highlight] settings
+    and the info-string options); languages Chroma does not know are
+    rendered as plain text.
+  - Fenced code without a language renders as Tufte CSS's <pre><code>.
+  - A fullwidth class widens the block:
+
+      ```clojure {.fullwidth}
+      (map tufte-css blog-posts)
+      ```
+
+    → <div class="highlight fullwidth"><pre …><code …>…</code></pre></div>
+      (Hugo copies the block attributes onto the highlight wrapper; if it
+      did not, the block is wrapped in <div class="fullwidth"> instead)
+      (without a language: <pre class="fullwidth"><code>…</code></pre>)
+
+  Mermaid diagrams are not supported.
+*/ -}}
+{{- $fullwidth := findRE `(^|\s)fullwidth(\s|$)` (printf "%v" (index .Attributes "class" | default "")) 1 -}}
+{{- if .Type -}}
+  {{- $opts := dict -}}
+  {{- if not (transform.CanHighlight .Type) -}}
+    {{- $opts = dict "type" "text" -}}
+  {{- end -}}
+  {{- $result := transform.HighlightCodeBlock . $opts -}}
+  {{- if and $fullwidth (not (findRE `^\s*<div[^>]*\sclass="[^"]*\bfullwidth\b` (string $result.Wrapped) 1)) -}}
+<div class="fullwidth">{{ $result.Wrapped }}</div>
+  {{- else -}}
+    {{- $result.Wrapped -}}
+  {{- end -}}
+{{- else -}}
+<pre{{ if $fullwidth }} class="fullwidth"{{ end }}><code>{{ .Inner }}</code></pre>
+{{- end -}}

@@ -1,0 +1,20 @@
+{{ define "main" }}
+{{- /* A taxonomy (for example /tags/): every term, alphabetically, with the
+       number of pages using it. */ -}}
+<article>
+  <h1>{{ .Title }}</h1>
+  {{- with .Params.subtitle }}
+  <p class="subtitle">{{ . }}</p>
+  {{- end }}
+  {{ partial "func/content.html" . }}
+  {{- with .Data.Terms.Alphabetical }}
+  <section>
+    <ul class="taxonomy-list">
+      {{- range . }}
+      <li><a href="{{ .Page.RelPermalink }}">{{ .Page.LinkTitle }}</a> <span class="taxonomy-count">{{ .Count }}</span></li>
+      {{- end }}
+    </ul>
+  </section>
+  {{- end }}
+</article>
+{{ end }}

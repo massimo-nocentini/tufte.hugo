@@ -1,0 +1,50 @@
+{{- /*
+  Responsive embedded iframe (block), in the Tufte CSS iframe-wrapper.
+  Put it on its own line:
+
+    {{< iframe src="https://example.org/embed" title="An embedded map" ratio="4:3" >}}
+    {{< iframe "https://example.org/embed" >}}
+
+  Params:
+    src    URL of the embedded page (required; or the first positional param)
+    title  accessible title of the iframe (default "Embedded content")
+    ratio  aspect ratio "W:H" (also "W/H" or "WxH"); default 16:9. Emitted
+           as style="--iframe-ratio: W / H;", read by theme.css (aspect-ratio)
+    allow  value of the iframe allow attribute
+    class  extra classes for the figure
+
+  Output (Tufte CSS):
+    <figure class="iframe-wrapper"><iframe src="…" title="…" frameborder="0" loading="lazy" allowfullscreen></iframe></figure>
+*/ -}}
+{{- $src := "" -}}{{- $title := "" -}}{{- $ratio := "" -}}{{- $allow := "" -}}{{- $class := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $src = .Get "src" | default "" -}}
+  {{- $title = .Get "title" | default "" -}}
+  {{- $ratio = .Get "ratio" | default "" -}}
+  {{- $allow = .Get "allow" | default "" -}}
+  {{- $class = .Get "class" | default "" -}}
+{{- else -}}
+  {{- $src = .Get 0 | default "" -}}
+{{- end -}}
+{{- if not $src -}}
+  {{- errorf "iframe shortcode: the src parameter is required (%s)" .Position -}}
+{{- end -}}
+{{- $style := "" -}}
+{{- with $ratio -}}
+  {{- $r := replaceRE `[/xX]` ":" (printf "%v" .) | strings.TrimSpace -}}
+  {{- if findRE `^\d+(\.\d+)?\s*:\s*\d+(\.\d+)?$` $r 1 -}}
+    {{- $parts := split $r ":" -}}
+    {{- $w := float (strings.TrimSpace (index $parts 0)) -}}
+    {{- $h := float (strings.TrimSpace (index $parts 1)) -}}
+    {{- if and (gt $w 0) (gt $h 0) -}}
+      {{- /* theme.css sizes the wrapper with aspect-ratio: var(--iframe-ratio). */ -}}
+      {{- $style = printf "--iframe-ratio: %g / %g;" $w $h -}}
+    {{- end -}}
+  {{- else -}}
+    {{- warnf "iframe shortcode: invalid ratio %q, expected W:H such as 4:3 (%s)" $r $.Position -}}
+  {{- end -}}
+{{- end -}}
+<figure class="iframe-wrapper{{ with $class }} {{ . }}{{ end }}"{{ with $style }} style="{{ . | safeCSS }}"{{ end }}>
+<iframe src="{{ $src }}" title="{{ $title | default "Embedded content" }}" frameborder="0" loading="lazy"{{ with $allow }} allow="{{ . }}"{{ end }} allowfullscreen></iframe>
+</figure>
+{{- /* no trailing newline */ -}}
