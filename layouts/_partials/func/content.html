@@ -1,52 +1,54 @@
 {{- /*
-  Returns the final article HTML of a page, in the shape tufte.css expects.
+  Returns the final article HTML of a page, in the shape tufte.css expects
+  (SPEC-LATEX §3.1, R1/R2):
 
-  1. Footnotes: when the "footnotes" param (front matter, else site params)
-     is "sidenotes" (the default), Goldmark footnotes become sidenotes via
-     func/footnotes.html. With "endnotes" they are left as Goldmark renders
-     them, except in summaries, where the refs lose their id and link to
-     the endnotes on the post page.
-  2. Sections: when the "sections" param is "h2" (the default), the content
-     is split into <section> elements at each <h2> via func/sectionize.html.
-     With "none" the whole content goes into one <section>.
+    raw   = func/content-raw.html   footnotes → sidenotes, nest tokens
+    html  = tufte/postprocess.html  numbers, xrefs, cites, placeholders,
+                                    automatic bibliography, markers
+    final = sections                 when the "sections" param (front
+                                    matter, else site) is "h2" (default),
+                                    split into <section> elements at each
+                                    <h2> by func/sectionize.html; with
+                                    "none" one <section>.
+
+  Postprocess runs before sectionize, so a generated <h2> (References,
+  Index…) starts its own section. The front-matter abstract, processed
+  with the content, is cut off here (tufte/abstract.html returns it). Then the real-footnote list (§11.3) is
+  placed per footnotePlacement: "page" (default) = its own
+  <section class="footnotes" role="doc-endnotes"> after the text sections
+  (before the References section); "section" = a
+  <div class="footnotes footnotes-section" role="doc-endnotes"> at the end
+  of each <section> holding the notes first referenced there.
 
   Takes: a page, or a dict with
     "page"    - the page,
     "summary" - true to process .Summary instead of .Content. A summary is
                 not wrapped in sections: the caller (post-summary.html)
-                places it inside its own <section>. Headings are removed
-                from it: Hugo's automatic summary can run past the first
-                <h2>, and on a list page those headings (with their ids and
-                #anchors) would read as list-level titles and could clash.
+                places it inside its own <section>.
+    "print"   - optional, true in the whole-book print document (passed on
+                to postprocess).
   Returns: template.HTML (empty when the page has no content).
+  Callers may cache: partialCached "func/content.html" $ctx (or $p.RelPermalink $p.Path) $s
 */ -}}
 {{- $page := . -}}
 {{- $summary := false -}}
+{{- $print := false -}}
 {{- if reflect.IsMap . -}}
   {{- $page = .page -}}
-  {{- $summary = .summary | default false -}}
+  {{- $summary = eq .summary true -}}
+  {{- $print = eq .print true -}}
 {{- end -}}
-{{- $footnotes := "sidenotes" -}}
-{{- with $page.Param "footnotes" }}{{ $footnotes = . }}{{ end -}}
 {{- $sections := "h2" -}}
-{{- with $page.Param "sections" }}{{ $sections = . }}{{ end -}}
-{{- $html := "" -}}
-{{- if $summary -}}
-  {{- $html = string $page.Summary -}}
-  {{- $html = replaceRE `(?s)<h[1-6][\s>].*?</h[1-6]>\s*` "" $html -}}
-{{- else -}}
-  {{- $html = string $page.Content -}}
-{{- end -}}
-{{- if and (eq $footnotes "sidenotes") (strings.Contains $html "footnote-ref") -}}
-  {{- $html = partial "func/footnotes.html" (dict "page" $page "content" $html "source" (string $page.Content)) -}}
-{{- else if and $summary (strings.Contains $html "footnote-ref") -}}
-  {{- /* Endnotes mode on a list page: the endnote list belongs to the post,
-         so drop it from the summary (a short post's summary can be the
-         whole content), point each reference at the post's endnote and drop
-         the ref's id, which several summaries on one list page could share. */ -}}
-  {{- $html = replaceRE `(?s)<div class="footnotes"[^>]*>.*</div>` "" $html -}}
-  {{- $base := replace $page.RelPermalink "$" "$$" -}}
-  {{- $html = replaceRE `<sup id="[^"]*">(\s*<a href=")#` (printf "<sup>${1}%s#" $base) $html -}}
+{{- with $page.Param "sections" }}{{ $sections = lower (printf "%v" .) }}{{ end -}}
+{{- /* raw → postprocess, once per (page, summary) (tufte/processed.html):
+       tufte/abstract.html reads the same processed HTML, and the
+       whole-book print document reuses the chapter pages'. */ -}}
+{{- $html := partial "tufte/processed.html" (dict "page" $page "summary" $summary "print" $print) -}}
+{{- /* The front-matter abstract (first in the phase-1 content, see
+       func/content-raw.html) belongs to the title block
+       (tufte/abstract.html), not to the sections. */ -}}
+{{- if and (not $summary) (strings.Contains $html `<i class="tufte-abstract-end" hidden></i>`) -}}
+  {{- $html = replaceRE `(?s)^.*?<i class="tufte-abstract-end" hidden></i>\n?` "" $html -}}
 {{- end -}}
 {{- if not $summary -}}
   {{- if eq $sections "none" -}}
@@ -54,8 +56,101 @@
       {{- $html = printf "<section>\n%s\n</section>\n" . -}}
     {{- end -}}
   {{- else -}}
-    {{- $html = partial "func/sectionize.html" $html -}}
+    {{- $html = partial "func/sectionize.html" $html | string -}}
   {{- end -}}
 {{- end -}}
-{{- $html = $html | safeHTML -}}
-{{- return $html -}}
+{{- /* Real footnotes (§11.3): postprocess appended the list as
+       <section class="footnotes" …> at the end of the content (before the
+       automatic bibliography), so sectionize put it inside a <section>.
+       "page" placement: move it right after that section (between the
+       text and the References section). "section" placement: each
+       <section> gets, at its end, the notes first referenced in it. */ -}}
+{{- $listRE := `(?s)<section class="footnotes[^"]*" role="doc-endnotes"[^>]*>.*?</ol></section>` -}}
+{{- if and (not $summary) (strings.Contains $html `<section class="footnotes`) -}}
+  {{- with findRE $listRE $html 1 -}}
+    {{- $list := index . 0 -}}
+    {{- $placement := "" -}}
+    {{- with index $page.Params "footnoteplacement" -}}
+      {{- $placement = . -}}
+    {{- else -}}
+      {{- $placement = partialCached "tufte/opt.html" (dict "page" $page "key" "footnoteplacement" "default" "page") (or $page.RelPermalink $page.Path) "footnoteplacement" -}}
+    {{- end -}}
+    {{- $placement = lower (printf "%v" $placement) -}}
+    {{- if not (in (slice "page" "section") $placement) -}}
+      {{- $at := $page.RelPermalink -}}
+      {{- with $page.File }}{{ $at = .Path }}{{ end -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: footnotePlacement must be page or section, not %q, in %s; using page" $placement $at -}}
+      {{- $placement = "page" -}}
+    {{- end -}}
+    {{- $mark := `<i class="fn-list" hidden></i>` -}}
+    {{- $body := replace $html $list $mark 1 -}}
+    {{- $open := "<section>\n" -}}
+    {{- $close := "\n</section>\n" -}}
+    {{- $sep := "\n</section>\n<section>\n" -}}
+    {{- if and (strings.HasPrefix $body $open) (strings.HasSuffix $body $close) -}}
+      {{- $body = strings.TrimSuffix $close (strings.TrimPrefix $open $body) -}}
+      {{- /* List items by id, for section placement. */ -}}
+      {{- $items := newScratch -}}
+      {{- $listOpen := replaceRE `(?s)^(<section[^>]*>).*$` "$1" $list -}}
+      {{- if eq $placement "section" -}}
+        {{- range after 1 (split $list `<li id="`) -}}
+          {{- $li := printf `<li id="%s` (strings.TrimSuffix "</ol></section>" .) -}}
+          {{- $items.SetInMap "li" (replaceRE `(?s)^<li id="([^"]*)".*$` "$1" $li) $li -}}
+          {{- $items.Add "order" (slice (replaceRE `(?s)^<li id="([^"]*)".*$` "$1" $li)) -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $chunks := split $body $sep -}}
+      {{- $out := "" -}}
+      {{- range $i, $chunk := $chunks -}}
+        {{- $after := "" -}}
+        {{- $inside := "" -}}
+        {{- $hasMark := strings.Contains $chunk $mark -}}
+        {{- if $hasMark -}}
+          {{- if eq $placement "page" -}}
+            {{- $chunk = strings.TrimSpace (replace $chunk $mark "") -}}
+            {{- $after = printf "%s\n" $list -}}
+          {{- end -}}
+        {{- end -}}
+        {{- if eq $placement "section" -}}
+          {{- $lis := "" -}}
+          {{- range findRE `<sup class="footnote-ref" id="[^"]*"><a href="#[^"]*"` $chunk -}}
+            {{- $fid := replaceRE `^.*href="#([^"]*)"$` "$1" . -}}
+            {{- with index ($items.Get "li") $fid -}}
+              {{- if not ($items.Get (printf "done-%s" $fid)) -}}
+                {{- $items.Set (printf "done-%s" $fid) true -}}
+                {{- $lis = printf "%s%s" $lis . -}}
+              {{- end -}}
+            {{- end -}}
+          {{- end -}}
+          {{- if eq (add $i 1) (len $chunks) -}}
+            {{- /* Notes referenced nowhere in the text (e.g. only from a
+                   generated list) go to the last section. */ -}}
+            {{- range $items.Get "order" -}}
+              {{- if not ($items.Get (printf "done-%s" .)) -}}
+                {{- $items.Set (printf "done-%s" .) true -}}
+                {{- $lis = printf "%s%s" $lis (index ($items.Get "li") .) -}}
+              {{- end -}}
+            {{- end -}}
+          {{- end -}}
+          {{- with $lis -}}
+            {{- $inside = printf "\n%s<hr class=\"footnotes-sep\"><ol class=\"footnotes-list\">%s</ol></div>" (replace (replace $listOpen "<section" "<div") `class="footnotes ` `class="footnotes footnotes-section `) . -}}
+          {{- end -}}
+        {{- end -}}
+        {{- if and $hasMark (eq $placement "section") -}}
+          {{- /* The list's own position: the end of the text, before a
+                 generated References or Index that shares the section
+                 (sections = "none"). */ -}}
+          {{- $chunk = strings.TrimSpace (replace $chunk $mark $inside) -}}
+          {{- $inside = "" -}}
+        {{- end -}}
+        {{- if or (strings.TrimSpace $chunk) $inside -}}
+          {{- $out = printf "%s%s%s%s%s%s" $out $open $chunk $inside $close $after -}}
+        {{- else -}}
+          {{- $out = printf "%s%s" $out $after -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $html = $out -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return ($html | safeHTML) -}}

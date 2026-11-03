@@ -1,41 +1,62 @@
 {{- /*
   One line of page metadata: date (and update date), author, reading time,
   word count, categories, tags. Rendered only for pages that have a date,
-  categories or tags.
+  categories or tags (or author sidenotes to show).
   Params: showReadingTime (default true), showWordCount (default false);
   both can be overridden in front matter.
-  Takes: the page.
+  Front matter, as in the latex title block (\date): `showDate: false`
+  hides the date, `dateText` replaces it with free text ("Spring 2026").
+  Authors: tufte/authors.html (a string, a list of strings or a list of
+  {name, thanks}; names joined "A, B and C").
+  Takes: the page, or a dict with
+    page         the page
+    authorHTML   optional: the author HTML to show (tufte/title-block.html
+                 passes the names with their thanks sidenotes)
+    authorNotes  optional: how many sidenotes authorHTML holds
 */ -}}
-{{- $tags := .GetTerms "tags" -}}
-{{- $categories := .GetTerms "categories" -}}
-{{- if or (not .Date.IsZero) $tags $categories -}}
+{{- $p := . -}}
 {{- $author := "" -}}
-{{- with .Params.author -}}
-  {{- if reflect.IsSlice . }}{{ $author = delimit . ", " }}{{ else }}{{ $author = . }}{{ end -}}
-{{- else -}}
-  {{- with site.Params.author }}{{ $author = .name }}{{ end -}}
+{{- $notes := 0 -}}
+{{- if reflect.IsMap . -}}
+  {{- $p = .page -}}
+  {{- with .authorHTML }}{{ $author = . }}{{ end -}}
+  {{- with .authorNotes }}{{ $notes = int . }}{{ end -}}
 {{- end -}}
+{{- if not $author -}}
+  {{- $author = (partial "tufte/authors.html" (dict "page" $p)).html -}}
+{{- end -}}
+{{- $tags := $p.GetTerms "tags" -}}
+{{- $categories := $p.GetTerms "categories" -}}
+{{- $showDate := ne $p.Params.showdate false -}}
+{{- $dateText := "" -}}
+{{- with $p.Params.datetext }}{{ $dateText = printf "%v" . }}{{ end -}}
+{{- if or (not $p.Date.IsZero) $tags $categories (and $showDate $dateText) (gt $notes 0) -}}
 {{- $sep := false }}
 <p class="post-meta sans">
-  {{- if not .Date.IsZero -}}
-    {{ T "postedOn" }} <time datetime="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ partial "func/date.html" .Date }}</time>
-    {{- if and (not .Lastmod.IsZero) (gt (.Lastmod.Format "2006-01-02") (.Date.Format "2006-01-02")) }} ({{ T "updatedOn" }} <time datetime="{{ .Lastmod.Format "2006-01-02T15:04:05Z07:00" }}">{{ partial "func/date.html" .Lastmod }}</time>)
+  {{- if $showDate -}}
+    {{- if $dateText -}}
+      {{ T "postedOn" }} {{ $dateText }}
+      {{- $sep = true -}}
+    {{- else if not $p.Date.IsZero -}}
+      {{ T "postedOn" }} <time datetime="{{ $p.Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ partial "func/date.html" $p.Date }}</time>
+      {{- if and (not $p.Lastmod.IsZero) (gt ($p.Lastmod.Format "2006-01-02") ($p.Date.Format "2006-01-02")) }} ({{ T "updatedOn" }} <time datetime="{{ $p.Lastmod.Format "2006-01-02T15:04:05Z07:00" }}">{{ partial "func/date.html" $p.Lastmod }}</time>)
+      {{- end -}}
+      {{- $sep = true -}}
     {{- end -}}
-    {{- $sep = true -}}
   {{- end -}}
   {{- with $author -}}
     {{- if $sep }} &middot; {{ end -}}
-    {{ T "by" }} {{ . }}
+    {{ T "by" }} {{ . | safeHTML }}
     {{- $sep = true -}}
   {{- end -}}
-  {{- if and (ne ($.Param "showReadingTime") false) (gt .ReadingTime 0) -}}
+  {{- if and (ne ($p.Param "showReadingTime") false) (gt $p.ReadingTime 0) -}}
     {{- if $sep }} &middot; {{ end -}}
-    {{ T "readingTime" .ReadingTime }}
+    {{ T "readingTime" $p.ReadingTime }}
     {{- $sep = true -}}
   {{- end -}}
-  {{- if and ($.Param "showWordCount") (gt .WordCount 0) -}}
+  {{- if and ($p.Param "showWordCount") (gt $p.WordCount 0) -}}
     {{- if $sep }} &middot; {{ end -}}
-    {{ T "wordCount" .WordCount }}
+    {{ T "wordCount" $p.WordCount }}
     {{- $sep = true -}}
   {{- end -}}
   {{- with $categories -}}

@@ -1,0 +1,63 @@
+{{- /*
+  Figure, block form (\begin{figure} … \caption{…} \label{…} \end{figure}):
+  the caption is the inner text, inline Markdown that may contain other
+  shortcodes (cite, xref, sidenote-free inline shortcodes, math). Put it on
+  its own lines (block shortcode) and always close it:
+
+    {{< fig src="helix.svg" type="margin" label="fig:marginfig" >}}
+    This is a margin figure. The helix is defined by $x = \cos(2\pi z)$,
+    $y = \sin(2\pi z)$ and $z = [0, 2.7]$ {{< cite "tufte2006" >}}.
+    {{< /fig >}}
+
+    {{< fig "rhino.png" >}}A rhinoceros.{{< /fig >}}     (positional: src)
+
+  Params (named): every param of the figure shortcode (src, alt, title,
+  attr, attrlink, link, type, width, height, class, inline, label, short,
+  numbered, captionpos, offset, cite) except caption, which is the inner
+  text. A citation inside the caption becomes a citation block in the
+  caption, as \cite inside \caption does in tufte-latex.
+
+  The figure, marginfigure and fullwidthfigure shortcodes cannot gain this
+  form: a shortcode whose template reads .Inner must always be closed, and
+  that would break every existing one-line use of them.
+*/ -}}
+{{- $src := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $src = .Get "src" | default "" -}}
+{{- else -}}
+  {{- $src = .Get 0 | default "" -}}
+{{- end -}}
+{{- if not $src -}}
+  {{- errorf "fig shortcode: the src parameter is required (%s)" .Position -}}
+{{- end -}}
+{{- $get := dict -}}
+{{- if .IsNamedParams -}}
+  {{- $get = .Params -}}
+{{- end -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- $cap := "" -}}
+{{- with $text -}}
+  {{- $cap = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+{{- end -}}
+{{- $out := partial "tufte/figure.html" (dict
+  "Page" .Page
+  "Src" $src
+  "Alt" (index $get "alt" | default "")
+  "CaptionHTML" $cap
+  "Title" (index $get "title" | default "")
+  "Attr" (index $get "attr" | default "")
+  "AttrLink" (index $get "attrlink" | default "")
+  "Link" (index $get "link" | default "")
+  "Type" (index $get "type" | default "main")
+  "Width" (index $get "width" | default "")
+  "Height" (index $get "height" | default "")
+  "Class" (index $get "class" | default "")
+  "Inline" (partial "tufte/truthy.html" (index $get "inline"))
+  "Label" (index $get "label" | default "")
+  "Short" (index $get "short" | default "")
+  "Numbered" (index $get "numbered")
+  "CaptionPos" (index $get "captionpos" | default "")
+  "Offset" (index $get "offset" | default "")
+  "Cite" (index $get "cite" | default "")
+) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

@@ -1,0 +1,52 @@
+{{- /*
+  <blockquote> with an optional attribution footer, shared by the blockquote
+  and epigraph shortcodes (area B helper).
+
+  Takes a dict:
+    page    the page
+    html    the rendered quote (block HTML)
+    author  attribution, inline Markdown
+    cite    title of the work, in <cite>, after the author
+    url     source URL: the cite attribute; also links the footer (unless
+            the footer already has links). Script URLs become #ZgotmplZ.
+    footer  full footer, inline Markdown (replaces author/cite)
+    class   classes of the blockquote
+
+  Returns: the HTML string
+    <blockquote[ class][ cite]>\nHTML\n<footer>…</footer>\n</blockquote>
+*/ -}}
+{{- $p := .page -}}
+{{- $footer := "" -}}
+{{- with .footer -}}
+  {{- $footer = $p.RenderString (printf "%v" .) | string -}}
+{{- else -}}
+  {{- with $.author -}}
+    {{- $footer = $p.RenderString (printf "%v" .) | string -}}
+  {{- end -}}
+  {{- with $.cite -}}
+    {{- $c := printf "<cite>%s</cite>" ($p.RenderString (printf "%v" .)) -}}
+    {{- if $footer -}}
+      {{- $footer = printf "%s, %s" $footer $c -}}
+    {{- else -}}
+      {{- $footer = $c -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $url := "" -}}
+{{- with .url -}}
+  {{- $url = printf "%v" . | strings.TrimSpace -}}
+  {{- if findRE `(?i)^\s*(javascript|vbscript|data):` $url 1 }}{{ $url = "#ZgotmplZ" }}{{ end -}}
+  {{- $url = htmlEscape $url -}}
+{{- end -}}
+{{- $foot := "" -}}
+{{- with $footer -}}
+  {{- if and $url (not (strings.Contains . "<a ")) -}}
+    {{- $foot = printf "\n<footer><a href=\"%s\">%s</a></footer>" $url . -}}
+  {{- else -}}
+    {{- $foot = printf "\n<footer>%s</footer>" . -}}
+  {{- end -}}
+{{- end -}}
+{{- $attrs := "" -}}
+{{- with printf "%v" (.class | default "") | strings.TrimSpace }}{{ $attrs = printf ` class="%s"` (htmlEscape .) }}{{ end -}}
+{{- with $url }}{{ $attrs = printf `%s cite="%s"` $attrs . }}{{ end -}}
+{{- return (printf "<blockquote%s>\n%s%s\n</blockquote>" $attrs (string .html) $foot) -}}

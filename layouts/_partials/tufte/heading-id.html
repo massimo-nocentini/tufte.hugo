@@ -1,0 +1,26 @@
+{{- /*
+  The id of a heading without Hugo's shortcode placeholders.
+
+  Hugo computes heading ids (and .TableOfContents, .Fragments) from the
+  heading text before shortcodes are expanded, so a heading such as
+  "## Notes" followed by a sidenote shortcode gets an id like
+  "notes-hahahugoshortcode10s0hbhb", whose number changes with the Hugo
+  version and with every shortcode earlier on the page. This partial
+  removes those placeholders (and the hyphen before each), so the id is
+  "notes" on every Hugo version. render-heading.html writes the cleaned id;
+  tufte/page-toc.html and tufte/book/toc-headings.html clean the TOC links
+  the same way, so they still match.
+
+  Two headings that differ only by their shortcodes end up with the same
+  id: give such headings an explicit {#id} (README, "Headings").
+
+  Takes: an id (string).
+  Returns: the id (string); unchanged when it holds no placeholder.
+*/ -}}
+{{- $id := string . -}}
+{{- if strings.Contains (lower $id) "hahahugoshortcode" -}}
+  {{- $id = replaceRE `(?i)-?hahahugoshortcode[0-9a-z]*?hbhb` "" $id -}}
+  {{- $id = strings.Trim $id "-" -}}
+  {{- if not $id }}{{ $id = "heading" }}{{ end -}}
+{{- end -}}
+{{- return $id -}}

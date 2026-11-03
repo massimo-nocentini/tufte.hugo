@@ -1,0 +1,33 @@
+{{- /*
+  Turns block HTML left in a note's text into phrasing content, so the text
+  can sit in a <span> (sidenote, margin note, caption, footnote turned
+  sidenote) without the browser closing the paragraph around it.
+
+  Paragraphs must already be flattened (</p><p> → <br>, <p> removed). Each
+  remaining block element becomes a <span> that keeps its attributes and
+  records its tag in data-sn, which tufte-latex.css lays out as the block
+  it was (list items, code blocks, quotes, tables):
+
+    <ul class="x">…</ul>   → <span data-sn="ul" class="x">…</span>
+    <li>…</li>             → <span data-sn="li">…</span>
+    <pre …><code>…</code></pre>, <div class="highlight">, <blockquote>,
+    <table>/<thead>/<tbody>/<tr>/<th>/<td>, <dl>/<dt>/<dd>, <figure>,
+    <figcaption>, <h1>…<h6>, <section>, <header>, <footer>, <aside>,
+    <details>, <summary>, <nav>, <address>, <article> likewise
+    <hr>                   → <br>
+
+  Takes: the HTML (string or template.HTML).
+  Returns: the HTML string (unchanged when it holds no block element).
+*/ -}}
+{{- $html := string . -}}
+{{- $tags := `ul|ol|li|pre|div|blockquote|table|thead|tbody|tfoot|tr|th|td|caption|dl|dt|dd|figure|figcaption|h[1-6]|section|header|footer|aside|details|summary|nav|address|article` -}}
+{{- if findRE (printf `(?i)<(?:%s|hr)[\s/>]` $tags) $html 1 -}}
+  {{- $html = replaceRE (printf `(?i)<(%s)(\s[^>]*)?>` $tags) `<span data-sn="$1"$2>` $html -}}
+  {{- $html = replaceRE (printf `(?i)</(?:%s)\s*>` $tags) `</span>` $html -}}
+  {{- $html = replaceRE `(?i)<hr\s*/?>` `<br>` $html -}}
+  {{- /* data-sn values in lower case. */ -}}
+  {{- range findRE `data-sn="[A-Za-z0-9]+"` $html | uniq -}}
+    {{- $html = replace $html . (lower .) -}}
+  {{- end -}}
+{{- end -}}
+{{- return $html -}}

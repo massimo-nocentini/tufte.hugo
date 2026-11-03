@@ -1,0 +1,37 @@
+{{- /*
+  The chapters of a book that hold the generated lists (SPEC-LATEX §5.4):
+  for each placeholder kind, the first page of the book (landing, part
+  pages and chapters in reading order, tufte/scope.html) whose
+  phase-1 HTML contains <div class="tufte-placeholder" data-what="KIND".
+  Used e.g. to link citations to the bibliography chapter
+  (BIBPAGE.RelPermalink#ref-KEY) and index locators to the index chapter.
+
+  Takes: the book root page.
+  Returns: dict with keys bibliography, lof, lot, lol, index, toc; each
+  value is a page or false.
+  Callers: partialCached "tufte/book/special.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- /* Memoized in the root's Store (not in hugo server): see
+       tufte/opts.html. */ -}}
+{{- $memoRes := false -}}
+{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoSpecial") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $root := . -}}
+{{- $found := dict "bibliography" false "lof" false "lot" false "lol" false "index" false "toc" false -}}
+{{- $S := newScratch -}}
+{{- range $k, $v := $found }}{{ $S.SetInMap "f" $k $v }}{{ end -}}
+{{- range $p := partial "tufte/scope.html" $root -}}
+  {{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) (or $p.RelPermalink $p.Path) false | string -}}
+  {{- if strings.Contains $raw `class="tufte-placeholder"` -}}
+    {{- range $k, $unused := $found -}}
+      {{- if and (not (index ($S.Get "f") $k)) (strings.Contains $raw (printf `data-what="%s"` $k)) -}}
+        {{- $S.SetInMap "f" $k $p -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $memoRes = $S.Get "f" -}}
+{{- if not hugo.IsServer }}{{ $root.Store.Set "tufteMemoSpecial" (dict "v" $memoRes) }}{{ end -}}
+{{- end -}}
+{{- return $memoRes -}}

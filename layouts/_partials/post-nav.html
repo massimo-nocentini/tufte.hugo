@@ -4,13 +4,33 @@
   root of content/ (such as an About page) get no navigation.
   Takes: the page.
 */ -}}
-{{- if and .Section (ne (.Param "showPostNav") false) (or .PrevInSection .NextInSection) }}
+{{- /* Pages without a URL (build.render = never) are skipped: the
+       neighbours are followed (PrevInSection/NextInSection) until a page
+       that has one, as tufte/book/nav.html does for chapters. The loops
+       are bounded by the pages of the section (no chain is longer; seq
+       is capped at 2000 on Hugo 0.146). */ -}}
+{{- $bound := slice -}}
+{{- with .CurrentSection }}{{ $bound = .RegularPagesRecursive }}{{ end -}}
+{{- $prev := false -}}{{- $next := false -}}
+{{- $q := .PrevInSection -}}
+{{- range $bound -}}
+  {{- if not $q }}{{ break }}{{ end -}}
+  {{- if $q.RelPermalink }}{{ $prev = $q }}{{ break }}{{ end -}}
+  {{- $q = $q.PrevInSection -}}
+{{- end -}}
+{{- $q = .NextInSection -}}
+{{- range $bound -}}
+  {{- if not $q }}{{ break }}{{ end -}}
+  {{- if $q.RelPermalink }}{{ $next = $q }}{{ break }}{{ end -}}
+  {{- $q = $q.NextInSection -}}
+{{- end -}}
+{{- if and .Section (ne (.Param "showPostNav") false) (or $prev $next) }}
 <nav class="post-nav" aria-label="{{ T "previousPost" }} / {{ T "nextPost" }}">
-  {{- with .PrevInSection }}
-  <a class="prev" href="{{ .RelPermalink }}" rel="prev"><span class="sans">&larr;&nbsp;{{ T "previousPost" }}</span> {{ .LinkTitle }}</a>
+  {{- with $prev }}
+  <a class="prev" href="{{ .RelPermalink }}" rel="prev"><span class="sans">&larr;&nbsp;{{ T "previousPost" }}</span> {{ partial "tufte/plain-title.html" (dict "page" .) }}</a>
   {{- end }}
-  {{- with .NextInSection }}
-  <a class="next" href="{{ .RelPermalink }}" rel="next"><span class="sans">{{ T "nextPost" }}&nbsp;&rarr;</span> {{ .LinkTitle }}</a>
+  {{- with $next }}
+  <a class="next" href="{{ .RelPermalink }}" rel="next"><span class="sans">{{ T "nextPost" }}&nbsp;&rarr;</span> {{ partial "tufte/plain-title.html" (dict "page" .) }}</a>
   {{- end }}
 </nav>
 {{- end -}}

@@ -1,0 +1,35 @@
+{{- /*
+  Verse (block; the verse environment): line breaks are kept, blank lines
+  separate stanzas, long lines hang. Put it on its own lines:
+
+    {{< verse >}}
+    The fog comes
+    on little cat feet.
+
+    It sits looking
+    over harbor and city
+    {{< /verse >}}
+
+  Each line is inline Markdown.
+
+  Output: <div class="verse"><p><span class="verse-line">…</span>…</p>…</div>
+*/ -}}
+{{- $p := .Page -}}
+{{- $where := printf "%s shortcode in %v" .Name .Position -}}
+{{- $text := replace (strings.TrimSpace .Inner) "\r\n" "\n" -}}
+{{- $stanzas := "" -}}
+{{- range split $text "\n\n" -}}
+  {{- $st := strings.TrimSpace . -}}
+  {{- if $st -}}
+    {{- $lines := "" -}}
+    {{- range split $st "\n" -}}
+      {{- with strings.TrimSpace . -}}
+        {{- $l := partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "where" $where) | string -}}
+        {{- $lines = printf `%s<span class="verse-line">%s</span>` $lines $l -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $stanzas = printf "%s<p>%s</p>\n" $stanzas $lines -}}
+  {{- end -}}
+{{- end -}}
+{{- $out := printf "<div class=\"verse\">\n%s</div>" $stanzas -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

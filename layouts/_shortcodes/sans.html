@@ -1,16 +1,25 @@
 {{- /*
-  Sans-serif text (inline):
+  Sans-serif text (inline; \textsf):
 
     {{< sans >}}Some *sans-serif* text{{< /sans >}}
+    {{< sans "Some text" />}}
 
-  The inner text is inline Markdown; nested inline shortcodes (e.g. a
-  sidenote) are kept.
+  The inner text is inline Markdown; nested inline shortcodes are kept.
 
   Output (Tufte CSS): <span class="sans">TEXT</span>
 */ -}}
 {{- $text := strings.TrimSpace .Inner -}}
-{{- /* Inline Markdown; the HTML of nested shortcodes is kept as is. */ -}}
-{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "text" $text "where" (printf "%s shortcode in %v" .Name .Position)) -}}
-{{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
-<span class="sans">{{ $html | safeHTML }}</span>
-{{- /* no trailing newline */ -}}
+{{- if not $text -}}
+  {{- if .IsNamedParams -}}
+    {{- $text = printf "%v" (.Get "text" | default "") -}}
+  {{- else -}}
+    {{- $text = printf "%v" (.Get 0 | default "") -}}
+  {{- end -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with $text -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- end -}}
+{{- $out := printf `<span class="sans">%s</span>` $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

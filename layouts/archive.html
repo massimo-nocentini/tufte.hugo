@@ -1,28 +1,19 @@
 {{ define "main" }}
 {{- /* Archive page (front matter "layout: archive"): every post of the main
-       sections grouped by year, newest first. The page content, if any, is
+       sections grouped by year, newest first (undated pages last:
+       tufte/archive-list.html). The page content, if any, is
        shown above the list. */ -}}
 {{- $main := site.Params.mainSections | default site.MainSections -}}
 {{- $pages := where site.RegularPages "Type" "in" $main }}
 <article>
-  <h1>{{ .Title }}</h1>
+  <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" .Title "heading" true) }}</h1>
   {{- with .Params.subtitle }}
   <p class="subtitle">{{ . }}</p>
   {{- end }}
   {{ partial "before_content.html" . }}
-  {{ partial "func/content.html" . }}
-  <div class="archive">
-    {{- range $pages.GroupByDate "2006" }}
-    <section>
-      <h2 class="archive-year">{{ .Key }}</h2>
-      <ul class="archive-list">
-        {{- range .Pages }}
-        <li><time datetime="{{ .Date.Format "2006-01-02" }}">{{ partial "func/date.html" (dict "date" .Date "format" "Jan 2") }}</time> <a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></li>
-        {{- end }}
-      </ul>
-    </section>
-    {{- end }}
-  </div>
+  {{ partial "tufte/abstract.html" . }}
+  {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
+  {{ partial "tufte/archive-list.html" $pages }}
   {{ partial "after_content.html" . }}
 </article>
 {{ end }}

@@ -1,0 +1,45 @@
+{{- /*
+  Resolves one [params.tufte] option for a page (SPEC-LATEX §3.0.6, R7).
+
+  The key is dotted ("bibliography.style", "book.numberChapters") and is
+  lowercased first (Hugo lowercases param keys). It is looked up leaf by
+  leaf, nearest level first (tufte/opts.html resolves all of a page's
+  options once):
+    1. the page's top-level front matter, for footnotes, footnoteStyle,
+       footnotePlacement and citeAs only;
+    2. the page's `tufte` front matter;
+    3. the nearest part (a section between the page and its book root),
+       when the page is inside a part and is not that part;
+    4. the book root's `tufte` front matter, when the page is in a book and
+       is not the root;
+    5. site [params.tufte];
+    6. site [params], for the same four keys as level 1.
+  The first level where the whole path is set wins (false and "" count as
+  set). Otherwise the style preset's default (tufte/defaults.html) for the
+  page's style and book flag, then `default`, then "".
+
+  `cascade` is deliberately not used for tufte.*: it does not deep-merge,
+  so a chapter setting one key would lose the others.
+
+  The style itself ("style" key) comes from levels 1–6, with "css" (or
+  `default`) as the fallback.
+
+  Takes a dict:
+    page     the page
+    key      the dotted key
+    default  optional fallback when neither a level nor the preset has it
+  Returns: the value (any type).
+  Callers: partialCached "tufte/opt.html" (dict "page" $p "key" "x.y") (or $p.RelPermalink $p.Path) "x.y"
+  (the cache variants must include the key; the partial is pure). It is
+  cheap: a map lookup in the page's memoized option map.
+*/ -}}
+{{- $page := .page -}}
+{{- $key := lower (printf "%v" .key) -}}
+{{- $m := partial "tufte/opts.html" $page -}}
+{{- $val := "" -}}
+{{- if isset $m $key -}}
+  {{- $val = index $m $key -}}
+{{- else if ne .default nil -}}
+  {{- $val = .default -}}
+{{- end -}}
+{{- return $val -}}

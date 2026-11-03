@@ -1,0 +1,38 @@
+{{- /*
+  List of references (block; \bibliography). Put it on its own line:
+
+    {{< bibliography >}}
+    {{< bibliography all=true heading="Further reading" >}}
+
+  Handouts get an automatic list at the end of the page when they cite
+  anything (params.tufte.bibliography.list); this shortcode puts it where
+  you want (the automatic one is then left out). In a book, write it in a
+  back-matter chapter: it lists the citations of the whole book.
+
+  Named params:
+    all      true = every entry of the database (\nocite{*}), in this list
+             only (other lists on the page keep the cited keys)
+    heading  heading text; "" = no heading (e.g. the chapter title already
+             says "Bibliography"). Default: params.tufte.bibliography.heading,
+             else "References" (handout) or "Bibliography" (book)
+
+  Output: a placeholder, replaced at render time (tufte/postprocess.html):
+    <div class="tufte-placeholder" data-what="bibliography"[ data-opts="k=v;k=v"]></div>
+*/ -}}
+{{- $opts := slice -}}
+{{- if .IsNamedParams -}}
+  {{- range $k := slice "all" "heading" -}}
+    {{- if isset $.Params $k -}}
+      {{- $v := printf "%v" (index $.Params $k) | replaceRE `[;=]` "" | strings.TrimSpace -}}
+      {{- $opts = $opts | append (printf "%s=%s" $k $v) -}}
+    {{- end -}}
+  {{- end -}}
+{{- else if .Params -}}
+  {{- warnidf "tufte-bad-option" "bibliography shortcode: use named parameters (%s)" .Position -}}
+{{- end -}}
+{{- $out := `<div class="tufte-placeholder" data-what="bibliography"` -}}
+{{- with $opts -}}
+  {{- $out = printf `%s data-opts="%s"` $out (htmlEscape (delimit . ";")) -}}
+{{- end -}}
+{{- $out = printf `%s></div>` $out -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

@@ -1,0 +1,37 @@
+{{- /*
+  Table of contents (block; \tableofcontents). Put it on its own line:
+
+    {{< tableofcontents >}}
+    {{< tableofcontents depth=1 >}}     book: chapters and their sections
+
+  Inside a book: the book's contents (chapters, parts); elsewhere: the
+  page's own table of contents (its h2/h3 headings).
+
+  Named params: depth (book: 0 = chapters only, 1 = with sections),
+  heading (text; "" = no heading).
+
+  Output: a placeholder, replaced at render time (tufte/postprocess.html):
+    <div class="tufte-placeholder" data-what="toc"[ data-opts="k=v;k=v"]></div>
+*/ -}}
+{{- $opts := slice -}}
+{{- if .IsNamedParams -}}
+  {{- range $k := slice "depth" "heading" -}}
+    {{- if isset $.Params $k -}}
+      {{- $v := printf "%v" (index $.Params $k) | replaceRE `[;=]` "" | strings.TrimSpace -}}
+      {{- if eq $k "depth" }}{{ $v = replaceRE `^([0-9]+)\.0+$` "$1" $v }}{{ end -}}
+      {{- if and (eq $k "depth") (not (findRE `^[0-9]{1,2}$` $v 1)) -}}
+        {{- warnidf "tufte-bad-option" "tableofcontents shortcode: depth must be a whole number (0 = chapters only, 1 = with sections), not %q; ignored (%s)" $v $.Position -}}
+      {{- else -}}
+        {{- $opts = $opts | append (printf "%s=%s" $k $v) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- else if .Params -}}
+  {{- warnidf "tufte-bad-option" "tableofcontents shortcode: use named parameters (%s)" .Position -}}
+{{- end -}}
+{{- $out := `<div class="tufte-placeholder" data-what="toc"` -}}
+{{- with $opts -}}
+  {{- $out = printf `%s data-opts="%s"` $out (htmlEscape (delimit . ";")) -}}
+{{- end -}}
+{{- $out = printf `%s></div>` $out -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

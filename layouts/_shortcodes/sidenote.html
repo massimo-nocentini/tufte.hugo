@@ -1,30 +1,74 @@
 {{- /*
-  Numbered sidenote (inline). Use inside a paragraph, right after the
-  word it annotates, with no space before it:
+  Numbered sidenote (inline; \sidenote). Use inside a paragraph, right after
+  the word it annotates, with no space before it:
 
     Sidenotes are great{{< sidenote >}}This is a *sidenote*.{{< /sidenote >}} for asides.
+    A one-line form: {{< sidenote "This is a sidenote." />}}
 
-  The inner text is inline Markdown. A one-line form also works:
-  {{< sidenote "This is a sidenote." />}} or {{< sidenote text="…" />}}.
+  The inner text is inline Markdown and may contain other inline shortcodes
+  (xref, smallcaps, cite, math…).
 
-  Output (Tufte CSS):
-    <label for="sn-ID" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-ID" class="margin-toggle"/><span class="sidenote">TEXT</span>
+  Named params (never mixed with positional ones):
+    text    the note text (instead of the inner text)
+    number  \sidenote[num]: a mark of 1–8 characters shown instead of the
+            next number ("*", "†"); the counter does not advance
+    offset  \sidenote[][offset]: vertical shift, e.g. "-2bl" (baselines),
+            "1rem", "10px"
+    label   key for xref ("sn:x"): {{< xref "sn:x" "full" >}} → "note 7"
+    cite    citation keys ("tufte2006,tufte1990"): their full references
+            follow the text, in a citation block
+
+  Output (Tufte CSS + SPEC-LATEX §3.3):
+    <label for="sn-ID" class="margin-toggle sidenote-number"[ id="KEY" data-key="KEY"][ data-number="X"]></label><input type="checkbox" id="sn-ID" class="margin-toggle"/><span class="sidenote"[ data-number="X"][ style="--tufte-offset:…"]>TEXT[<span class="citation-block">…</span>]</span><i class="sn-end" hidden></i>
 */ -}}
+{{- $p := .Page -}}
 {{- $text := strings.TrimSpace .Inner -}}
-{{- if not $text -}}
-  {{- if .IsNamedParams -}}
-    {{- $text = .Get "text" | default "" -}}
-  {{- else -}}
-    {{- $text = .Get 0 | default "" -}}
+{{- $number := "" -}}{{- $offset := "" -}}{{- $label := "" -}}{{- $cite := "" -}}
+{{- if .IsNamedParams -}}
+  {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
+  {{- $number = printf "%v" (.Get "number" | default "") | strings.TrimSpace -}}
+  {{- $offset = printf "%v" (.Get "offset" | default "") -}}
+  {{- $label = printf "%v" (.Get "label" | default "") -}}
+  {{- $cite = printf "%v" (.Get "cite" | default "") -}}
+{{- else if not $text -}}
+  {{- $text = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- if and (not $text) (not $cite) -}}
+  {{- warnidf "tufte-empty" "sidenote shortcode: empty sidenote in %s" .Position -}}
+{{- end -}}
+{{- if gt (strings.RuneCount $number) 8 -}}
+  {{- warnidf "tufte-bad-option" "sidenote shortcode: number must be 1–8 characters, not %q; ignored (%s)" $number .Position -}}
+  {{- $number = "" -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with $text -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- /* A sidenote or margin note nested in it cannot float. */ -}}
+  {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $.Name) "where" $.Position) -}}
+  {{- /* A span cannot hold paragraphs: turn paragraph breaks into <br>. */ -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- end -}}
+{{- /* Citations: those of nested cite shortcodes and of cite=, in one
+       block after the text (tufte/cite-gather.html). */ -}}
+{{- $keys := slice -}}
+{{- range split $cite "," }}{{ with strings.TrimSpace . }}{{ $keys = $keys | append (lower .) }}{{ end }}{{ end -}}
+{{- with partial "tufte/cite-gather.html" (dict "page" $p "html" $html "keys" $keys) -}}
+  {{- $html = printf "%s%s" .html .block -}}
+{{- end -}}
+{{- $id := partial "func/note-id.html" $p -}}
+{{- $labelAttrs := "" -}}
+{{- with partial "tufte/label-key.html" (dict "key" $label "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+  {{- $labelAttrs = printf ` id="%s" data-key="%s"` (htmlEscape .) (htmlEscape .) -}}
+{{- end -}}
+{{- $spanAttrs := "" -}}
+{{- with $number -}}
+  {{- $labelAttrs = printf `%s data-number="%s"` $labelAttrs (htmlEscape .) -}}
+  {{- $spanAttrs = printf ` data-number="%s"` (htmlEscape .) -}}
+{{- end -}}
+{{- with $offset -}}
+  {{- with partial "tufte/offset.html" (dict "value" . "page" $.Page "where" (printf "(%s shortcode, line %d)" $.Name $.Position.LineNumber)) -}}
+    {{- $spanAttrs = printf `%s style="%s"` $spanAttrs (htmlEscape (string .)) -}}
   {{- end -}}
 {{- end -}}
-{{- if not $text -}}
-  {{- warnf "sidenote shortcode: empty sidenote in %s" .Position -}}
-{{- end -}}
-{{- /* Inline Markdown; the HTML of nested shortcodes is kept as is. */ -}}
-{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "text" $text "where" (printf "%s shortcode in %v" .Name .Position)) -}}
-{{- /* A span cannot hold paragraphs: turn paragraph breaks into <br>. */ -}}
-{{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
-{{- $id := partial "func/note-id.html" .Page -}}
-<label for="sn-{{ $id }}" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-{{ $id }}" class="margin-toggle"/><span class="sidenote">{{ $html | safeHTML }}</span>
-{{- /* no trailing newline */ -}}
+{{- $out := printf `<label for="sn-%s" class="margin-toggle sidenote-number"%s></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote"%s>%s</span><i class="sn-end" hidden></i>` $id $labelAttrs $id $spanAttrs $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

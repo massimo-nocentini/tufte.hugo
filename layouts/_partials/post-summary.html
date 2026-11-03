@@ -2,17 +2,32 @@
   One entry of a list page. A div (not an article: tufte.css pads every
   article) holding a <section>, so the summary paragraphs are direct children
   of a section and get the text column width and working sidenotes.
+  The summary HTML is cached per page (it resolves numbers and cross
+  references against the full page, tufte/postprocess.html), so a page
+  listed on several pagers renders it once.
+  Each summary restarts the sidenote counter (theme.css resets it on
+  div.post-summary) at the number its first body note has on the page
+  itself: the book offset (tufte/offsets.html, chapters of a continuous
+  book) plus the title-block \thanks notes the summary does not show
+  (tufte/counts.html .thanks), the same start tufte/labels.html uses, so a
+  summary's notes and the xrefs to them show the page's numbers.
   Takes: the listed page.
 */ -}}
-<div class="post-summary">
+{{- $snStart := 0 -}}
+{{- with (partialCached "tufte/offsets.html" . (or .RelPermalink .Path)).sidenote }}{{ $snStart = int . }}{{ end -}}
+{{- with (partialCached "tufte/counts.html" . (or .RelPermalink .Path)).thanks }}{{ $snStart = add $snStart (int .) }}{{ end }}
+<div class="post-summary"{{ if gt $snStart 0 }} style="{{ printf "counter-reset: sidenote-counter %d" $snStart | safeCSS }}"{{ end }}>
   <section>
-    <h2 class="post-summary-title"><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></h2>
+    {{- /* A page with build.render = never has no URL: no links to it. */}}
+    {{- /* Markdown in the title is rendered, as in the h1. */}}
+    {{- $title := partial "tufte/title-html.html" (dict "page" .) }}
+    <h2 class="post-summary-title">{{ with .RelPermalink }}<a href="{{ . }}">{{ $title }}</a>{{ else }}{{ $title }}{{ end }}</h2>
     {{- with .Params.subtitle }}
     <p class="subtitle">{{ . }}</p>
     {{- end }}
     {{ partial "post-meta.html" . }}
-    {{ partial "func/content.html" (dict "page" . "summary" true) }}
-    {{- if and .Truncated (ne site.Params.readMore false) }}
+    {{ partialCached "func/content.html" (dict "page" . "summary" true) (or .RelPermalink .Path) true }}
+    {{- if and .Truncated .RelPermalink (ne site.Params.readMore false) }}
     <p class="read-more"><a href="{{ .RelPermalink }}">{{ T "readMore" }}&nbsp;&rarr;</a></p>
     {{- end }}
   </section>

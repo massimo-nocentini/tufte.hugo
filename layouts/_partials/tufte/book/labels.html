@@ -1,0 +1,65 @@
+{{- /*
+  Book-wide label map (SPEC-LATEX §6.4, R11): the merge of
+  tufte/labels.html entries over the book root, its parts and its
+  chapters (reading order). Labels are global within a book: an xref that
+  misses on its own page looks here. Each entry carries its page.
+
+  The first definition wins; the same explicit label in two pages gives one
+  tufte-duplicate-label warning (this partial is cached, so it is warned
+  once per build). Same ranks as tufte/labels.html: heading ids (they
+  repeat across chapters: "introduction", …) < \label anchors < the rest;
+  a higher rank wins silently, headings never conflict.
+
+  Takes: the book root page.
+  Returns: map normalised key → entry dict (see tufte/labels.html).
+  Callers: partialCached "tufte/book/labels.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- /* Memoized in the root's Store (not in hugo server): see
+       tufte/opts.html. Every chapter's xrefs read it. */ -}}
+{{- $memoRes := false -}}
+{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoBookLabels") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $root := . -}}
+{{- $pages := slice $root -}}
+{{- range partialCached "tufte/book/parts.html" $root (or $root.RelPermalink $root.Path) -}}
+  {{- $pages = $pages | append .Page -}}
+{{- end -}}
+{{- range partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
+  {{- $pages = $pages | append .Page -}}
+{{- end -}}
+{{- $ranks := dict "heading" 0 "label" 1 -}}
+{{- $E := newScratch -}}
+{{- $E.Set "e" dict -}}
+{{- $dups := slice -}}
+{{- range $pages -}}
+  {{- $L := partialCached "tufte/labels.html" . (or .RelPermalink .Path) -}}
+  {{- range $k, $v := $L.entries -}}
+    {{- $old := index ($E.Get "e") $k -}}
+    {{- $rank := 2 -}}
+    {{- if isset $ranks $v.kind }}{{ $rank = index $ranks $v.kind }}{{ end -}}
+    {{- $oldRank := 0 -}}
+    {{- with $old -}}
+      {{- $oldRank = 2 -}}
+      {{- if isset $ranks .kind }}{{ $oldRank = index $ranks .kind }}{{ end -}}
+    {{- end -}}
+    {{- if not $old -}}
+      {{- $E.SetInMap "e" $k $v -}}
+    {{- else if gt $rank $oldRank -}}
+      {{- $E.SetInMap "e" $k $v -}}
+    {{- else if and (eq $rank $oldRank) (gt $rank 0) (ne $old.page $v.page) -}}
+      {{- $at := $v.page.RelPermalink -}}
+      {{- with $v.page.File }}{{ $at = .Path }}{{ end -}}
+      {{- $dups = $dups | append (printf "%s (%s)" $k $at) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- with $dups -}}
+  {{- $at := $root.RelPermalink -}}
+  {{- with $root.File }}{{ $at = .Path }}{{ end -}}
+  {{- warnidf "tufte-duplicate-label" "tufte.hugo: duplicate label(s) across the book %s: %s (the first one in reading order wins)" $at (delimit . ", ") -}}
+{{- end -}}
+{{- $memoRes = $E.Get "e" -}}
+{{- if not hugo.IsServer }}{{ $root.Store.Set "tufteMemoBookLabels" (dict "v" $memoRes) }}{{ end -}}
+{{- end -}}
+{{- return $memoRes -}}

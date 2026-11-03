@@ -1,0 +1,55 @@
+{{- /*
+  The full title page of a book (\maketitlepage): author, title and
+  publisher in sans-serif capitals, as tufte-book prints it.
+
+    <header class="title-page"><p class="title-page-author allcaps sans">AUTHOR</p><h1 class="title-page-title allcaps sans">TITLE[THANKS]</h1>[<p class="title-page-subtitle">…</p>]<p class="title-page-publisher allcaps sans">PUBLISHER</p></header>
+
+  AUTHOR: front matter `author` of the book root (string, list of strings
+  or list of {name, thanks}), else params.author.name. THANKS: `thanks`
+  (string or list) as sidenotes in the h1 marked "*" (data-number), which
+  do not step the sidenote counter: \maketitlepage prints \thanklesstitle
+  (tufte-common.def), so in tufte-book the title-page \thanks takes no
+  footnote number and the first note of the book is 1. tufte/counts.html
+  leaves them out of the count accordingly. PUBLISHER: `publisher`
+  (inline Markdown, like the title).
+
+  Takes: the book root page.
+*/ -}}
+{{- $p := . -}}
+{{- $authors := slice -}}
+{{- with $p.Params.author -}}
+  {{- if reflect.IsSlice . }}{{ $authors = . }}{{ else }}{{ $authors = slice . }}{{ end -}}
+{{- else -}}
+  {{- with (partial "func/site-author.html" .).name }}{{ $authors = slice . }}{{ end -}}
+{{- end -}}
+{{- $names := slice -}}
+{{- range $authors -}}
+  {{- if reflect.IsMap . }}{{ with .name }}{{ $names = $names | append (printf "%v" .) }}{{ end }}{{ else }}{{ $names = $names | append (printf "%v" .) }}{{ end -}}
+{{- end -}}
+{{- $author := "" -}}
+{{- $n := len $names -}}
+{{- range $i, $a := $names -}}
+  {{- if eq $i 0 }}{{ $author = $a }}{{ else if eq $i (sub $n 1) }}{{ $author = printf "%s %s %s" $author (T "and") $a }}{{ else }}{{ $author = printf "%s, %s" $author $a }}{{ end -}}
+{{- end -}}
+{{- $thanks := slice -}}
+{{- with $p.Params.thanks -}}
+  {{- if reflect.IsSlice . }}{{ $thanks = . }}{{ else }}{{ $thanks = slice . }}{{ end -}}
+{{- end -}}
+{{- $notes := "" -}}
+{{- range $thanks -}}
+  {{- with . -}}
+    {{- $id := partial "func/note-id.html" $p -}}
+    {{- $text := $p.RenderString (printf "%v" .) | string | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" -}}
+    {{- $notes = printf `%s<label for="sn-%s" class="margin-toggle sidenote-number" data-number="*"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote" data-number="*">%s</span>` $notes $id $id $text -}}
+  {{- end -}}
+{{- end -}}
+{{- $title := $p.Title -}}
+{{- $titleHTML := htmlEscape $title -}}
+{{- if findRE "[`*_~$\\\\\\['\"]|--|\\.\\.\\." $title 1 }}{{ $titleHTML = $p.RenderString $title | string }}{{ end }}
+<header class="title-page">
+  {{- with $author }}<p class="title-page-author allcaps sans">{{ . }}</p>{{ end }}
+  <h1 class="title-page-title allcaps sans">{{ $titleHTML | safeHTML }}{{ $notes | safeHTML }}</h1>
+  {{- with $p.Params.subtitle }}<p class="title-page-subtitle">{{ . }}</p>{{ end }}
+  {{- with $p.Params.publisher }}<p class="title-page-publisher allcaps sans">{{ $p.RenderString (printf "%v" .) }}</p>{{ end }}
+</header>
+{{- /* no trailing newline */ -}}

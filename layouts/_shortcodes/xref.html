@@ -1,0 +1,47 @@
+{{- /*
+  Cross-reference (inline; \ref, \nameref, \pageref, Figure~\ref):
+
+    see {{< xref "fig:helix" >}}                → 3
+    {{< xref "fig:helix" "full" >}}             → Figure 3
+    {{< xref "sec:sidenotes" "name" >}}         → Sidenotes
+    {{< xref "err:floats" "page" >}}            → the section (handout) or chapter it is in
+    {{< xref ref="ch:intro" fmt="full" >}}      named form
+    {{< xref "/books/b/intro#fig:x" >}}         a key in another page (path#key)
+
+  REF is a key ("fig:x" and "fig-x" are the same key) defined by a label
+  param, a {#id} attribute, a heading id, a label shortcode or a chapter's
+  front matter `label`. Inside a book, keys of every chapter are found.
+  FMT: auto (default: the number, else the name) | num | full ("Figure 3",
+  "Section 2", "note 7") | name | page | eq ("(3)").
+
+  Output: a marker resolved by tufte/postprocess.html (SPEC-LATEX §3.0.1):
+    <a class="xref" data-ref="REF" data-fmt="FMT" href="#KEY">REF</a>
+*/ -}}
+{{- $ref := "" -}}{{- $fmt := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $ref = printf "%v" (.Get "ref" | default "") -}}
+  {{- $fmt = printf "%v" (.Get "fmt" | default "") -}}
+{{- else -}}
+  {{- $ref = printf "%v" (.Get 0 | default "") -}}
+  {{- $fmt = printf "%v" (.Get 1 | default "") -}}
+{{- end -}}
+{{- $ref = strings.TrimSpace $ref -}}
+{{- $fmt = lower (strings.TrimSpace $fmt) | default "auto" -}}
+{{- if not $ref -}}
+  {{- errorf "xref shortcode: a key is required, e.g. {{< xref \"fig:x\" >}} (%s)" .Position -}}
+{{- end -}}
+{{- if not (in (slice "auto" "num" "full" "name" "page" "eq") $fmt) -}}
+  {{- warnidf "tufte-bad-option" "xref shortcode: fmt must be auto, num, full, name, page or eq, not %q; using auto (%s)" $fmt .Position -}}
+  {{- $fmt = "auto" -}}
+{{- end -}}
+{{- $path := "" -}}
+{{- $key := $ref -}}
+{{- with findRESubmatch `^([^#]*)#(.*)$` $ref 1 -}}
+  {{- $path = index . 0 1 -}}
+  {{- $key = index . 0 2 -}}
+{{- end -}}
+{{- $key = partial "tufte/key.html" $key -}}
+{{- $dataRef := $key -}}
+{{- with $path }}{{ $dataRef = printf "%s#%s" . $key }}{{ end -}}
+{{- $out := printf `<a class="xref" data-ref="%s" data-fmt="%s" href="#%s">%s</a>` (htmlEscape $dataRef) $fmt (htmlEscape $key) (htmlEscape $ref) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

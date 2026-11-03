@@ -1,0 +1,28 @@
+{{- /*
+  Equation reference (inline; \eqref): {{< eqref "eq:euler" >}} → (3).
+  Positional: the key; or named: ref="eq:euler". Same as
+  {{< xref "eq:euler" "eq" >}}.
+
+  Output: <a class="xref" data-ref="KEY" data-fmt="eq" href="#KEY">REF</a>
+*/ -}}
+{{- $ref := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $ref = printf "%v" (.Get "ref" | default "") -}}
+{{- else -}}
+  {{- $ref = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- $ref = strings.TrimSpace $ref -}}
+{{- if not $ref -}}
+  {{- errorf "eqref shortcode: a key is required, e.g. {{< eqref \"eq:x\" >}} (%s)" .Position -}}
+{{- end -}}
+{{- $path := "" -}}
+{{- $key := $ref -}}
+{{- with findRESubmatch `^([^#]*)#(.*)$` $ref 1 -}}
+  {{- $path = index . 0 1 -}}
+  {{- $key = index . 0 2 -}}
+{{- end -}}
+{{- $key = partial "tufte/key.html" $key -}}
+{{- $dataRef := $key -}}
+{{- with $path }}{{ $dataRef = printf "%s#%s" . $key }}{{ end -}}
+{{- $out := printf `<a class="xref" data-ref="%s" data-fmt="eq" href="#%s">%s</a>` (htmlEscape $dataRef) (htmlEscape $key) (htmlEscape $ref) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

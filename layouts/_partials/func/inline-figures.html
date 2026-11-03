@@ -16,23 +16,34 @@
     a margin figure ({.margin}): label, input and span.marginnote around
     the image, with or without its <p>                 → <img …/> CAPTION
 
-  A linked image keeps its <a>. Figures of any other shape (for example an
-  iframe wrapper) are left alone.
+  The caption loses its "Figure N:" label (README: an image in a note is
+  a plain inline image whose title follows it as text).
+
+  A linked image keeps its <a> (also a linked stand-alone image, whose link
+  render-link.html moved inside the figure; its tufte-block markers are
+  removed here), and an unnumbered labelled float its tufte-float marker.
+  Figures of any other shape (for example an iframe wrapper) are left
+  alone.
 
   Takes: the HTML (string or template.HTML).
   Returns: the HTML string.
 */ -}}
 {{- $html := string . -}}
-{{- $img := `((?:<a [^>]*>)?<img [^>]*/>(?:</a>)?)` -}}
-{{- $note := `<label for="mn-[^"]*" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-[^"]*" class="margin-toggle"/><span class="marginnote[^"]*">` -}}
+{{- if strings.Contains $html `<i class="tufte-block` -}}
+  {{- $html = replaceRE `<i class="tufte-block(?:-end)?" hidden></i>` "" $html -}}
+{{- end -}}
+{{- $img := `((?:<i class="tufte-float"[^>]*></i>)?(?:<a [^>]*>)?<img [^>]*/>(?:</a>)?)` -}}
+{{- /* Figures from tufte/figure.html may carry an anchor before the note. */ -}}
+{{- $note := `<label for="mn-[^"]*" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-[^"]*" class="margin-toggle"/><span class="marginnote[^"]*"[^>]*>` -}}
 {{- if strings.Contains $html "<figure" -}}
-  {{- /* Groups: 1 margin-note caption, 2 image, 3 figcaption. */ -}}
-  {{- $figRE := printf `(?s)^<figure[^>]*>(?:%s(.*)</span>)?%s(?:<figcaption>(.*)</figcaption>)?</figure>$` $note $img -}}
+  {{- /* Groups: 1 figcaption before the image (caption-bottom), 2 margin-note
+         caption, 3 image, 4 figcaption. */ -}}
+  {{- $figRE := printf `(?s)^<figure[^>]*>(?:<figcaption[^>]*>(.*)</figcaption>)?(?:%s(.*)</span>)?%s(?:<figcaption[^>]*>(.*)</figcaption>)?</figure>$` $note $img -}}
   {{- range findRE `(?s)<figure[^>]*>.*?</figure>` $html -}}
     {{- with findRESubmatch $figRE . 1 -}}
       {{- $m := index . 0 -}}
-      {{- $new := index $m 2 -}}
-      {{- with strings.TrimSpace (printf "%s%s" (index $m 1) (index $m 3)) -}}
+      {{- $new := index $m 3 -}}
+      {{- with strings.TrimSpace (printf "%s%s%s" (index $m 1) (index $m 2) (index $m 4)) -}}
         {{- $new = printf "%s %s" $new . -}}
       {{- end -}}
       {{- $html = replace $html (index $m 0) $new 1 -}}
@@ -42,7 +53,16 @@
 {{- if strings.Contains $html `class="marginnote` -}}
   {{- /* Margin figure: in its <p>, or alone (the <p> already trimmed). */ -}}
   {{- $html = replaceRE (printf `(?s)<p[^>]*>%s%s(.*?)</span></p>` $note $img) "$1 $2" $html -}}
-  {{- $html = replaceRE (printf `(?s)^\s*%s%s(.*)</span>\s*$` $note $img) "$1 $2" $html -}}
+  {{- $html = replaceRE (printf `(?s)^\s*(?:<span id="[^"]*" class="tufte-anchor"></span>)?%s%s(.*)</span>\s*$` $note $img) "$1 $2" $html -}}
   {{- $html = strings.TrimSpace $html -}}
+{{- end -}}
+{{- /* An image in running text is never a numbered float: the caption
+       label and number token of an unwrapped figure go (they would show
+       "Figure N:" in the note, take a figure number and give the lists of
+       figures a link to an anchor that no longer exists); its title stays
+       as plain text. */ -}}
+{{- if strings.Contains $html `<span class="caption-label">` -}}
+  {{- $html = replaceRE `<span class="caption-label">[^<]*<span class="tufte-num"[^>]*></span>:</span> ?` "" $html -}}
+  {{- $html = replaceRE `(?s)<span class="caption-text">(.*?)</span><i class="cap-end" hidden></i>` "$1" $html -}}
 {{- end -}}
 {{- return $html -}}

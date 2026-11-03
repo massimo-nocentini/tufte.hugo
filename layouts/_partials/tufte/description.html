@@ -1,0 +1,52 @@
+{{- /*
+  The plain-text description of a page built from its summary, for
+  <meta name="description"> and the OpenGraph/Twitter fallbacks.
+
+  It starts from the processed summary (func/content.html with "summary"
+  true: numbers and cross-references resolved, placeholders removed), then
+  drops whole elements that are not part of the running text, so their
+  words do not run into the sentence:
+    - sidenotes, margin notes, margin blocks, citation blocks
+      (span/div with class sidenote, marginnote or citation-block, nested
+      spans included),
+    - margin toggles (label: the ⊕ of margin notes) and their checkboxes,
+    - heading anchors (a.heading-anchor: "#"), footnote references
+      (sup.footnote-ref), the MathML copy of KaTeX output (span.katex-mathml),
+    - embedded media: <video>, <audio>, <iframe> and <object> elements (the
+      video shortcode's fallback link names the file: "flow.mp4").
+  The rest is plainified, whitespace is collapsed and the text is cut at
+  160 characters.
+
+  Takes: the page.
+  Returns: a string ("" when the page has no summary text).
+*/ -}}
+{{- $p := . -}}
+{{- $html := string (partialCached "func/content.html" (dict "page" $p "summary" true) (or $p.RelPermalink $p.Path) true) -}}
+{{- $skipRE := `^<(span|div|label|a|sup)\s[^>]*class="(?:sidenote|marginnote|citation-block|margin-toggle|heading-anchor|footnote-ref|katex-mathml)\b` -}}
+{{- $out := "" -}}
+{{- $tag := "" -}}
+{{- $depth := 0 -}}
+{{- range findRE `<[^>]*>|[^<]+` $html -}}
+  {{- if $tag -}}
+    {{- if findRE (printf `^<%s[\s>]` $tag) . 1 -}}
+      {{- $depth = add $depth 1 -}}
+    {{- else if eq . (printf "</%s>" $tag) -}}
+      {{- $depth = sub $depth 1 -}}
+      {{- if le $depth 0 }}{{ $tag = "" }}{{ end -}}
+    {{- end -}}
+  {{- else if strings.HasPrefix . "<input " -}}
+    {{- /* checkbox of a margin toggle: dropped */ -}}
+  {{- else if or (findRE $skipRE . 1) (findRE `^<(?:video|audio|iframe|object)[\s>]` . 1) -}}
+    {{- $tag = replaceRE `^<([a-z]+)[\s\S]*$` "$1" . -}}
+    {{- $depth = 1 -}}
+  {{- else -}}
+    {{- /* Block boundaries become spaces, so paragraphs do not run together. */ -}}
+    {{- if findRE `^</?(p|li|h[1-6]|div|br|blockquote|figure|figcaption|td|th|tr)\b` . 1 -}}
+      {{- $out = printf "%s " $out -}}
+    {{- else -}}
+      {{- $out = printf "%s%s" $out . -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $out = $out | plainify | htmlUnescape | replaceRE `\s+` " " | strings.TrimSpace -}}
+{{- return ($out | truncate 160) -}}

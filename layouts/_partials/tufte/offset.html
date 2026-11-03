@@ -1,0 +1,52 @@
+{{- /*
+  Validates a LaTeX-style vertical offset (\sidenote[][offset],
+  \marginnote[offset], \caption[][offset], \cite[offset]) and returns the
+  value of a style attribute (SPEC-LATEX §3.0.3).
+
+  Accepted: ^-?(0|[0-9]*\.?[0-9]+(px|rem|em|ex|pt|pc|in|cm|mm|bl))$
+    "1.5rem" → --tufte-offset:1.5rem
+    "-2bl"   → --tufte-offset:calc(-2 * 2rem)    (bl = one body \baselineskip)
+    "0"      → --tufte-offset:0px
+  "lh" is not accepted on purpose (it would be the note's own line height).
+  Anything else gives warnidf "tufte-bad-offset" and "".
+
+  Takes: the offset string, or a dict
+    value  the offset string
+    page   the page (used in the warning)
+    where  optional extra position text for the warning
+  Returns: safeCSS ("--tufte-offset:…") or "" (empty input or invalid).
+  Safe to emit as a style value: the regex is a whitelist.
+*/ -}}
+{{- $v := . -}}
+{{- $page := false -}}
+{{- $where := "" -}}
+{{- if reflect.IsMap . -}}
+  {{- $v = .value -}}
+  {{- with .page }}{{ $page = . }}{{ end -}}
+  {{- $where = .where | default "" -}}
+{{- end -}}
+{{- $s := "" -}}
+{{- if ne $v nil -}}
+  {{- $s = trim (printf "%v" $v) " " -}}
+{{- end -}}
+{{- $out := "" -}}
+{{- if $s -}}
+  {{- if findRE `^-?(0|[0-9]*\.?[0-9]+(px|rem|em|ex|pt|pc|in|cm|mm|bl))$` $s 1 -}}
+    {{- $val := $s -}}
+    {{- if eq $s "0" "-0" -}}
+      {{- $val = "0px" -}}
+    {{- else if strings.HasSuffix $s "bl" -}}
+      {{- $val = printf "calc(%s * 2rem)" (strings.TrimSuffix "bl" $s) -}}
+    {{- end -}}
+    {{- $out = printf "--tufte-offset:%s" $val -}}
+  {{- else -}}
+    {{- $at := "" -}}
+    {{- with $page -}}
+      {{- with .File }}{{ $at = .Path }}{{ else }}{{ $at = $page.RelPermalink }}{{ end -}}
+    {{- end -}}
+    {{- with $where }}{{ $at = printf "%s %s" $at . }}{{ end -}}
+    {{- with $at }}{{ $at = printf " in %s" . }}{{ end -}}
+    {{- warnidf "tufte-bad-offset" "tufte.hugo: invalid offset %q (use e.g. \"-2bl\", \"1.5rem\", \"10px\")%s" $s $at -}}
+  {{- end -}}
+{{- end -}}
+{{- return (safeCSS $out) -}}

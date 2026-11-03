@@ -1,0 +1,37 @@
+{{- /*
+  The opening epigraphs of a book (\openepigraph, before the title page):
+  front matter `epigraphs` of the book root, a list of
+  {quote, author, work}; quote is Markdown.
+
+    <section class="open-epigraphs"><div class="epigraph open-epigraph"><blockquote><p>QUOTE</p><footer>AUTHOR[, <cite>WORK</cite>]</footer></blockquote></div>…</section>
+
+  Takes: the book root page.
+*/ -}}
+{{- $p := . -}}
+{{- $list := $p.Params.epigraphs -}}
+{{- if and $list (not (reflect.IsSlice $list)) }}{{ $list = slice $list }}{{ end -}}
+{{- $items := slice -}}
+{{- range $list -}}
+  {{- $quote := "" }}{{ $author := "" }}{{ $work := "" -}}
+  {{- if reflect.IsMap . -}}
+    {{- $quote = printf "%v" (.quote | default "") -}}
+    {{- $author = printf "%v" (.author | default "") -}}
+    {{- $work = printf "%v" (.work | default "") -}}
+  {{- else -}}
+    {{- $quote = printf "%v" . -}}
+  {{- end -}}
+  {{- if strings.TrimSpace $quote -}}
+    {{- $q := $p.RenderString (dict "display" "block") $quote | string | strings.TrimSpace -}}
+    {{- $footer := "" -}}
+    {{- with $author }}{{ $footer = $p.RenderString . | string }}{{ end -}}
+    {{- with $work -}}
+      {{- $c := printf "<cite>%s</cite>" ($p.RenderString . | string) -}}
+      {{- $footer = cond (ne $footer "") (printf "%s, %s" $footer $c) $c -}}
+    {{- end -}}
+    {{- with $footer }}{{ $footer = printf "<footer>%s</footer>" . }}{{ end -}}
+    {{- $items = $items | append (printf `<div class="epigraph open-epigraph"><blockquote>%s%s</blockquote></div>` $q $footer) -}}
+  {{- end -}}
+{{- end -}}
+{{- with $items }}
+<section class="open-epigraphs">{{ delimit . "" | safeHTML }}</section>
+{{- end -}}

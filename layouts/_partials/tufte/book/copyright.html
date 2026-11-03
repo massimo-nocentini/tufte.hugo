@@ -1,0 +1,91 @@
+{{- /*
+  The copyright page of a book (the verso of the title page in
+  sample-book.tex): front matter `copyrightPage` of the book root.
+
+  - a string: Markdown, rendered as blocks:
+      <section class="copyright-page">BLOCKS</section>
+  - a map {year, holder, publisher, url, license, printing}:
+      <section class="copyright-page"><p>Copyright &copy; YEAR HOLDER</p><p class="smallcaps">Published by PUBLISHER</p><p class="smallcaps">URL</p><p>LICENSE</p><p><em>PRINTING</em></p></section>
+    Defaults: holder = the book author; publisher = publisherPlain (plain
+    text), else publisher (Markdown, like copyrightPage.publisher); year = the year of the root's date (else the build year);
+    printing = "First printing, MONTH YEAR" from the root's date (none
+    without a date; `printing: false` removes it). license is Markdown;
+    url is printed as given and linked when it has an http(s) scheme
+    (<a class="url" href="URL">URL without scheme</a>: class url keeps
+    the print stylesheet from repeating the address after it).
+
+  Takes: the book root page.
+*/ -}}
+{{- $p := . -}}
+{{- with $p.Params.copyrightpage -}}
+  {{- if reflect.IsMap . -}}
+    {{- $m := . -}}
+    {{- /* Holder: the book author(s). */ -}}
+    {{- $names := slice -}}
+    {{- $authors := slice -}}
+    {{- with $p.Params.author -}}
+      {{- if reflect.IsSlice . }}{{ $authors = . }}{{ else }}{{ $authors = slice . }}{{ end -}}
+    {{- else -}}
+      {{- with (partial "func/site-author.html" .).name }}{{ $authors = slice . }}{{ end -}}
+    {{- end -}}
+    {{- range $authors -}}
+      {{- if reflect.IsMap . }}{{ with .name }}{{ $names = $names | append (printf "%v" .) }}{{ end }}{{ else }}{{ $names = $names | append (printf "%v" .) }}{{ end -}}
+    {{- end -}}
+    {{- $holder := "" -}}
+    {{- $n := len $names -}}
+    {{- range $i, $a := $names -}}
+      {{- if eq $i 0 }}{{ $holder = $a }}{{ else if eq $i (sub $n 1) }}{{ $holder = printf "%s %s %s" $holder (T "and") $a }}{{ else }}{{ $holder = printf "%s, %s" $holder $a }}{{ end -}}
+    {{- end -}}
+    {{- with $m.holder }}{{ $holder = printf "%v" . }}{{ end -}}
+    {{- $year := now.Year -}}
+    {{- if not $p.Date.IsZero }}{{ $year = $p.Date.Year }}{{ end -}}
+    {{- with $m.year }}{{ $year = . }}{{ end -}}
+    {{- /* Publisher: copyrightPage.publisher, else publisherPlain (plain
+           text), else publisher; the first and the last are Markdown,
+           rendered inline. */ -}}
+    {{- $publisher := "" -}}
+    {{- $pubMD := "" -}}
+    {{- with $m.publisher -}}
+      {{- $pubMD = printf "%v" . -}}
+    {{- else -}}
+      {{- with $p.Params.publisherplain -}}
+        {{- $publisher = htmlEscape (printf "%v" .) -}}
+      {{- else -}}
+        {{- with $p.Params.publisher }}{{ $pubMD = printf "%v" . }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- with $pubMD -}}
+      {{- $publisher = $p.RenderString . | string | strings.TrimSpace -}}
+    {{- end -}}
+    {{- $printing := "" -}}
+    {{- if not $p.Date.IsZero -}}
+      {{- $printing = printf "%s, %s" (T "firstPrinting") (time.Format "January 2006" $p.Date) -}}
+    {{- end -}}
+    {{- if isset $m "printing" -}}
+      {{- if eq $m.printing false }}{{ $printing = "" }}{{ else }}{{ $printing = printf "%v" $m.printing }}{{ end -}}
+    {{- end }}
+<section class="copyright-page">
+  <p>{{ T "copyright" }} &copy; {{ $year }}{{ with $holder }} {{ . }}{{ end }}</p>
+  {{- with $publisher }}
+  <p class="smallcaps">{{ T "publishedBy" }} {{ . | safeHTML }}</p>
+  {{- end }}
+  {{- with $m.url }}
+  {{- $u := printf "%v" . }}
+  {{- if findRE `^https?://` $u 1 }}
+  <p class="smallcaps"><a class="url" href="{{ $u }}">{{ replaceRE `^https?://` "" $u }}</a></p>
+  {{- else }}
+  <p class="smallcaps">{{ $u }}</p>
+  {{- end }}
+  {{- end }}
+  {{- with $m.license }}
+  <p>{{ $p.RenderString (printf "%v" .) }}</p>
+  {{- end }}
+  {{- with $printing }}
+  <p><em>{{ . }}</em></p>
+  {{- end }}
+</section>
+  {{- else -}}
+    {{- $html := $p.RenderString (dict "display" "block") (printf "%v" .) | string | strings.TrimSpace }}
+<section class="copyright-page">{{ $html | safeHTML }}</section>
+  {{- end -}}
+{{- end -}}

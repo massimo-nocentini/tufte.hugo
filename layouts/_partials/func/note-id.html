@@ -6,7 +6,7 @@
   partial, so the ids never collide, not even on list pages that show the
   summaries of several pages.
 
-  The id is "<first 6 chars of md5 of .RelPermalink>-<n>", where n is a
+  The id is "<first 6 chars of md5 of (or .RelPermalink .Path)>-<n>", where n is a
   per-page counter kept in .Store under the key "tufteNoteCounter".
   Callers prefix it with "sn-" (sidenote) or "mn-" (margin note).
 
@@ -20,5 +20,5 @@
        only grows, so each rendering gets strictly increasing ids. */ -}}
 {{- $page.Store.Add "tufteNoteCounter" 1 -}}
 {{- $n := int ($page.Store.Get "tufteNoteCounter") -}}
-{{- $hash := substr (md5 (printf "%s" $page.RelPermalink)) 0 6 -}}
+{{- $hash := substr (md5 (printf "%s" (or $page.RelPermalink $page.Path))) 0 6 -}}
 {{- return (printf "%s-%d" $hash $n) -}}

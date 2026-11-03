@@ -1,0 +1,92 @@
+{{- /*
+  The body of a book chapter: chapter head (tufte/title-block.html with the
+  chapter dict), abstract, optional page TOC, the content
+  (func/content.html) and the before/after_content hooks.
+
+  On the chapter's own page (chapter.html) it is placed inside
+  <article class="chapter" id="tufte-chapter">. In the whole-book print document
+  (list.print.html, `print` true) every chapter is one article of a single
+  HTML document, so the ids are made unique and the links turned into
+  in-document anchors:
+    - every id="X", for="X" and href="#X" gets the chapter prefix
+      (tufte-cN-X);
+    - links to any chapter of the book, href="REL#X" and href="REL", become
+      href="#tufte-cM-X" and href="#tufte-cM";
+    - the output is wrapped in
+      <article class="chapter matter-MATTER" id="tufte-cN" style="page: cN">,
+      cN being the CSS named page that carries the chapter's running head.
+  The ids are in the theme's tufte- namespace, so ids of the landing body
+  (headings, labels), which keep their names, cannot collide with them.
+
+  A chapter whose front matter sets `dedication` (Markdown) is a dedication
+  page placed among the chapters (sample-book.tex puts it after the lists
+  of figures and tables): instead of the chapter head it shows
+  <h1 class="visually-hidden">TITLE</h1> and the dedication markup of
+  tufte/book/dedication.html, then its content (usually none).
+
+  Takes: a dict with
+    page     the chapter page
+    root     the book root
+    chapter  optional: its dict from tufte/book/chapters.html
+    prefix   print only: the id prefix, "tufte-c<Index>"
+    print    true in the print document
+  Returns: template.HTML.
+*/ -}}
+{{- $p := .page -}}
+{{- $root := .root -}}
+{{- $print := .print | default false -}}
+{{- $chapters := partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
+{{- $ch := .chapter | default false -}}
+{{- if not $ch -}}
+  {{- range $chapters -}}
+    {{- if eq .Page $p }}{{ $ch = . }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $ch -}}
+  {{- $ch = dict "Page" $p "Matter" "main" "Numbered" false "Display" "" -}}
+{{- end -}}
+{{- $content := "" -}}
+{{- if $print -}}
+  {{- $content = partialCached "func/content.html" (dict "page" $p "summary" false "print" true) (or $p.RelPermalink $p.Path) false "print" -}}
+{{- else -}}
+  {{- $content = partialCached "func/content.html" $p (or $p.RelPermalink $p.Path) false -}}
+{{- end -}}
+{{- $head := "" -}}
+{{- if and $p.Params.dedication (ne $p $root) -}}
+  {{- $t := partial "tufte/plain-title.html" (dict "page" $p) -}}
+  {{- $head = printf `<h1 class="visually-hidden">%s</h1>%s` (htmlEscape $t) (partial "tufte/book/dedication.html" $p | string) -}}
+{{- else -}}
+  {{- $head = partial "tufte/title-block.html" (dict "page" $p "chapter" $ch "print" $print) | string -}}
+{{- end -}}
+{{- $html := printf "%s\n%s\n%s\n%s\n%s"
+  $head
+  (partial "toc.html" $p | string)
+  (partial "before_content.html" $p | string)
+  (string $content)
+  (partial "after_content.html" $p | string)
+-}}
+{{- if $print -}}
+  {{- $prefix := .prefix | default (printf "tufte-c%v" $ch.Index) -}}
+  {{- if not (findRE `^[A-Za-z][A-Za-z0-9_-]*$` $prefix 1) -}}
+    {{- errorf "tufte/book/chapter-body.html: invalid prefix %q" $prefix -}}
+  {{- end -}}
+  {{- $html = replace $html ` id="` (printf ` id="%s-` $prefix) -}}
+  {{- $html = replace $html ` for="` (printf ` for="%s-` $prefix) -}}
+  {{- $html = replaceRE `href="#([^"])` (printf `href="#%s-$1` $prefix) $html -}}
+  {{- /* Relative links (../other/#x) are resolved against the chapter's
+         own URL: the print document lives elsewhere (…/print.html). */ -}}
+  {{- $base := $p.RelPermalink -}}
+  {{- if not (strings.HasSuffix $base "/") }}{{ $base = path.Dir $base }}{{ end -}}
+  {{- range uniq (findRE `href="[^"#:/?][^"#:?]*` $html) -}}
+    {{- $rel := strings.TrimPrefix `href="` . -}}
+    {{- $abs := path.Join $base $rel -}}
+    {{- if or (strings.HasSuffix $rel "/") (eq $rel ".") (eq $rel "..") }}{{ $abs = printf "%s/" (strings.TrimSuffix "/" $abs) }}{{ end -}}
+    {{- $html = replace $html (printf `%s"` .) (printf `href="%s"` $abs) -}}
+    {{- $html = replace $html (printf `%s#` .) (printf `href="%s#` $abs) -}}
+  {{- end -}}
+  {{- $html = partial "tufte/book/print-links.html" (dict "html" $html "page" $p "root" $root) -}}
+  {{- $matter := $ch.Matter | default "main" -}}
+  {{- /* The named page (list.print.html's @page rules) is c<Index>. */ -}}
+  {{- $html = printf `<article class="chapter matter-%s" id="%s" style="page: c%v">%s%s</article>` (htmlEscape $matter) $prefix $ch.Index "\n" $html -}}
+{{- end -}}
+{{- return ($html | safeHTML) -}}

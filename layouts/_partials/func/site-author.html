@@ -1,0 +1,27 @@
+{{- /*
+  The site author, params.author, in either form:
+    [params.author]          name = "…", email = "…", url = "…"
+    [params]  author = "…"   (a plain name, as many other themes take it)
+  Takes: nothing (call it with any context).
+  Returns: a dict with name, email and url (strings, "" when unset).
+*/ -}}
+{{- $name := "" -}}
+{{- $email := "" -}}
+{{- $url := "" -}}
+{{- with site.Params.author -}}
+  {{- if reflect.IsMap . -}}
+    {{- with .name }}{{ $name = printf "%v" . }}{{ end -}}
+    {{- with .email }}{{ $email = printf "%v" . }}{{ end -}}
+    {{- with .url }}{{ $url = printf "%v" . }}{{ end -}}
+  {{- else if reflect.IsSlice . -}}
+    {{- /* A list: the names joined with ", ". */ -}}
+    {{- $names := slice -}}
+    {{- range . -}}
+      {{- if reflect.IsMap . }}{{ with .name }}{{ $names = $names | append (printf "%v" .) }}{{ end }}{{ else }}{{ with . }}{{ $names = $names | append (printf "%v" .) }}{{ end }}{{ end -}}
+    {{- end -}}
+    {{- $name = delimit $names ", " -}}
+  {{- else -}}
+    {{- $name = printf "%v" . -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "name" $name "email" $email "url" $url) -}}

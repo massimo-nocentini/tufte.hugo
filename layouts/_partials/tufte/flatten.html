@@ -1,0 +1,26 @@
+{{- /*
+  Flattens a nested option map into dotted lowercase keys:
+    {book: {numberChapters: true}, style: "latex"}
+      → {"book.numberchapters": true, "style": "latex"}
+  A nested map is walked, every other value (scalar or list) is a leaf. Nil
+  values are skipped (YAML `key: ~` counts as unset).
+
+  Takes a dict:
+    m       the map (anything else gives an empty map)
+    prefix  optional key prefix ("" at the top)
+  Returns: a map of dotted keys to leaf values.
+  Used by tufte/opts.html.
+*/ -}}
+{{- $out := dict -}}
+{{- if reflect.IsMap .m -}}
+  {{- $prefix := .prefix | default "" -}}
+  {{- range $k, $v := .m -}}
+    {{- $key := lower (printf "%s%v" $prefix $k) -}}
+    {{- if reflect.IsMap $v -}}
+      {{- $out = merge $out (partial "tufte/flatten.html" (dict "m" $v "prefix" (printf "%s." $key))) -}}
+    {{- else if ne $v nil -}}
+      {{- $out = merge $out (dict $key $v) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $out -}}

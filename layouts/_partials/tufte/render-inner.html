@@ -1,41 +1,125 @@
 {{- /*
-  Renders the inner text of a shortcode as Markdown while keeping the HTML
-  that is already in it (the output of nested shortcodes, e.g. a sidenote
-  inside a blockquote, or a figure inside fullwidth).
+  Renders the inner text of a shortcode as Markdown, keeping the HTML of
+  nested shortcodes (SPEC-LATEX §3.0.4).
 
-  With {{< >}} nesting, .Inner holds the rendered HTML of the nested
-  shortcodes. Rendered as is, Goldmark would drop that HTML when
-  markup.goldmark.renderer.unsafe = false. So every balanced run of HTML
-  tags (from an opening tag to its matching closing tag) is swapped for a
-  token, the rest is rendered with .Page.RenderString, and the tokens are
-  swapped back. Tags inside code spans and fenced code blocks are left
-  alone; autolinks (<https://…>, <me@example.com>) are not tags. A run that
-  starts with a block element (figure, div, blockquote, table, …) is put
-  in a paragraph of its own in block mode, and that paragraph is unwrapped
-  afterwards, so no <p><figure> is produced. In inline mode, a figure made
-  by the image render hook (an image alone in the text) is turned back into
-  a plain <img> by func/inline-figures.html.
+  Two mechanisms, both applied:
+  1. Nest tokens (the theme's own shortcodes): a nested theme shortcode
+     emits TUFTENEST<16 hex>END (tufte/nest.html) and stores its HTML in
+     .Page.Store "tufteNest". The token is plain ASCII, so Markdown leaves
+     it alone; after RenderString it is swapped back. A token alone in a
+     paragraph (<p>TOKEN</p>) is a block child and replaces the whole
+     paragraph.
+  2. Raw HTML runs, only with the opt-in option tufte.innerHTML = true
+     (for third-party shortcodes that print HTML inside a theme
+     shortcode): every balanced run of HTML tags in the inner text is
+     swapped for a placeholder before RenderString and restored
+     afterwards, so Goldmark does not drop it when
+     markup.goldmark.renderer.unsafe = false. Tags in code spans and
+     fenced code blocks are left alone; autolinks (<https://…>) are not
+     tags. In block mode a run that starts with a block element gets a
+     paragraph of its own, unwrapped afterwards. Off by default: raw HTML
+     an author types in a note then follows the site's Goldmark setting
+     (dropped, with the tufte-raw-html warning, when unsafe = false).
+
+  Escaped shortcodes (written with the comment-style escape): Hugo has
+  already turned them into literal shortcode text in .Inner; they are
+  escaped again before RenderString, so they stay literal text instead of
+  running.
+
+  Markdown footnotes referenced in the inner text ([^x]) would make a
+  nested Goldmark footnote list: they become real-footnote markers (as the
+  footnote shortcode emits), numbered and listed with the page's other
+  footnotes. A definition written elsewhere on the page (RenderString
+  cannot see it) is copied from the page source first; a reference with
+  no definition is warned (tufte-undefined-ref).
+
+  A shortcode inside a Markdown blockquote gets its inner text with the
+  enclosing quote's markers on each line: they are removed first (step 0).
+
+  Inline mode also turns a figure made by the image render hook back into
+  a plain <img> (func/inline-figures.html) and flattens paragraphs:
+  </p><p> → <br>, outer <p> removed (a note or caption is a <span>).
+  Block elements left after that (a list, code block, quote or table)
+  cannot sit in a <span>: tufte/inline-blocks.html turns them into
+  span[data-sn] (laid out as blocks by tufte-latex.css) and
+  "tufte-block-in-note" is warned, unless blocks = "keep".
+
+  If Goldmark still dropped HTML ("raw HTML omitted"), warnidf
+  "tufte-raw-html" with a hint.
 
   Takes a dict:
     page     the page (required)
-    text     the Markdown text (string)
+    inner    the Markdown text (string); "text" is accepted as an alias
     display  "inline" (default) or "block", passed to RenderString
-    where    optional position, used in the warning below
+    where    optional position text for warnings (e.g. .Position)
+    blocks   optional, inline mode: "keep" leaves block elements alone
+             (the footnote shortcode: its text goes to the footnote list)
+    shortcodes  optional: "run" when the text is not a shortcode's .Inner
+             (a caption= parameter, front-matter Markdown): shortcodes
+             written in it run, as RenderString does, instead of being
+             taken for escaped ones
 
   Returns: the HTML string.
 */ -}}
 {{- $page := .page -}}
-{{- $text := .text | default "" | string -}}
+{{- $text := "" -}}
+{{- if ne .inner nil -}}
+  {{- $text = string .inner -}}
+{{- else if ne .text nil -}}
+  {{- $text = string .text -}}
+{{- end -}}
 {{- $display := .display | default "inline" -}}
 {{- $isBlock := eq $display "block" -}}
 {{- $where := .where | default "" -}}
+{{- $keepBlocks := eq .blocks "keep" -}}
+{{- $at := "" -}}
+{{- with $page.File }}{{ $at = .Path }}{{ else }}{{ $at = $page.RelPermalink }}{{ end -}}
+{{- with $where }}{{ $at = printf "%s (%s)" $at . }}{{ end -}}
 {{- $void := slice "area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr" -}}
 {{- $blockTags := slice "address" "article" "aside" "blockquote" "details" "div" "dl" "fieldset" "figure" "footer" "form" "h1" "h2" "h3" "h4" "h5" "h6" "header" "hr" "nav" "ol" "p" "pre" "section" "table" "ul" -}}
 {{- $nameRE := `(?s)^</?([a-zA-Z][a-zA-Z0-9-]*).*$` -}}
 
+{{- /* 0. A shortcode inside a Markdown blockquote: Hugo passes .Inner with
+       the quote markers of the enclosing quote still on its lines
+       ("Text\n> more\n> " for a closing tag on a quoted line), so
+       RenderString would make a quote of its own. The markers are the
+       enclosing quote's when every line after the first starts with ">"
+       and either the last line holds nothing but markers (the prefix of the
+       closing tag's line, a block shortcode) or the first line has none (an
+       inline shortcode whose text runs over quoted lines). The common
+       number of markers is then removed from every line. A quote written
+       inside the shortcode (closing tag on a line of its own) ends with a
+       line of text or an empty line, and stays a quote. */ -}}
+{{- if and (strings.Contains $text "\n") (strings.Contains $text ">") -}}
+  {{- $lines := split $text "\n" -}}
+  {{- $restQ := true -}}
+  {{- $levels := 99 -}}
+  {{- range after 1 $lines -}}
+    {{- $q := replaceRE `^((?:[ \t]{0,3}>)*).*$` "$1" . -}}
+    {{- $n := strings.Count ">" $q -}}
+    {{- if eq $n 0 }}{{ $restQ = false }}{{ break }}{{ end -}}
+    {{- if lt $n $levels }}{{ $levels = $n }}{{ end -}}
+  {{- end -}}
+  {{- if $restQ -}}
+    {{- $last := index $lines (sub (len $lines) 1) -}}
+    {{- $firstQ := findRE `^[ \t]{0,3}>` (index $lines 0) 1 -}}
+    {{- if or (findRE `^(?:[ \t]*>)+[ \t]*$` $last 1) (and (not $isBlock) (not $firstQ)) -}}
+      {{- $strip := printf `^(?:[ \t]{0,3}>[ \t]?){1,%d}` $levels -}}
+      {{- $out := slice -}}
+      {{- range $lines }}{{ $out = $out | append (replaceRE $strip "" .) }}{{ end -}}
+      {{- $text = delimit $out "\n" -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* 1. Protect raw HTML runs. */ -}}
 {{- $md := $text -}}
 {{- $saved := slice -}}
+{{- $protect := false -}}
 {{- if strings.Contains $text "<" -}}
+  {{- $protect = partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $page "key" "innerhtml") (or $page.RelPermalink $page.Path) "innerhtml") -}}
+{{- end -}}
+{{- if $protect -}}
   {{- $md = "" -}}
   {{- /* Split the text into code (left alone), tags, plain text and single
          characters; the pieces concatenate back to the whole text. */ -}}
@@ -60,7 +144,7 @@
         {{- $depth = add $depth 1 -}}
       {{- end -}}
       {{- if eq $depth 0 -}}
-        {{- $tok := printf "%%%%TUFTEHTML%d%%%%" (len $saved) -}}
+        {{- $tok := printf "TUFTEHTML%dEND" (len $saved) -}}
         {{- $saved = $saved | append $run -}}
         {{- if and $isBlock $runIsBlock -}}
           {{- $md = printf "%s\n\n%s\n\n" $md $tok -}}
@@ -81,25 +165,165 @@
   {{- end -}}
 {{- end -}}
 
+{{- /* Escaped shortcodes: .Inner holds them as literal shortcode text
+       (real nested shortcodes are already rendered, or nest tokens).
+       RenderString would run them, and does not undo an escape: their
+       delimiters become ASCII tokens, restored as text after rendering. */ -}}
+{{- $scEsc := false -}}
+{{- if and (ne .shortcodes "run") (or (strings.Contains $md "{{<") (strings.Contains $md "{{%")) -}}
+  {{- $scEsc = true -}}
+  {{- $md = replaceRE `(?s)\{\{<(.*?)>\}\}` "TUFTESCLT${1}TUFTESCGT" $md -}}
+  {{- $md = replaceRE `(?s)\{\{%(.*?)%\}\}` "TUFTESCPO${1}TUFTESCPC" $md -}}
+{{- end -}}
+
+{{- /* Markdown footnote references whose definition is on the page, not
+       in the inner text ({{< fig >}}Caption[^c]{{< /fig >}} … [^c]: …):
+       RenderString cannot see the page's definitions (the reference would
+       print as "[^c]", and Goldmark drops the then unreferenced definition
+       from the page), so the definition is copied from the page source
+       after the inner text and handled below like one written there.
+       Code spans and fenced code are ignored. A reference with no
+       definition anywhere is warned (tufte-undefined-ref). */ -}}
+{{- if strings.Contains $md "[^" -}}
+  {{- $probe := $md | replaceRE "(?ms)^[ \\t]*```.*?^[ \\t]*```[^\\n]*$" "" | replaceRE "(?ms)^[ \\t]*~~~.*?^[ \\t]*~~~[^\\n]*$" "" | replaceRE "`[^`\\n]*`" "" -}}
+  {{- $labels := slice -}}
+  {{- range findRE `\[\^[^\]\s]+\]` $probe -}}
+    {{- $l := strings.TrimSuffix "]" (strings.TrimPrefix "[^" .) -}}
+    {{- if not (in $labels $l) }}{{ $labels = $labels | append $l }}{{ end -}}
+  {{- end -}}
+  {{- $src := "" -}}
+  {{- $defs := slice -}}
+  {{- range $l := $labels -}}
+    {{- $q := replaceRE `([.+*?()|\[\]{}^$\\])` `\$1` $l -}}
+    {{- $defRE := printf `^ {0,3}\[\^%s\]:` $q -}}
+    {{- if findRE (printf `(?m)%s` $defRE) $probe 1 }}{{ continue }}{{ end -}}
+    {{- if not $src -}}
+      {{- $src = string $page.RawContent | replaceRE "(?ms)^[ \\t]*```.*?^[ \\t]*```[^\\n]*$" "" | replaceRE "(?ms)^[ \\t]*~~~.*?^[ \\t]*~~~[^\\n]*$" "" -}}
+    {{- end -}}
+    {{- /* The definition: its line, indented continuation lines (blank
+           lines between them included) and lazy continuation lines. */ -}}
+    {{- $buf := "" -}}
+    {{- $on := false -}}
+    {{- $blank := false -}}
+    {{- range split $src "\n" -}}
+      {{- if not $on -}}
+        {{- if findRE $defRE . 1 }}{{ $on = true }}{{ $buf = . }}{{ end -}}
+      {{- else if not (strings.TrimSpace .) -}}
+        {{- $blank = true -}}
+      {{- else if findRE `^(?: {4}|\t)` . 1 -}}
+        {{- $buf = printf "%s%s%s" $buf (cond $blank "\n\n" "\n") . -}}
+        {{- $blank = false -}}
+      {{- else if and (not $blank) (not (findRE "^ {0,3}(?:\\[\\^|\\{\\{|#|<|>|[-*+] |\\d+[.)] |\\||```|~~~)" . 1)) -}}
+        {{- $buf = printf "%s\n%s" $buf . -}}
+      {{- else -}}
+        {{- break -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if $buf -}}
+      {{- $defs = $defs | append $buf -}}
+    {{- else -}}
+      {{- warnidf "tufte-undefined-ref" "tufte.hugo: footnote reference [^%s] with no definition ([^%s]: …) in %s" $l $l $at -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $defs -}}
+    {{- $md = printf "%s\n\n%s\n" (strings.TrimRight " \t\n" $md) (delimit . "\n\n") -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* 2. Render. */ -}}
 {{- $html := "" -}}
 {{- with strings.TrimSpace $md -}}
   {{- $html = $page.RenderString (dict "display" $display) . | string -}}
 {{- end -}}
-{{- /* Inline mode: an image alone in the text still reaches the image hook
-       as a block and becomes a <figure>, which cannot sit in the span of a
-       note or caption. Turn it back into a plain <img>. Only the Markdown
-       output is touched; the HTML of nested shortcodes is restored below. */ -}}
+{{- if $scEsc -}}
+  {{- $html = replace $html "TUFTESCLT" "{{&lt;" -}}
+  {{- $html = replace $html "TUFTESCGT" "&gt;}}" -}}
+  {{- $html = replace $html "TUFTESCPO" "{{%" -}}
+  {{- $html = replace $html "TUFTESCPC" "%}}" -}}
+{{- end -}}
+
+{{- /* Markdown footnotes defined in the inner text: Goldmark appended its
+       own list (<div class="footnotes" role="doc-endnotes">) to this
+       fragment. Each reference becomes a real-footnote marker (kept aside
+       as a token until the end, so the inline flattening below does not
+       touch its text) and the list goes. */ -}}
+{{- $fnSaved := slice -}}
+{{- $fnOpen := `<div class="footnotes" role="doc-endnotes">` -}}
+{{- if and (strings.Contains $html "footnote-ref") (strings.Contains $html $fnOpen) -}}
+  {{- $pieces := split $html $fnOpen -}}
+  {{- $block := index $pieces (sub (len $pieces) 1) -}}
+  {{- if findRE `(?s)</ol>\s*</div>\s*$` $block 1 -}}
+    {{- $html = delimit (first (sub (len $pieces) 1) $pieces) $fnOpen -}}
+    {{- $notes := dict -}}
+    {{- range after 1 (split $block `<li id="`) -}}
+      {{- $id := replaceRE `(?s)^([^"]*)".*$` "$1" . -}}
+      {{- $t := replaceRE `(?s)^[^"]*"[^>]*>` "" . -}}
+      {{- $t = replaceRE `(?s)</li>\s*(</ol>\s*</div>\s*)?$` "" $t -}}
+      {{- $t = replaceRE `(?s)(&#160;|&nbsp;|\s)*<a [^>]*class="footnote-backref"[^>]*>.*?</a>` "" $t | strings.TrimSpace -}}
+      {{- with $id }}{{ $notes = merge $notes (dict . $t) }}{{ end -}}
+    {{- end -}}
+    {{- $keys := dict -}}
+    {{- range findRE `<sup [^>]*>\s*<a [^>]*class="footnote-ref"[^>]*>[^<]*</a>\s*</sup>` $html -}}
+      {{- $ref := . -}}
+      {{- $target := replaceRE `(?s)^.*href="#([^"]+)".*$` "$1" $ref -}}
+      {{- if isset $notes $target -}}
+        {{- $key := index $keys $target -}}
+        {{- if not $key -}}
+          {{- $key = printf "s%s" (replaceRE `^.*-` "" (partial "func/note-id.html" $page)) -}}
+          {{- $keys = merge $keys (dict $target $key) -}}
+        {{- end -}}
+        {{- $tok := printf "TUFTEFNMARK%dEND" (len $fnSaved) -}}
+        {{- $fnSaved = $fnSaved | append (printf `<span class="tufte-fn" data-key="%s" hidden>%s</span>` $key (index $notes $target)) -}}
+        {{- $html = replace $html $ref $tok 1 -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* 3. Inline: no figures, no paragraphs (only the Markdown output is
+       touched; the HTML of nested shortcodes is restored below). */ -}}
 {{- if not $isBlock -}}
   {{- $html = partial "func/inline-figures.html" $html -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- if not $keepBlocks -}}
+    {{- $flat := partial "tufte/inline-blocks.html" $html -}}
+    {{- if ne $flat $html -}}
+      {{- $html = $flat -}}
+      {{- warnidf "tufte-block-in-note" "tufte.hugo: block content (a list, code block, quote or table) in inline text in %s: a note or caption is a <span>, so it is shown as inline blocks; use marginblock for margin material with blocks, or a real footnote ({{< footnote >}}, [^fn-x])" $at -}}
+    {{- end -}}
+  {{- end -}}
 {{- end -}}
+{{- range $i, $m := $fnSaved -}}
+  {{- $html = replace $html (printf "TUFTEFNMARK%dEND" $i) $m -}}
+{{- end -}}
+
+{{- /* 4. Restore raw HTML runs. */ -}}
 {{- range $i, $h := $saved -}}
-  {{- $tok := printf "%%%%TUFTEHTML%d%%%%" $i -}}
+  {{- $tok := printf "TUFTEHTML%dEND" $i -}}
   {{- if in $blockTags (replaceRE $nameRE "$1" $h | lower) -}}
     {{- $html = replace $html (printf "<p>%s</p>" $tok) $h -}}
   {{- end -}}
   {{- $html = replace $html $tok $h -}}
 {{- end -}}
-{{- if and $where (strings.Contains $html "raw HTML omitted") -}}
-  {{- warnf "tufte.hugo: raw HTML in the inner text was dropped by Goldmark (markup.goldmark.renderer.unsafe = false): %s" $where -}}
+
+{{- /* 5. Swap nest tokens (a few passes: stored HTML may itself hold
+       tokens when a middle shortcode printed its .Inner raw). */ -}}
+{{- if strings.Contains $html "TUFTENEST" -}}
+  {{- $map := $page.Store.Get "tufteNest" | default dict -}}
+  {{- range seq 4 -}}
+    {{- if strings.Contains $html "TUFTENEST" -}}
+      {{- range $tok := findRE `TUFTENEST[0-9a-f]{16}END` $html | uniq -}}
+        {{- $h := substr $tok 9 16 -}}
+        {{- with index $map $h -}}
+          {{- $html = replace $html (printf "<p>%s</p>" $tok) . -}}
+          {{- $html = replace $html $tok . -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if strings.Contains $html "raw HTML omitted" -}}
+  {{- warnidf "tufte-raw-html" "tufte.hugo: raw HTML in a shortcode's inner text was dropped by Goldmark (markup.goldmark.renderer.unsafe = false) in %s: use the theme's shortcodes (sidenote, cite, xref, smallcaps…) or Markdown instead of HTML tags; HTML printed by a third-party shortcode nested in a theme shortcode is kept with [params.tufte] innerHTML = true" $at -}}
 {{- end -}}
 {{- return $html -}}

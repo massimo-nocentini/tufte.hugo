@@ -1,0 +1,39 @@
+{{- /*
+  The front-matter `abstract` of a page, processed with its content:
+
+    <section class="abstract">BLOCKS</section>
+
+  func/content-raw.html renders the abstract (Markdown; shortcodes such as
+  cite, xref and sidenote run) first in the phase-1 content, so its notes
+  and citations are counted, numbered and listed with the page's, and
+  tufte/postprocess.html resolves its cross-references; func/content.html
+  cuts it off the sections. This partial returns that processed abstract,
+  from the same processed HTML (tufte/processed.html), for the title block
+  (tufte/title-block.html, the book landing and part pages, list pages).
+
+  Takes: the page, or a dict with
+    page   the page
+    print  optional bool: the whole-book print document (passed on to
+           postprocess, which shares one cached result for both)
+  Returns: template.HTML ("" without an abstract).
+*/ -}}
+{{- $p := . -}}
+{{- $print := false -}}
+{{- if reflect.IsMap . -}}
+  {{- $p = .page -}}
+  {{- $print = eq .print true -}}
+{{- end -}}
+{{- $out := "" -}}
+{{- if $p.Params.abstract -}}
+  {{- $key := or $p.RelPermalink $p.Path -}}
+  {{- $end := `<i class="tufte-abstract-end" hidden></i>` -}}
+  {{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) $key false -}}
+  {{- if strings.Contains (string $raw) $end -}}
+    {{- /* The same processed HTML as func/content.html's. */ -}}
+    {{- $html := partial "tufte/processed.html" (dict "page" $p "summary" false "print" $print) -}}
+    {{- with findRE (printf `(?s)^.*?%s` $end) $html 1 -}}
+      {{- $out = index . 0 | strings.TrimSuffix $end | strings.TrimSpace -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return ($out | safeHTML) -}}

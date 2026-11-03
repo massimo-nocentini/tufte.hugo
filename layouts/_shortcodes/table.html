@@ -1,0 +1,35 @@
+{{- /*
+  Numbered table with a margin caption (block; \begin{table} … \caption …
+  \label …). Put it on its own lines, the Markdown table inside:
+
+    {{< table caption="Font sizes." label="tab:font-sizes" >}}
+    | Size | Points |
+    |------|-------:|
+    | body | 10     |
+    {{< /table >}}
+
+  Without caption, a first paragraph inside is the caption:
+
+    {{< table label="tab:x" >}}
+    Font sizes used in the class.
+
+    | Size | Points |
+    …
+    {{< /table >}}
+
+  Named params: caption (inline Markdown), label (key for xref), short
+  (list of tables), type ("main" | "fullwidth", table*), numbered,
+  captionpos (top|bottom), offset (caption shift: 1bl, -2rem…), cite
+  (keys), class.
+
+  Markdown footnotes [^x] inside (in a cell or the caption) become real
+  footnotes, numbered and listed below the text. For a margin note beside
+  the table use footnotemark in the cell + footnotetext after the
+  shortcode. A cite in a cell stays a numbered sidenote in the cell (as in
+  a Markdown table); a cite in the caption joins its citation block.
+
+  Output (SPEC-LATEX §3.4):
+    <figure class="tufte-table" id="K"><label …>&#8853;</label><input …/><span class="marginnote caption">LABEL+CAPTION</span><div class="table-wrapper"><table>…</table></div></figure>
+*/ -}}
+{{- $out := partial "tufte/float-body.html" (dict "ctx" . "inner" .Inner "kind" "table") -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

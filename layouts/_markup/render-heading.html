@@ -4,17 +4,67 @@
 
     <h2 id="figures">Figures<a class="heading-anchor" href="#figures" aria-hidden="true" tabindex="-1">#</a></h2>
 
-  Tufte CSS styles h1 (title), h2 (sections) and h3; deeper levels are
-  rendered but not specially styled.
+  Tufte CSS styles h1 (title), h2 (sections) and h3. tufte-latex parity
+  (SPEC-LATEX §3.8):
+  - h4 (#### Title) gets class run-in: an italic run-in paragraph heading
+    (\paragraph); the paragraph shortcode is the exact inline form.
+  - h5/h6 do not exist in tufte-latex (no \subsubsection): warning
+    tufte-heading-depth, or a build error with params.tufte.headings.strict.
+  - Section numbers (secnumdepth): with params.tufte.headings.number = 1
+    (h2) or 2 (h2 and h3), a number token is the heading's first child,
+    filled in by tufte/postprocess.html ("2", "2.1", "3.2" in a numbered
+    chapter). {.unnumbered} on a heading leaves it out.
 */ -}}
+{{- $p := .Page -}}
+{{- $level := .Level -}}
+{{- $classes := slice -}}
+{{- $p := .Page -}}
+{{- $where := $p.RelPermalink -}}
+{{- with $p.File }}{{ $where = .Path }}{{ end -}}
 {{- $extra := "" -}}
+{{- $classes := slice -}}
 {{- range $k, $v := .Attributes -}}
   {{- $val := printf "%v" $v -}}
-  {{- if and $val (ne $k "id") (findRE `^[a-zA-Z][a-zA-Z0-9_:.-]*$` $k 1) (not (strings.HasPrefix (lower $k) "on")) -}}
+  {{- if eq $k "class" -}}
+    {{- $classes = findRE `\S+` $val -}}
+  {{- else if and $val (ne $k "id") (findRE `^[a-zA-Z][a-zA-Z0-9_:.-]*$` $k 1) (not (strings.HasPrefix (lower $k) "on")) -}}
     {{- $extra = printf `%s %s="%s"` $extra $k (htmlEscape $val) -}}
   {{- end -}}
 {{- end -}}
-<h{{ .Level }}{{ with .Anchor }} id="{{ . }}"{{ end }}{{ $extra | safeHTMLAttr }}>{{ .Text }}
-{{- with .Anchor }}<a class="heading-anchor" href="#{{ . }}" aria-hidden="true" tabindex="-1">#</a>{{ end -}}
+{{- if eq .Level 4 -}}
+  {{- $classes = $classes | append "run-in" -}}
+{{- end -}}
+{{- if ge .Level 5 -}}
+  {{- $strict := partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "headings.strict") (or $p.RelPermalink $p.Path) "headings.strict") -}}
+  {{- if $strict -}}
+    {{- errorf "tufte.hugo: h%d heading %q in %s: tufte-latex has no level below \\paragraph (h4); restructure, or set params.tufte.headings.strict = false" .Level (.PlainText) $where -}}
+  {{- else -}}
+    {{- warnidf "tufte-heading-depth" "tufte.hugo: h%d heading %q in %s: tufte-latex has no level below \\paragraph (h4, a run-in heading); consider restructuring (silence with ignoreLogs = ['tufte-heading-depth'])" .Level (.PlainText) $where -}}
+  {{- end -}}
+{{- end -}}
+{{- /* The id without Hugo's shortcode placeholders (tufte/heading-id.html):
+       stable across Hugo versions; the TOCs clean their links the same way. */ -}}
+{{- $anchor := "" -}}
+{{- with .Anchor }}{{ $anchor = partial "tufte/heading-id.html" . }}{{ end -}}
+{{- $num := "" -}}
+{{- if and (in (slice 2 3) .Level) $anchor (not (in $classes "unnumbered")) -}}
+  {{- /* A whole number (0 none, 1 h2, 2 h2+h3); anything else is warned
+         (once per page: identical warnings are logged once) and read as 0. */ -}}
+  {{- $depth := 0 -}}
+  {{- $dv := printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "headings.number") (or $p.RelPermalink $p.Path) "headings.number" | default 0) | strings.TrimSpace | replaceRE `^(-?[0-9]+)\.0*$` "$1" -}}
+  {{- if findRE `^-?[0-9]{1,3}$` $dv 1 -}}
+    {{- $depth = int (replaceRE `^(-?)0+([0-9])` "$1$2" $dv) -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.headings.number must be a whole number (0 = none, 1 = h2, 2 = h2 and h3), not %q, in %s; read as 0" $dv $where -}}
+  {{- end -}}
+  {{- if ge $depth (sub .Level 1) -}}
+    {{- $num = printf `<span class="tufte-num" data-kind="sec" data-key="%s" data-level="%d"></span>` (htmlEscape (partial "tufte/key.html" $anchor)) .Level -}}
+  {{- end -}}
+{{- end -}}
+{{- with $classes -}}
+  {{- $extra = printf ` class="%s"%s` (htmlEscape (delimit . " ")) $extra -}}
+{{- end -}}
+<h{{ .Level }}{{ with $anchor }} id="{{ . }}"{{ end }}{{ $extra | safeHTMLAttr }}>{{ $num | safeHTML }}{{ .Text }}
+{{- with $anchor }}<a class="heading-anchor" href="#{{ . }}" aria-hidden="true" tabindex="-1">#</a>{{ end -}}
 </h{{ .Level }}>
 {{- /* no trailing newline */ -}}

@@ -1,0 +1,30 @@
+{{- /*
+  The book a page belongs to (SPEC-LATEX §4.1).
+
+  A book is a section whose _index.md sets `book: true`, or the home page
+  when content/_index.md sets it (the whole site is one book: its top-level
+  regular pages are the chapters, its top-level sections the parts). The
+  root is the page itself when it is such a section (or that home page),
+  else the nearest ancestor that is. Taxonomy and term pages (tags,
+  categories) are never in a book: their ancestor is the home page, but
+  they are not chapters. Nested books are unsupported (the nearest one
+  wins).
+
+  Takes: a page.
+  Returns: the book root page, or false.
+  Callers: partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path)
+*/ -}}
+{{- $root := false -}}
+{{- $p := . -}}
+{{- if in (slice "home" "section" "page") $p.Kind -}}
+  {{- if and (or $p.IsSection $p.IsHome) (partial "tufte/truthy.html" (index $p.Params "book")) -}}
+    {{- $root = $p -}}
+  {{- else -}}
+    {{- range $p.Ancestors -}}
+      {{- if and (not $root) (or .IsSection .IsHome) (partial "tufte/truthy.html" (index .Params "book")) -}}
+        {{- $root = . -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $root -}}

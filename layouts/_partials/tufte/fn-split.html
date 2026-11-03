@@ -1,0 +1,67 @@
+{{- /*
+  Splits HTML at the real-footnote markers (SPEC-LATEX §11):
+
+    <span class="tufte-fn"[ data-key="KEY"][ data-label="LABEL"][ data-md="MDLABEL"] hidden>TEXT</span>[<i class="fn-end" hidden></i>]
+  (KEY = identity, unique per page, e.g. "s3"; LABEL = the normalised
+  label= key for xref; MDLABEL = the Markdown footnote label)
+
+  emitted by the footnote shortcode, cite as=footnote, and
+  func/footnotes.html (Markdown footnotes that stay footnotes). TEXT may
+  hold nested spans: the closing </span> is found by balancing <span> tags,
+  so the fn-end marker is optional. Nested footnote markers are not
+  supported.
+
+  Takes: the HTML (string or template.HTML).
+  Returns: dict
+    head   the HTML before the first marker
+    items  slice of dict { attrs, key, label, md, ident, text, tail } in document
+           order: attrs = the raw attributes after the class; key/md = the
+           data-key / data-md values ("" if absent); ident = "md:LABEL",
+           "key:KEY" or "pos:N" (identity: repeated references to one
+           Markdown footnote share it); tail = the HTML after the marker,
+           up to the next one.
+  Rebuild: head + for each item (replacement + tail).
+*/ -}}
+{{- $html := string . -}}
+{{- $open := `<span class="tufte-fn"` -}}
+{{- $head := $html -}}
+{{- $items := slice -}}
+{{- if strings.Contains $html $open -}}
+  {{- $parts := split $html $open -}}
+  {{- $head = index $parts 0 -}}
+  {{- range $i, $part := after 1 $parts -}}
+    {{- $attrs := replaceRE `(?s)^([^>]*)>.*$` "$1" $part -}}
+    {{- $body := replaceRE `(?s)^[^>]*>` "" $part -}}
+    {{- /* Balance spans: count closes until depth 0. */ -}}
+    {{- $depth := 1 -}}
+    {{- $closes := 0 -}}
+    {{- range findRE `<span[\s>]|</span>` $body -}}
+      {{- if gt $depth 0 -}}
+        {{- if eq . "</span>" -}}
+          {{- $depth = sub $depth 1 -}}
+          {{- $closes = add $closes 1 -}}
+        {{- else -}}
+          {{- $depth = add $depth 1 -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $text := $body -}}
+    {{- $tail := "" -}}
+    {{- if eq $depth 0 -}}
+      {{- $pieces := split $body "</span>" -}}
+      {{- $text = delimit (first $closes $pieces) "</span>" -}}
+      {{- $tail = delimit (after $closes $pieces) "</span>" -}}
+      {{- $tail = strings.TrimPrefix `<i class="fn-end" hidden></i>` $tail -}}
+    {{- end -}}
+    {{- $key := "" -}}
+    {{- if strings.Contains $attrs `data-key="` }}{{ $key = replaceRE `(?s)^.*data-key="([^"]*)".*$` "$1" $attrs }}{{ end -}}
+    {{- $md := "" -}}
+    {{- if strings.Contains $attrs `data-md="` }}{{ $md = replaceRE `(?s)^.*data-md="([^"]*)".*$` "$1" $attrs }}{{ end -}}
+    {{- $label := "" -}}
+    {{- if strings.Contains $attrs `data-label="` }}{{ $label = replaceRE `(?s)^.*data-label="([^"]*)".*$` "$1" $attrs }}{{ end -}}
+    {{- $ident := printf "pos:%d" $i -}}
+    {{- if $md }}{{ $ident = printf "md:%s" $md }}{{ else if $key }}{{ $ident = printf "key:%s" $key }}{{ end -}}
+    {{- $items = $items | append (dict "attrs" $attrs "key" $key "label" $label "md" $md "ident" $ident "text" $text "tail" $tail) -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "head" $head "items" $items) -}}

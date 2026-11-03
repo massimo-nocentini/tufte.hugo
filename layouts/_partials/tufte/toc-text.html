@@ -1,0 +1,49 @@
+{{- /*
+  The text of one contents entry (page TOC, book contents), as inline HTML
+  that may sit inside the entry's <a>:
+
+  1. Links of the heading text are unwrapped (Hugo 0.146's
+     .TableOfContents keeps them, and an <a> inside the entry's <a> splits
+     the entry in a browser).
+  2. Math: Hugo builds the TOC texts (.TableOfContents, .Fragments) from
+     the Markdown source before the passthrough render hook runs, so a
+     formula in a heading comes out as raw TeX ($\alpha$, Hugo 0.169) or is
+     dropped (Hugo 0.146). When the page has math (Store "hasMath", set by
+     render-passthrough.html), the heading with this id is looked up in the
+     page's phase-1 HTML (func/content-raw.html) and, when it holds typeset
+     math (KaTeX output, or the client engine's span.math), its rendered
+     inner HTML is used instead, cleaned like the TOC texts: no heading
+     anchor, number tokens, index or label anchors, margin toggles, notes
+     or links. The math is then the one of the heading (server KaTeX, or
+     span.math for the browser's auto-render).
+
+  Takes: a dict with
+    page  the page holding the heading
+    id    the heading id (as render-heading.html writes it)
+    text  the entry text from Hugo's TOC, margin material already removed
+  Returns: string (HTML).
+*/ -}}
+{{- $p := .page -}}
+{{- $text := replaceRE `</?a\b[^>]*>` "" (string .text) -}}
+{{- if and .id $p -}}
+  {{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) (or $p.RelPermalink $p.Path) false | string -}}
+  {{- if $p.Store.Get "hasMath" -}}
+    {{- $parts := split $raw (printf ` id="%s"` .id) -}}
+    {{- if and (ge (len $parts) 2) (findRE `<h[1-6]$` (index $parts 0) 1) -}}
+      {{- $inner := replaceRE `(?s)^[^>]*>(.*?)</h[1-6]>.*$` "$1" (index $parts 1) -}}
+      {{- if findRE `class="(?:katex|math math-inline|math-error)` $inner 1 -}}
+        {{- $t := $inner -}}
+        {{- $t = replaceRE `<a class="heading-anchor"[^>]*>[^<]*</a>` "" $t -}}
+        {{- $t = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $t -}}
+        {{- $t = replaceRE `(?s)<span class="(?:sidenote|marginnote)[^"]*"[^>]*>.*?</span><i class="sn-end" hidden></i>` "" $t -}}
+        {{- $t = replaceRE `<span class="(?:sidenote|marginnote)[^"]*"[^>]*>[^<]*</span>` "" $t -}}
+        {{- $t = replaceRE `<span class="(?:index-anchor|tufte-anchor|tufte-num)[^>]*>[^<]*</span>` "" $t -}}
+        {{- $t = replaceRE `<i class="(?:sn-end|cap-end)" hidden></i>` "" $t -}}
+        {{- $t = replaceRE `</?a\b[^>]*>` "" $t -}}
+        {{- $t = replaceRE `\s+id="[^"]*"` "" $t -}}
+        {{- $text = strings.TrimSpace $t -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $text -}}

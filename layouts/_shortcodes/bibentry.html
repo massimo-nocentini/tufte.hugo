@@ -1,0 +1,21 @@
+{{- /*
+  A full bibliographic reference in the running text (inline; \bibentry):
+
+    The classic is {{< bibentry "tufte2001" >}}
+
+  Positional: the key; or named: key="tufte2001". Output:
+    <span class="bib-entry" data-cite="key">…</span>
+  (formatted by tufte/bib/entries.html, as in the margin).
+*/ -}}
+{{- $key := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $key = printf "%v" (.Get "key" | default "") -}}
+{{- else -}}
+  {{- $key = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- $key = strings.TrimSpace $key | lower -}}
+{{- if not $key -}}
+  {{- errorf "bibentry shortcode: a citation key is required, e.g. {{< bibentry \"tufte2001\" >}} (%s)" .Position -}}
+{{- end -}}
+{{- $out := partial "tufte/bib/entries.html" (dict "page" .Page "keys" (slice $key) "postnote" "") | string -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

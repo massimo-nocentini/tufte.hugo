@@ -1,0 +1,188 @@
+{{- /*
+  Phase 1 of the content pipeline (SPEC-LATEX §3.1, R1): the page HTML with
+  footnotes turned into sidenotes and leftover nest tokens swapped, but no
+  resolution (numbers, xrefs, placeholders stay as inert markers). It never
+  reads another page, so every cross-page scan (labels, counts, offsets,
+  book TOC, LoF/LoT, bibliography, index) reads this, safely.
+
+  1. Content: .Content, or the .Summary with its headings removed (Hugo's
+     automatic summary can run past the first <h2>; on a list page those
+     headings would read as list-level titles and their ids could clash).
+  2. Footnotes (mode: front matter `footnotes`, else tufte.footnotes via
+     tufte/opt.html, else site params.footnotes, default "sidenotes"):
+     func/footnotes.html turns each Markdown footnote into a sidenote
+     (deterministic id) or a real-footnote marker, by mode and label
+     prefix (fn-/sn-, §11.1). The markers are numbered and listed by
+     tufte/postprocess.html (removed in summaries).
+  3. Nest tokens still in the HTML (e.g. under a third-party shortcode that
+     printed .Inner raw) are swapped with the HTML stored in
+     .Page.Store "tufteNest".
+  4. Block markers of linked stand-alone images (render-link.html): a
+     block alone in its paragraph replaces the paragraph (a <figure> may
+     not sit in a <p>); a block sharing its paragraph with text becomes a
+     linked plain image and its caption (func/inline-figures.html).
+  The front-matter `abstract` (Markdown, shortcodes run) is part of the
+  full content: it comes first, as
+    <section class="abstract">BLOCKS</section><i class="tufte-abstract-end" hidden></i>
+  so its notes, citations, labels and cross-references are counted,
+  numbered and resolved with the rest of the page (the abstract
+  environment may hold \cite and \ref). func/content.html cuts it off the
+  processed content and tufte/abstract.html gives it to the title block.
+
+  Takes a dict:
+    page     the page
+    summary  bool: process .Summary instead of .Content
+  Returns: template.HTML.
+  Callers: partialCached "func/content-raw.html" (dict "page" $p "summary" $s) (or $p.RelPermalink $p.Path) $s
+*/ -}}
+{{- /* Memoized in the page's Store (see tufte/memo note in tufte/opts.html):
+       cross-page scans read this for every chapter of a book, and
+       partialCached's bounded cache would evict it on large books. */ -}}
+{{- $memoKey := printf "tufteMemoRaw|%v" (eq .summary true) -}}
+{{- $memoRes := "" -}}
+{{- with cond hugo.IsServer nil (.page.Store.Get $memoKey) -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $page := .page -}}
+{{- $summary := eq .summary true -}}
+{{- /* Footnote mode (§11.1): front matter `footnotes`, else tufte.footnotes
+       (page → part → book → site), else site params.footnotes. */ -}}
+{{- $footnotes := "" -}}
+{{- with index $page.Params "footnotes" -}}
+  {{- $footnotes = . -}}
+{{- else -}}
+  {{- $footnotes = partialCached "tufte/opt.html" (dict "page" $page "key" "footnotes") (or $page.RelPermalink $page.Path) "footnotes" -}}
+  {{- if not $footnotes }}{{ $footnotes = site.Params.footnotes | default "sidenotes" }}{{ end -}}
+{{- end -}}
+{{- $footnotes = lower (printf "%v" $footnotes) -}}
+{{- if not (in (slice "sidenotes" "endnotes" "footnotes") $footnotes) -}}
+  {{- if not $summary -}}
+    {{- $at := $page.RelPermalink -}}
+    {{- with $page.File }}{{ $at = .Path }}{{ end -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: footnotes must be sidenotes, endnotes or footnotes, not %q, in %s; using sidenotes" $footnotes $at -}}
+  {{- end -}}
+  {{- $footnotes = "sidenotes" -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- $full := string $page.Content -}}
+{{- if $summary -}}
+  {{- $html = string $page.Summary -}}
+  {{- $html = replaceRE `(?s)<h[1-6][\s>].*?</h[1-6]>\s*` "" $html -}}
+  {{- /* A front-matter `summary:` of one paragraph comes without its <p>
+         (Hugo renders it with TrimShortHTML): inline-only summary HTML is
+         wrapped in a <p>, so it gets the text column and size of
+         `section > p` like every other summary. */ -}}
+  {{- with strings.TrimSpace $html -}}
+    {{- if not (findRE `<(?:p|div|figure|figcaption|ul|ol|dl|li|blockquote|h[1-6]|section|article|aside|nav|header|footer|table|pre|hr|details|address|form|fieldset)[\s>/]` . 1) -}}
+      {{- $html = printf "<p>%s</p>" . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* An automatic summary (no <!--more-->) may be cut inside a block
+         (Hugo 0.146 cuts after a margin block's caption paragraph): close
+         the elements still open at the end, innermost first, so they do not
+         swallow what the list page puts after the summary. */ -}}
+  {{- $balanced := true -}}
+  {{- range slice "div" "span" "figure" "section" "blockquote" "ul" "ol" "li" "table" "p" "a" "em" "strong" "label" -}}
+    {{- if ne (len (findRE (printf `<%s[\s>]` .) $html)) (len (findRE (printf `</%s\s*>` .) $html)) }}{{ $balanced = false }}{{ end -}}
+  {{- end -}}
+  {{- if not $balanced -}}
+    {{- $void := slice "area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr" -}}
+    {{- $stack := slice -}}
+    {{- range findRE `<(/?)([a-zA-Z][a-zA-Z0-9-]*)[^>]*>` $html -}}
+      {{- $name := replaceRE `^</?([a-zA-Z][a-zA-Z0-9-]*).*$` "$1" . | lower -}}
+      {{- if strings.HasPrefix . "</" -}}
+        {{- if in $stack $name -}}
+          {{- /* Pop up to and including the matching open tag. */ -}}
+          {{- $keep := len $stack -}}
+          {{- range $i, $s := $stack }}{{ if eq $s $name }}{{ $keep = $i }}{{ end }}{{ end -}}
+          {{- $stack = first $keep $stack -}}
+        {{- end -}}
+      {{- else if not (or (strings.HasSuffix . "/>") (in $void $name)) -}}
+        {{- $stack = $stack | append $name -}}
+      {{- end -}}
+    {{- end -}}
+    {{- range $i, $s := $stack -}}
+      {{- $html = printf "%s</%s>" $html (index $stack (sub (sub (len $stack) 1) $i)) -}}
+    {{- end -}}
+  {{- end -}}
+{{- else -}}
+  {{- $html = $full -}}
+{{- end -}}
+
+{{- /* Also when only Goldmark's endnotes block is left (a summary whose
+       sole footnote reference sat in a removed heading): it is dropped. */ -}}
+{{- if or (strings.Contains $html "footnote-ref") (strings.Contains $html `<div class="footnotes" role="doc-endnotes">`) -}}
+  {{- $html = partial "func/footnotes.html" (dict "page" $page "content" $html "source" $full "mode" $footnotes "summary" $summary) | string -}}
+{{- end -}}
+
+{{- /* The front-matter abstract, first (see above). */ -}}
+{{- if not $summary -}}
+  {{- with $page.Params.abstract -}}
+    {{- $md := printf "%v" . -}}
+    {{- $abs := partial "tufte/render-inner.html" (dict "page" $page "inner" $md "display" "block" "shortcodes" "run" "where" "front matter abstract") | string -}}
+    {{- $html = printf "<section class=\"abstract\">%s</section><i class=\"tufte-abstract-end\" hidden></i>\n%s" $abs $html -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if strings.Contains $html "TUFTENEST" -}}
+  {{- $map := $page.Store.Get "tufteNest" | default dict -}}
+  {{- range seq 4 -}}
+    {{- if strings.Contains $html "TUFTENEST" -}}
+      {{- range $tok := findRE `TUFTENEST[0-9a-f]{16}END` $html | uniq -}}
+        {{- with index $map (substr $tok 9 16) -}}
+          {{- $html = replace $html (printf "<p>%s</p>" $tok) . -}}
+          {{- $html = replace $html $tok . -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* 5. Captions of the image and table render hooks that held a
+       shortcode (tufte/figure.html marks them): the shortcode ran without
+       a parent, so a cite made a citation sidenote and a sidenote or margin
+       note floats inside the caption. As tufte/figure.html does for a
+       caption= parameter: cites join the caption's citation block, other
+       notes stay inline text (tufte-note-in-note). */ -}}
+{{- if strings.Contains $html `<i class="tufte-capsc" hidden></i>` -}}
+  {{- $capRE := `(?s)<i class="tufte-capsc" hidden></i>(.*?)<i class="tufte-capsc-mid" hidden></i>(.*?)<i class="tufte-capsc-end" hidden></i>` -}}
+  {{- range findRESubmatch $capRE $html -}}
+    {{- $cap := index . 1 -}}
+    {{- $blk := index . 2 -}}
+    {{- if strings.Contains $cap `class="margin-toggle` -}}
+      {{- $at := $page.RelPermalink -}}
+      {{- with $page.File }}{{ $at = .Path }}{{ end -}}
+      {{- $cap = partial "tufte/note-in-note.html" (dict "page" $page "html" $cap "holder" "Markdown image or table caption" "where" $at) -}}
+    {{- end -}}
+    {{- if strings.Contains $cap `class="cite-end"` -}}
+      {{- $nested := replaceRE `(?s)^<span class="citation-block">(.*)</span>$` `<span class="citation-block" data-nested="1">$1</span><i class="cite-end" hidden></i>` $blk -}}
+      {{- with partial "tufte/cite-gather.html" (dict "page" $page "html" (printf "%s%s" $cap $nested)) -}}
+        {{- $cap = .html -}}
+        {{- $blk = .block -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $html = replace $html (index . 0) (printf "%s%s" $cap $blk) 1 -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if strings.Contains $html `<i class="tufte-block" hidden></i>` -}}
+  {{- $blocks := findRE `(?s)<i class="tufte-block" hidden></i>.*?<i class="tufte-block-end" hidden></i>` $html | uniq -}}
+  {{- range $i, $b := $blocks -}}
+    {{- $html = replace $html $b (printf "TUFTEBLOCK%dEND" $i) -}}
+  {{- end -}}
+  {{- /* Alone in its paragraph: the paragraph goes (attributes such as
+         {.margin} on it go with it). */ -}}
+  {{- $html = replaceRE `<p(?:\s[^>]*)?>\s*TUFTEBLOCK([0-9]+)END\s*</p>` "TUFTEFIGURE${1}END" $html -}}
+  {{- range $i, $b := $blocks -}}
+    {{- $inner := $b | strings.TrimPrefix `<i class="tufte-block" hidden></i>` | strings.TrimSuffix `<i class="tufte-block-end" hidden></i>` -}}
+    {{- $html = replace $html (printf "TUFTEFIGURE%dEND" $i) $inner -}}
+    {{- $tok := printf "TUFTEBLOCK%dEND" $i -}}
+    {{- if strings.Contains $html $tok -}}
+      {{- $html = replace $html $tok (partial "func/inline-figures.html" $inner) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $memoRes = $html | safeHTML -}}
+{{- if not hugo.IsServer }}{{ $page.Store.Set $memoKey (dict "v" $memoRes) }}{{ end -}}
+{{- end -}}
+{{- return $memoRes -}}

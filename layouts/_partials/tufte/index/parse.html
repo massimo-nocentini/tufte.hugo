@@ -1,0 +1,63 @@
+{{- /*
+  Parses one \index{…} argument in makeindex syntax (SPEC-LATEX §3.12).
+
+  Takes: a string (already HTML-unescaped), e.g.
+    "classes!a4paper"            two levels
+    "allcaps@\allcaps"           sort key "allcaps", display "\allcaps"
+    "fonts|see{typefaces}"       cross-reference
+    "typefaces|seealso{fonts}"   "see also" cross-reference
+    "sidenotes|("  …  "sidenotes|)"   page range (open / close)
+    "x|textbf"                   page-number format (kept as "fmt")
+  Returns: dict
+    levels   slice (1–3 items) of dict {sort, display}; sort is lowercased
+             (and whitespace-collapsed), display is the raw text (Markdown)
+    see      string ("" if none)
+    seealso  string
+    range    "open" | "close" | ""
+    fmt      the encap word when it is none of the above ("" if none)
+  Quoting with " (makeindex's quote character) is not supported. Levels
+  beyond the third are folded into the third, joined by ", " (makeindex
+  allows three; the index shortcode warns).
+*/ -}}
+{{- $raw := trim (printf "%v" .) " \t\n" -}}
+{{- $main := $raw -}}
+{{- $encap := "" -}}
+{{- with findRESubmatch `(?s)^([^|]*)\|(.*)$` $raw 1 -}}
+  {{- $main = index (index . 0) 1 -}}
+  {{- $encap = trim (index (index . 0) 2) " " -}}
+{{- end -}}
+{{- $see := "" -}}
+{{- $seealso := "" -}}
+{{- $range := "" -}}
+{{- $fmt := "" -}}
+{{- if hasPrefix $encap "(" }}{{ $range = "open" }}{{ $encap = substr $encap 1 }}{{ end -}}
+{{- if hasPrefix $encap ")" }}{{ $range = "close" }}{{ $encap = substr $encap 1 }}{{ end -}}
+{{- with findRESubmatch `(?s)^\\?seealso\s*\{(.*)\}$` $encap 1 -}}
+  {{- $seealso = trim (index (index . 0) 1) " " -}}
+{{- else -}}
+  {{- with findRESubmatch `(?s)^\\?see\s*\{(.*)\}$` $encap 1 -}}
+    {{- $see = trim (index (index . 0) 1) " " -}}
+  {{- else -}}
+    {{- $fmt = trim (replaceRE `^\\` "" $encap) " " -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $parts := split $main "!" -}}
+{{- if gt (len $parts) 3 -}}
+  {{- $parts = slice (index $parts 0) (index $parts 1) (delimit (after 2 $parts) ", ") -}}
+{{- end -}}
+{{- $levels := slice -}}
+{{- range $parts -}}
+  {{- $lv := trim . " \t\n" -}}
+  {{- if not $lv }}{{ continue }}{{ end -}}
+  {{- $sort := $lv -}}
+  {{- $display := $lv -}}
+  {{- with findRESubmatch `(?s)^([^@]*)@(.*)$` $lv 1 -}}
+    {{- $sort = trim (index (index . 0) 1) " " -}}
+    {{- $display = trim (index (index . 0) 2) " " -}}
+  {{- end -}}
+  {{- if not $display }}{{ $display = $sort }}{{ end -}}
+  {{- if not $sort }}{{ $sort = $display }}{{ end -}}
+  {{- $levels = $levels | append (dict "sort" (lower (replaceRE `\s+` " " $sort)) "display" $display) -}}
+{{- end -}}
+{{- return (dict "levels" $levels "see" $see "seealso" $seealso "range" $range "fmt" $fmt) -}}

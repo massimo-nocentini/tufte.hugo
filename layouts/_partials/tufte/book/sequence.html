@@ -1,0 +1,57 @@
+{{- /*
+  The reading order of a book after its landing, as the whole-book print
+  document (list.print.html) prints it and the continuous numbering
+  (tufte/offsets.html) counts it: the chapters of tufte/book/chapters.html,
+  each part page (\part) right before the first chapter of its part, and
+  the parts without chapters at the place their weight gives them among
+  the chapters (the same rule and key as the book contents,
+  tufte/book/toc.html), or at the end.
+
+  Takes: the book root.
+  Returns: a slice of dicts { Kind, Page, Chapter }: Kind "part" (Chapter
+  false) or "chapter" (Chapter: the tufte/book/chapters.html entry).
+  Callers: partialCached "tufte/book/sequence.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- $root := . -}}
+{{- $parts := partialCached "tufte/book/parts.html" $root (or $root.RelPermalink $root.Path) -}}
+{{- $chapters := partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
+{{- $used := slice -}}
+{{- range $chapters }}{{ with .Part }}{{ if not (in $used .) }}{{ $used = $used | append . }}{{ end }}{{ end }}{{ end -}}
+{{- $lonely := slice -}}
+{{- range $parts -}}
+  {{- if not (in $used .Page) -}}
+    {{- $gw := partial "tufte/book/weight-key.html" .Page.Weight -}}
+    {{- $gname := .Page.Title -}}
+    {{- with .Page.File }}{{ $gname = .Dir }}{{ end -}}
+    {{- $lonely = $lonely | append (dict "Page" .Page "key" (printf "1|%s|%s|" $gw $gname)) -}}
+  {{- end -}}
+{{- end -}}
+{{- $seq := slice -}}
+{{- $done := slice -}}
+{{- $curPart := false -}}
+{{- range $chapters -}}
+  {{- $ck := .SortKey | default "" -}}
+  {{- range $lonely -}}
+    {{- if and (not (in $done .Page)) (lt .key $ck) -}}
+      {{- $seq = $seq | append (dict "Kind" "part" "Page" .Page "Chapter" false) -}}
+      {{- $done = $done | append .Page -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with .Part -}}
+    {{- if or (not $curPart) (ne . $curPart) -}}
+      {{- $curPart = . -}}
+      {{- /* Once per part, even if its chapters are not contiguous. */ -}}
+      {{- if not (in $done .) -}}
+        {{- $seq = $seq | append (dict "Kind" "part" "Page" . "Chapter" false) -}}
+        {{- $done = $done | append . -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $seq = $seq | append (dict "Kind" "chapter" "Page" .Page "Chapter" .) -}}
+{{- end -}}
+{{- range $lonely -}}
+  {{- if not (in $done .Page) -}}
+    {{- $seq = $seq | append (dict "Kind" "part" "Page" .Page "Chapter" false) -}}
+  {{- end -}}
+{{- end -}}
+{{- return $seq -}}

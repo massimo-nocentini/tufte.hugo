@@ -4,34 +4,39 @@
 {{- if .IsHome }}
 <title>{{ site.Title }}</title>
 {{- else }}
-<title>{{ with .Title }}{{ . }} | {{ end }}{{ site.Title }}</title>
+{{- /* The full title as plain text, as og:title, twitter:title, the
+       schema name and the RSS item title below (linkTitle is the link text
+       of lists, navigation and running heads, not metadata). */}}
+<title>{{ with .Title }}{{ with partial "tufte/plain-title.html" (dict "page" $ "title" .) }}{{ . }} | {{ end }}{{ end }}{{ site.Title }}</title>
 {{- end }}
 
 {{- /* Description: front matter, then subtitle, then the summary of a
        regular page, then the site description. */ -}}
+{{- $inBook := partialCached "tufte/book/root.html" . (or .RelPermalink .Path) -}}
 {{- $description := .Description | default .Params.subtitle -}}
-{{- if and (not $description) .IsPage -}}
-  {{- $description = .Summary | plainify | htmlUnescape | strings.TrimSpace | truncate 160 -}}
+{{- /* Book landings and part pages too: their content is a summary like
+       a chapter's. */ -}}
+{{- if and (not $description) (or .IsPage $inBook) -}}
+  {{- /* The processed summary without margin material (sidenote text
+         would otherwise run into the sentence), as plain text. */ -}}
+  {{- $description = partial "tufte/description.html" . -}}
 {{- end -}}
 {{- $description = $description | default site.Params.description -}}
 {{- with $description }}
 <meta name="description" content="{{ . }}">
 {{- end }}
-{{- /* Author: front matter author (a string or a list), else
-       params.author.name, as in post-meta.html. */ -}}
-{{- $author := "" -}}
-{{- with .Params.author -}}
-  {{- if reflect.IsSlice . }}{{ $author = delimit . ", " }}{{ else }}{{ $author = . }}{{ end -}}
-{{- else -}}
-  {{- with site.Params.author }}{{ $author = .name }}{{ end -}}
-{{- end -}}
+{{- /* Author: front matter author (a string, a list of strings or of
+       {name, thanks}), else params.author.name (tufte/authors.html). */ -}}
+{{- $author := (partial "tufte/authors.html" (dict "page" .)).plain -}}
 {{- with $author }}
 <meta name="author" content="{{ . }}">
 {{- end }}
 {{- /* Canonical: every pager of a list renders from the same page, whose
        .Permalink is the first pager; later pagers point to themselves. */ -}}
 {{- $canonical := .Permalink -}}
-{{- if or .IsHome (eq .Kind "section") -}}
+{{- /* Book landings and parts list no summaries: no paginator (it would
+       also publish /page/N/ copies of them). */ -}}
+{{- if and (not $inBook) (or .IsHome (eq .Kind "section")) -}}
   {{- with partial "func/paginate.html" . -}}
     {{- if gt .PageNumber 1 }}{{ $canonical = .URL | absURL }}{{ end -}}
   {{- end -}}
@@ -58,19 +63,54 @@
 <link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">
 {{- end }}
 {{ hugo.Generator }}
-{{ partial "opengraph.html" . }}
-{{ partial "twitter_cards.html" . }}
-{{ partial "schema.html" . }}
+{{- /* OpenGraph, Twitter card and schema.org tags: Hugo's embedded
+       templates (or a site's overrides), with their title and description
+       replaced by the theme's. The embedded ones use .Title (Markdown such
+       as `code` left raw) and .Description | default .Summary, the raw
+       summary in which sidenote and citation text runs into the sentence,
+       cross-reference keys are unresolved and heading anchors leave "#".
+       The theme's are the plain title (tufte/plain-title.html) and the
+       $description of <meta name="description"> above. */ -}}
+{{- $social := printf "%s\n%s\n%s" (partial "opengraph.html" . | string) (partial "twitter_cards.html" . | string) (partial "schema.html" . | string) -}}
+{{- $social = replaceRE `[ \t]*<meta (?:property="og:(?:title|description)"|name="twitter:(?:title|description)"|itemprop="(?:name|description)") content="[^"]*"\s*/?>\n?` "" $social -}}
+{{- $socialTitle := site.Title -}}
+{{- with .Title }}{{ $socialTitle = partial "tufte/plain-title.html" (dict "page" $ "title" .) | default site.Title }}{{ end }}
+{{ $social | safeHTML }}
+{{- with $socialTitle }}
+<meta property="og:title" content="{{ . }}">
+<meta name="twitter:title" content="{{ . }}">
+<meta itemprop="name" content="{{ . }}">
+{{- end }}
+{{- with $description }}
+<meta property="og:description" content="{{ . }}">
+<meta name="twitter:description" content="{{ . }}">
+<meta itemprop="description" content="{{ . }}">
+{{- end }}
 {{ partial "css.html" . }}
+{{- /* Page-dependent tufte-latex styles (marginalia variables, paper
+       geometry, running heads); after the stylesheet so they win. */}}
+{{ partial "tufte/head-style.html" . }}
 
-{{- /* KaTeX stylesheet, only when needed. The passthrough render hook sets
-       Store "hasMath" while the content renders; the head is written before
-       the body, so .WordCount forces that render first. List pages check the
-       pages they summarize. Params.math.enable: "auto" (default), true, false.
-       Front matter "math: true" always loads it, "math: false" never. */ -}}
+{{- /* KaTeX stylesheet, only when needed. Params.math.enable: "auto"
+       (default), true, false. Front matter "math: true" always loads it,
+       "math: false" never.
+       "auto" decides on the final HTML of the body, not on the page's own
+       Markdown: math is also copied from other pages (the book contents
+       and the tableofcontents shortcode typeset chapter titles and headings,
+       printindex entries, lists of figures, xref name/auto to a title with
+       math) and only the processed content (phase 2) holds it. The head is
+       written before the body, so it asks for the same cached partials the
+       templates use (func/content.html, tufte/abstract.html,
+       tufte/book/toc.html; same cache keys), which are then computed once,
+       here, and reused by the body: no content is rendered twice, and
+       nothing is rendered in an output format that does not show it. A
+       body with class="katex…" (server engine) or class="math math-…"
+       (client engine) loads KaTeX. */ -}}
 {{- $enable := "auto" -}}
-{{- with site.Params.math -}}
-  {{- if isset . "enable" }}{{ $enable = .enable }}{{ end -}}
+{{- /* func/math-config.html: [params.math] as a map, also for a site
+       that sets params.math = true / false / "auto". */ -}}
+{{- with partialCached "func/math-config.html" "math" "math" -}}
+  {{- if isset . "enable" }}{{ $enable = index . "enable" }}{{ end -}}
 {{- end -}}
 {{- $math := false -}}
 {{- if or (eq $enable true) (eq $enable "true") -}}
@@ -78,12 +118,63 @@
 {{- else if or (eq $enable false) (eq $enable "false") -}}
   {{- $math = false -}}
 {{- else -}}
-  {{- $noop := .WordCount -}}
-  {{- if .Store.Get "hasMath" }}{{ $math = true }}{{ end -}}
-  {{- if or .IsHome (eq .Kind "section") -}}
+  {{- $key := or .RelPermalink .Path -}}
+  {{- $mathRE := `class="(?:katex|math math-)` -}}
+  {{- $isPrint := and (.OutputFormats.Get "print") (.AlternativeOutputFormats.Get "html") -}}
+  {{- /* Markdown front matter rendered by the templates after the head
+         (title, thanks, authors, the book landing's epigraphs,
+         frontispiece, publisher, dedication and copyright page): look for
+         math delimiters. */ -}}
+  {{- $fm := slice .Title .Params.thanks .Params.author .Params.epigraphs .Params.frontispiece .Params.publisher .Params.dedication .Params.copyrightpage -}}
+  {{- if findRE `\$|\\\(|\\\[` (printf "%v" $fm) 1 }}{{ $math = true }}{{ end -}}
+  {{- /* The page's processed content and abstract (home: only when it
+         shows its content, params.homeIntro; a home book landing always
+         does). */ -}}
+  {{- if not $math -}}
+    {{- if not (and .IsHome (not $inBook) (eq site.Params.homeIntro false)) -}}
+      {{- $body := printf "%s%s" (partial "tufte/abstract.html" .) (partialCached "func/content.html" . $key false) -}}
+      {{- if or (findRE $mathRE $body 1) (.Store.Get "hasMath") }}{{ $math = true }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if and $inBook (eq $inBook .) -}}
+    {{- /* A book landing: its contents (chapter and part titles, and the
+           chapters' h2 sections with tufte.book.tocDepth = 1). */ -}}
+    {{- if and (not $math) (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" . "key" "book.toc") $key "book.toc")) -}}
+      {{- if findRE $mathRE (partialCached "tufte/book/toc.html" (dict "root" .) $key "landing") 1 }}{{ $math = true }}{{ end -}}
+    {{- end -}}
+    {{- /* The print document (all the chapters and parts in one page):
+           their processed content, as list.print.html and
+           tufte/book/chapter-body.html ask for it. */ -}}
+    {{- if and (not $math) $isPrint -}}
+      {{- range partialCached "tufte/book/chapters.html" . $key -}}
+        {{- if not $math -}}
+          {{- $c := .Page -}}
+          {{- $ck := or $c.RelPermalink $c.Path -}}
+          {{- $body := printf "%s%s" (partial "tufte/abstract.html" (dict "page" $c "print" true)) (partialCached "func/content.html" (dict "page" $c "summary" false "print" true) $ck false "print") -}}
+          {{- if or (findRE $mathRE $body 1) (findRE `\$|\\\(|\\\[` (printf "%v" (slice $c.Title $c.Params.thanks $c.Params.author)) 1) (eq $c.Params.math true) }}{{ $math = true }}{{ end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- range partialCached "tufte/book/parts.html" . $key -}}
+        {{- if not $math -}}
+          {{- $q := .Page -}}
+          {{- $body := printf "%s%s" (partial "tufte/abstract.html" $q) (partialCached "func/content.html" $q (or $q.RelPermalink $q.Path) false) -}}
+          {{- if or (findRE $mathRE $body 1) (findRE `\$|\\\(|\\\[` $q.Title 1) (eq $q.Params.math true) }}{{ $math = true }}{{ end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- else if and (not $math) $inBook .IsSection -}}
+    {{- /* A part page lists its chapters by title (Markdown rendered). */ -}}
+    {{- $part := . -}}
+    {{- range partialCached "tufte/book/chapters.html" $inBook (or $inBook.RelPermalink $inBook.Path) -}}
+      {{- if and .Part (eq .Part $part) (findRE `\$|\\\(|\\\[` .Page.LinkTitle 1) }}{{ $math = true }}{{ end -}}
+    {{- end -}}
+  {{- else if and (not $math) (not $inBook) (or .IsHome (eq .Kind "section")) -}}
+    {{- /* List pages: the processed summaries they show (post-summary.html). */ -}}
     {{- range (partial "func/paginate.html" .).Pages -}}
-      {{- $noop = .WordCount -}}
-      {{- if or (.Store.Get "hasMath") (eq .Params.math true) }}{{ $math = true }}{{ end -}}
+      {{- if not $math -}}
+        {{- $sum := partialCached "func/content.html" (dict "page" . "summary" true) (or .RelPermalink .Path) true -}}
+        {{- if or (findRE $mathRE $sum 1) (eq .Params.math true) }}{{ $math = true }}{{ end -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}

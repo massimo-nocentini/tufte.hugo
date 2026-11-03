@@ -33,6 +33,13 @@ The `figure` shortcode replaces Hugo's built-in one and accepts a `type`: `main`
 
 Keep margin figures small and simple: the margin is about a third as wide as the text column.
 
+A Markdown image can go to the margin too, with a class attribute on the line after it: `{.margin}`, or its aliases `{.marginfigure}` and `{.marginnote}`. LaTeX-like attributes work on any block image: `offset` moves the caption (here one baseline down, `1bl`), `captionpos="bottom"` aligns it with the bottom of the image, `cite` appends references, `short` and an `{#fig:id}` label it for the lists of figures, and `numbered=false` turns its number off.
+
+![A table of figures from Beautiful Evidence](images/table-example-be-page-159.png "A Markdown image in the margin, its caption moved down one baseline.")
+{.marginfigure offset="1bl"}
+
+Like the `marginfigure` shortcode without `inline`, a Markdown margin image stands between two paragraphs and floats into the margin beside the one that follows it, this one.
+
 ## Full-width figures
 
 Wide graphics, like time series and maps, need the full width of the page. Use `fullwidthfigure`, or `figure` with `type="fullwidth"`; the caption goes below the image:
@@ -72,4 +79,18 @@ The `youtube` shortcode embeds a video through YouTube's privacy-enhanced domain
 
 {{< youtube YslQ2625TR4 >}}
 
-For any other embeddable page there is the `iframe` shortcode, with `src`, `title` and an optional `ratio`.
+For any other embeddable page there is the `iframe` shortcode, with `src`, `title` and an optional `ratio`. Here it embeds a map of Florence at a 4:3 ratio:
+
+{{< iframe src="https://www.openstreetmap.org/export/embed.html?bbox=11.2400%2C43.7650%2C11.2700%2C43.7780&layer=mapnik" title="A map of the centre of Florence" ratio="4:3" >}}
+
+Inside a `fullwidth` block an embed spans the whole page width, margin included, as any other content of the block does:
+
+{{< fullwidth >}}
+{{< iframe src="https://www.openstreetmap.org/export/embed.html?bbox=11.2000%2C43.7500%2C11.3100%2C43.7900&layer=mapnik" title="A wider map of Florence" ratio="21:9" >}}
+{{< /fullwidth >}}
+
+A self-hosted video uses the `video` shortcode, which makes a Tufte figure with the caption in the margin (see the [theme guide]({{< relref "posts/theme-guide.md" >}}) for its options). This example site ships no video file, so it is not shown live here:
+
+```markdown
+{{</* video src="flow.mp4" poster="flow.jpg" caption="Water flow, *slowed down*." */>}}
+```

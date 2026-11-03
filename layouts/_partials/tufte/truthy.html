@@ -1,0 +1,18 @@
+{{- /*
+  Boolean coercion for shortcode arguments and options (SPEC-LATEX §3.0.3).
+
+  true for: true, "true", "yes", "1", "on" (strings compared lowercased,
+  surrounding spaces ignored) and the number 1. Everything else, including
+  nil, "", "false", false and 0, is false.
+
+  Takes: any value.
+  Returns: bool.
+*/ -}}
+{{- $v := . -}}
+{{- $r := false -}}
+{{- if eq (printf "%T" $v) "bool" -}}
+  {{- $r = $v -}}
+{{- else if ne $v nil -}}
+  {{- $r = in (slice "true" "yes" "1" "on") (lower (trim (printf "%v" $v) " ")) -}}
+{{- end -}}
+{{- return $r -}}

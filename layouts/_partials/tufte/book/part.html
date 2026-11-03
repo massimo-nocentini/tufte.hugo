@@ -1,0 +1,59 @@
+{{- /*
+  A part of a book (\part): the _index.md of a sub-section of the book.
+
+    <article class="part"><header class="part-head"><p class="part-number">Part I</p><h1 class="part-title">TITLE</h1></header>CONTENT<ol class="book-toc-chapters">…</ol></article>
+
+  The list holds the chapters of the part (same items as the book
+  contents), followed by the book navigation (Contents link).
+
+  Takes: a dict with
+    page  the part section page
+    root  the book root
+*/ -}}
+{{- $p := .page -}}
+{{- $root := .root -}}
+{{- $num := partial "tufte/book/part-number.html" (dict "root" $root "part" $p) -}}
+{{- $title := $p.Title -}}
+{{- $titleHTML := string (partial "tufte/title-html.html" (dict "page" $p "title" $title "heading" true)) -}}
+{{- $items := slice -}}
+{{- range partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
+  {{- if and .Part (eq .Part $p) -}}
+    {{- $c := .Page -}}
+    {{- $intoc := true -}}
+    {{- if isset $c.Params "intoc" }}{{ $intoc = partial "tufte/truthy.html" $c.Params.intoc }}{{ end -}}
+    {{- if $intoc -}}
+      {{- $t := $c.LinkTitle -}}
+      {{- $tHTML := htmlEscape $t -}}
+      {{- if findRE "[`*_~$\\\\\\['\"]|--|\\.\\.\\." $t 1 }}{{ $tHTML = $p.RenderString $t | string | replaceRE `</?a\b[^>]*>` "" | strings.TrimSpace }}{{ end -}}
+      {{- $n := "" -}}
+      {{- if .Numbered }}{{ $n = printf `<span class="toc-num">%s</span>` (htmlEscape (printf "%v" .Display)) }}{{ end -}}
+      {{- /* Not rendered (build.render = never): no link. */ -}}
+      {{- $entry := printf "%s%s" $n $tHTML -}}
+      {{- with $c.RelPermalink }}{{ $entry = printf `<a href="%s">%s</a>` . $entry }}{{ end -}}
+      {{- $items = $items | append (printf `<li class="toc-chapter matter-%s">%s</li>` (htmlEscape (.Matter | default "main")) $entry) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end }}
+{{- /* The sidenote counter continues from the pages before the part (as in
+       the print document, tufte/offsets.html). */ -}}
+{{- $style := "" -}}
+{{- $off := partialCached "tufte/offsets.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $n := int ($off.sidenote | default 0) -}}
+{{- if gt $n 0 }}{{ $style = printf "counter-reset: sidenote-counter %d" $n }}{{ end }}
+<article class="part"{{ with $style }} style="{{ . | safeCSS }}"{{ end }}>
+  <header class="part-head">
+    {{- with $num }}<p class="part-number">{{ T "part" }} {{ . }}</p>{{ end -}}
+    <h1 class="part-title">{{ $titleHTML | safeHTML }}</h1>
+  </header>
+  {{ partial "tufte/abstract.html" $p }}
+  {{ partial "before_content.html" $p }}
+  {{ partialCached "func/content.html" $p (or $p.RelPermalink $p.Path) false }}
+  {{- with $items }}
+  <section class="book-toc">
+    <ol class="book-toc-chapters">{{ delimit . "" | safeHTML }}</ol>
+  </section>
+  {{- end }}
+  {{ partial "after_content.html" $p }}
+  {{ partial "tufte/book/nav.html" (dict "page" $p "root" $root) }}
+</article>
+{{- /* no trailing newline */ -}}

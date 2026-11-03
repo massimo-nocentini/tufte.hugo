@@ -1,13 +1,26 @@
 {{ define "main" }}
-{{- /* Section pages (and the fallback for other list pages): title, the
-       _index.md content as introduction, then paginated post summaries. */ -}}
+{{- /* Section pages (and the fallback for other list pages):
+       - a section whose _index.md sets `book: true` is a book landing
+         (half title, epigraphs, title page, copyright page, contents,
+         dedication, then its own content): tufte/book/landing.html;
+       - a sub-section of a book is a part (\part): tufte/book/part.html;
+       - any other section: title, the _index.md content as introduction,
+         then paginated post summaries.
+       A site's own layouts/section.html takes precedence over this file. */ -}}
+{{- $root := partialCached "tufte/book/root.html" . (or .RelPermalink .Path) -}}
+{{- if and $root (eq $root .) }}
+{{ partial "tufte/book/landing.html" . }}
+{{- else if and $root .IsSection }}
+{{ partial "tufte/book/part.html" (dict "page" . "root" $root) }}
+{{- else }}
 <article>
-  <h1>{{ .Title }}</h1>
+  <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" .Title "heading" true) }}</h1>
   {{- with .Params.subtitle }}
   <p class="subtitle">{{ . }}</p>
   {{- end }}
+  {{ partial "tufte/abstract.html" . }}
   {{ partial "before_content.html" . }}
-  {{ partial "func/content.html" . }}
+  {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
   {{- $pag := partial "func/paginate.html" . }}
   {{- range $pag.Pages }}
   {{ partial "post-summary.html" . }}
@@ -15,4 +28,5 @@
   {{ partial "paginator.html" . }}
   {{ partial "after_content.html" . }}
 </article>
+{{- end }}
 {{ end }}

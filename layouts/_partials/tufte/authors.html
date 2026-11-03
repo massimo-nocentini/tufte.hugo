@@ -1,0 +1,62 @@
+{{- /*
+  The authors of a page, as the title blocks and the post-meta line show
+  them (\author, with \thanks).
+
+  Front matter `author`: a string, a list of strings, or a list of
+  {name, thanks} maps; else params.author.name. Names are joined
+  "A", "A and B", "A, B and C" (i18n "and").
+
+  Takes: a dict with
+    page   the page
+    notes  optional bool: true writes each author's `thanks` as a numbered
+           sidenote right after the name (ids from func/note-id.html; call
+           it once per rendered title block, never for summaries)
+  Returns: a dict
+    html   the joined names, HTML-escaped, with the sidenotes when asked
+    plain  the names joined with ", " (for <meta name="author">)
+    notes  the number of authors with `thanks` (the sidenotes written
+           when `notes` is true)
+*/ -}}
+{{- $p := .page -}}
+{{- $withNotes := .notes | default false -}}
+{{- $authors := slice -}}
+{{- with $p.Params.author -}}
+  {{- if reflect.IsSlice . }}{{ $authors = . }}{{ else }}{{ $authors = slice . }}{{ end -}}
+{{- else -}}
+  {{- with (partial "func/site-author.html" .).name }}{{ $authors = slice . }}{{ end -}}
+{{- end -}}
+{{- $names := slice -}}
+{{- $plain := slice -}}
+{{- $count := 0 -}}
+{{- range $authors -}}
+  {{- $name := "" }}{{ $note := "" -}}
+  {{- if reflect.IsMap . -}}
+    {{- $name = printf "%v" (.name | default "") -}}
+    {{- with .thanks -}}
+      {{- $count = add $count 1 -}}
+      {{- if $withNotes -}}
+        {{- $id := partial "func/note-id.html" $p -}}
+        {{- $text := $p.RenderString (printf "%v" .) | string | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" -}}
+        {{- $note = printf `<label for="sn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote">%s</span>` $id $id $text -}}
+      {{- end -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $name = printf "%v" . -}}
+  {{- end -}}
+  {{- if $name -}}
+    {{- $names = $names | append (printf "%s%s" (htmlEscape $name) $note) -}}
+    {{- $plain = $plain | append $name -}}
+  {{- end -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- $n := len $names -}}
+{{- range $i, $a := $names -}}
+  {{- if eq $i 0 -}}
+    {{- $html = $a -}}
+  {{- else if eq $i (sub $n 1) -}}
+    {{- $html = printf "%s %s %s" $html (T "and") $a -}}
+  {{- else -}}
+    {{- $html = printf "%s, %s" $html $a -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "html" $html "plain" (delimit $plain ", ") "notes" $count) -}}

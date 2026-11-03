@@ -1,0 +1,44 @@
+{{- /*
+  Reads one shortcode argument, named or positional (SPEC-LATEX §3.0.3).
+
+  Takes a dict:
+    ctx      the shortcode context (.)
+    name     the named-parameter name
+    pos      the positional index (int); negative or absent = no
+             positional form
+    default  the value returned when the argument is absent (optional)
+
+  Returns: with named params, the value of `name` when it is given (an
+  explicit empty string name="" is returned as "", so callers can tell
+  "absent" from "empty"; false stays false); with positional params, the
+  value at `pos` when it exists; otherwise `default` (or "" when no default
+  was passed). Values keep their type (bool, int, string): wrap numbers in
+  int and booleans in tufte/truthy.html.
+*/ -}}
+{{- $ctx := .ctx -}}
+{{- $name := .name | default "" -}}
+{{- $pos := -1 -}}
+{{- if ne .pos nil -}}
+  {{- $pos = int .pos -}}
+{{- end -}}
+{{- $def := "" -}}
+{{- if ne .default nil -}}
+  {{- $def = .default -}}
+{{- end -}}
+{{- $r := $def -}}
+{{- with $ctx.Params -}}
+  {{- if $ctx.IsNamedParams -}}
+    {{- if and $name (isset . $name) -}}
+      {{- $v := index . $name -}}
+      {{- if ne $v nil -}}
+        {{- $r = $v -}}
+      {{- end -}}
+    {{- end -}}
+  {{- else if and (ge $pos 0) (lt $pos (len .)) -}}
+    {{- $v := index . $pos -}}
+    {{- if ne $v nil -}}
+      {{- $r = $v -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $r -}}

@@ -1,0 +1,33 @@
+{{- /*
+  The id of a generated heading (bibliography, list of figures/tables/
+  listings, index; SPEC-LATEX §3.6, §5.4, §3.12).
+
+  Takes: dict
+    "page"  the page that shows the generated list
+    "base"  the id, e.g. "tufte-index"
+    "seq"   optional int: 1-based rank of this list among the lists of the
+            same kind on the page (default 1)
+  Returns: string, the SEQ-th of BASE, BASE-2, BASE-3, … that no element of
+  the page's own content uses (the author's headings, \label anchors…), so
+  a heading "## Tufte index" (id tufte-index) keeps its id, which its TOC
+  entry links to, and the generated index takes tufte-index-2. Without
+  such a clash: BASE for the first list, BASE-SEQ for the others.
+*/ -}}
+{{- $p := .page -}}
+{{- $base := .base -}}
+{{- $seq := 1 -}}
+{{- with .seq }}{{ $seq = int . }}{{ end -}}
+{{- if lt $seq 1 }}{{ $seq = 1 }}{{ end -}}
+{{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) (or $p.RelPermalink $p.Path) false | string -}}
+{{- $id := cond (eq $seq 1) $base (printf "%s-%d" $base $seq) -}}
+{{- if or (strings.Contains $raw (printf ` id="%s"` $base)) (strings.Contains $raw (printf ` id="%s-` $base)) -}}
+  {{- $k := 0 -}}
+  {{- range $i := seq 1 (add $seq 100) -}}
+    {{- $c := cond (eq $i 1) $base (printf "%s-%d" $base $i) -}}
+    {{- if not (strings.Contains $raw (printf ` id="%s"` $c)) -}}
+      {{- $k = add $k 1 -}}
+      {{- if eq $k $seq }}{{ $id = $c }}{{ break }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $id -}}

@@ -8,7 +8,7 @@
 
   Params (all optional):
     author  attribution, inline Markdown
-    cite    title of the work, rendered in <cite>, after the author
+    cite    title of the work, rendered in <cite>, after the author (alias: work)
     url     source URL: the blockquote cite attribute; also links the footer
     footer  full footer, inline Markdown (replaces author/cite)
     class   extra classes for the blockquote
@@ -18,40 +18,9 @@
 */ -}}
 {{- $p := .Page -}}
 {{- $text := strings.TrimSpace .Inner -}}
-{{- /* Block Markdown; the HTML of nested shortcodes is kept as is. */ -}}
-{{- $html := partial "tufte/render-inner.html" (dict "page" $p "text" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) -}}
-{{- $author := "" -}}{{- $cite := "" -}}{{- $url := "" -}}{{- $footerRaw := "" -}}{{- $class := "" -}}
-{{- if .IsNamedParams -}}
-  {{- $author = .Get "author" | default "" -}}
-  {{- $cite = .Get "cite" | default "" -}}
-  {{- $url = .Get "url" | default "" -}}
-  {{- $footerRaw = .Get "footer" | default "" -}}
-  {{- $class = .Get "class" | default "" -}}
-{{- end -}}
-{{- /* Footer: "Author, <cite>Work</cite>", or the footer param. */ -}}
-{{- $footer := "" -}}
-{{- with $footerRaw -}}
-  {{- $footer = $p.RenderString . | string -}}
-{{- else -}}
-  {{- with $author -}}
-    {{- $footer = $p.RenderString . | string -}}
-  {{- end -}}
-  {{- with $cite -}}
-    {{- $c := printf "<cite>%s</cite>" ($p.RenderString .) -}}
-    {{- if $footer -}}
-      {{- $footer = printf "%s, %s" $footer $c -}}
-    {{- else -}}
-      {{- $footer = $c -}}
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
-{{- /* Footer link: the anchor is built by html/template so that the URL is
-     filtered (javascript:, vbscript:, … become #ZgotmplZ), as in the link hook. */ -}}
-{{- $link := and $footer $url (not (strings.Contains $footer "<a ")) -}}
-<blockquote{{ with $class }} class="{{ . }}"{{ end }}{{ with $url }} cite="{{ . }}"{{ end }}>
-{{ $html | safeHTML }}
-{{- with $footer }}
-<footer>{{ if $link }}<a href="{{ $url }}">{{ . | safeHTML }}</a>{{ else }}{{ . | safeHTML }}{{ end }}</footer>
-{{- end }}
-</blockquote>
-{{- /* no trailing newline */ -}}
+{{- /* Block Markdown; nested shortcodes are kept (nest tokens). */ -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
+{{- $get := dict -}}
+{{- if .IsNamedParams }}{{ $get = .Params }}{{ end -}}
+{{- $out := partial "tufte/quote.html" (dict "page" $p "html" $html "author" (index $get "author" | default "") "cite" (index $get "cite" | default (index $get "work") | default "") "url" (index $get "url" | default "") "footer" (index $get "footer" | default "") "class" (index $get "class" | default "")) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

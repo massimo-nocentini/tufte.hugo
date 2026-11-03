@@ -1,8 +1,8 @@
 {{- /*
-  Full-width figure (block): spans the whole article width, caption in a
-  figcaption. Put it on its own line:
+  Full-width figure (figure*): spans the whole article width, caption in
+  the margin column. Put it on its own line:
 
-    {{< fullwidthfigure src="napoleons-march.png" alt="Napoleon's March" >}}
+    {{< fullwidthfigure src="napoleons-march.png" alt="Napoleon's March" label="fig:napoleon" >}}
 
   Params: as for the figure shortcode, without type.
 
@@ -15,7 +15,7 @@
 {{- if not $src -}}
   {{- errorf "fullwidthfigure shortcode: the src parameter is required (%s)" .Position -}}
 {{- end -}}
-{{- partial "tufte/figure.html" (dict
+{{- $out := partial "tufte/figure.html" (dict
   "Page" .Page
   "Src" $src
   "Alt" (.Get "alt" | default "")
@@ -24,9 +24,16 @@
   "Attr" (.Get "attr" | default "")
   "AttrLink" (.Get "attrlink" | default "")
   "Link" (.Get "link" | default "")
-  "Type" ("fullwidth")
+  "Type" "fullwidth"
   "Width" (.Get "width" | default "")
   "Height" (.Get "height" | default "")
   "Class" (.Get "class" | default "")
-  "Inline" (in (slice "true" "1" "yes") (printf "%v" (.Get "inline")))
+  "Inline" (partial "tufte/truthy.html" (.Get "inline"))
+  "Label" (.Get "label" | default "")
+  "Short" (.Get "short" | default "")
+  "Numbered" (.Get "numbered")
+  "CaptionPos" (.Get "captionpos" | default "")
+  "Offset" (.Get "offset" | default "")
+  "Cite" (.Get "cite" | default "")
 ) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

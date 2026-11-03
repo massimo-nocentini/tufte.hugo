@@ -1,0 +1,20 @@
+{{- /*
+  The normalised key of a label= parameter (or a \label, an {#id}) that
+  defines an anchor: tufte/key.html, plus a warning when the key is not
+  empty but normalises to "" (punctuation only, e.g. "!!!"), since it then
+  makes no anchor id and no reference can reach it.
+
+  Takes a dict:
+    key    the raw key (anything printable)
+    where  text naming the source for the warning, e.g. "sidenote shortcode in FILE:LINE"
+  Returns: the normalised key ("" for an empty or unusable key).
+*/ -}}
+{{- $raw := strings.TrimSpace (printf "%v" (.key | default "")) -}}
+{{- $k := "" -}}
+{{- with $raw -}}
+  {{- $k = partial "tufte/key.html" . -}}
+  {{- if not $k -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: the label %q has no letter or digit, so it makes no anchor id and is ignored; use letters, digits, \":\" and \"-\" (%s)" $raw $.where -}}
+  {{- end -}}
+{{- end -}}
+{{- return $k -}}

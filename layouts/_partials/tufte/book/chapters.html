@@ -1,0 +1,133 @@
+{{- /*
+  The chapters of a book in reading order (SPEC-LATEX §4.1, R13).
+
+  1. Regular pages of the root, plus the regular pages of each part (a
+     sub-section of the root; one level: pages of deeper sections are
+     flattened into their part, with a tufte-book-structure warning).
+  2. Sorted by matter (front, main, appendix, back), then by the weight of
+     the group (a part's weight for its chapters, the chapter's own weight
+     for chapters at the root, so parts and loose chapters interleave by
+     weight; weight 0 = unweighted = last), then the chapter's weight,
+     then its file name. Never by date.
+  3. Num: 1-based index among main-matter chapters that are not
+     `unnumbered`. Appendix chapters get the letters A, B, … as Display.
+  4. Numbered: book.numberChapters (resolved for the chapter) and not
+     `unnumbered` and matter is main or appendix.
+
+  Takes: the book root page.
+  Returns: a slice of dicts
+    { Page, Matter, Num, Display, Numbered, Part, Index, SortKey }
+  (Part is the part page or false; Index is the 0-based position; SortKey
+  is the reading-order key "MATTERRANK|GROUPWEIGHT|GROUPNAME|WEIGHT|NAME",
+  which tufte/book/toc.html uses to place parts without chapters).
+  Callers: partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- /* Memoized in the root's Store (not in hugo server): see
+       tufte/opts.html. */ -}}
+{{- $memoRes := false -}}
+{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoChapters") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $root := . -}}
+{{- $ranks := dict "front" 0 "main" 1 "appendix" 2 "back" 3 -}}
+{{- $items := slice -}}
+{{- $groups := slice -}}
+{{- range $root.RegularPages -}}
+  {{- $groups = $groups | append (dict "part" false "page" .) -}}
+{{- end -}}
+{{- /* Parts are one level deep (\part has no sub-parts): the pages of a
+       section inside a part are read as chapters of that part, after its
+       own pages of equal weight (their file name sorts under the
+       sub-section's directory), and tufte-book-structure is warned. */ -}}
+{{- $deep := slice -}}
+{{- range $root.Sections -}}
+  {{- $part := . -}}
+  {{- range $part.RegularPagesRecursive -}}
+    {{- $sub := "" -}}
+    {{- if ne .Parent $part -}}
+      {{- with .Parent -}}
+        {{- $sub = .Title -}}
+        {{- with .File }}{{ $sub = .Dir }}{{ end -}}
+        {{- with $part.File }}{{ $sub = strings.TrimPrefix .Dir $sub }}{{ end -}}
+        {{- $at := .RelPermalink -}}
+        {{- with .File }}{{ $at = .Path }}{{ end -}}
+        {{- if not (in $deep $at) }}{{ $deep = $deep | append $at }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $groups = $groups | append (dict "part" $part "page" . "sub" $sub) -}}
+  {{- end -}}
+{{- end -}}
+{{- with $deep -}}
+  {{- $at := $root.RelPermalink -}}
+  {{- with $root.File }}{{ $at = .Path }}{{ end -}}
+  {{- warnidf "tufte-book-structure" "tufte.hugo: book %s: parts are one level deep, but %s is a section inside a part; its pages are read as chapters of that part, and its own _index.md is not part of the book's reading order" $at (delimit . ", ") -}}
+{{- end -}}
+{{- range $groups -}}
+  {{- $p := .page -}}
+  {{- $part := .part -}}
+  {{- $sub := .sub | default "" -}}
+  {{- $matter := lower (printf "%v" (index $p.Params "matter" | default "main")) -}}
+  {{- if not (isset $ranks $matter) -}}
+    {{- $at := "" -}}
+    {{- with $p.File }}{{ $at = .Path }}{{ else }}{{ $at = $p.RelPermalink }}{{ end -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: matter must be front, main, appendix or back, not %q, in %s; using main" $matter $at -}}
+    {{- $matter = "main" -}}
+  {{- end -}}
+  {{- $name := $p.Title -}}
+  {{- with $p.File }}{{ $name = .ContentBaseName }}{{ end -}}
+  {{- with $sub }}{{ $name = printf "%s%s" . $name }}{{ end -}}
+  {{- /* Weights as fixed-width keys that sort like numbers, negative
+         weights included (tufte/book/weight-key.html). */ -}}
+  {{- $w := partial "tufte/book/weight-key.html" $p.Weight -}}
+  {{- $gw := $w -}}
+  {{- $gname := $name -}}
+  {{- with $part -}}
+    {{- $gw = partial "tufte/book/weight-key.html" .Weight -}}
+    {{- $gname = .Title -}}
+    {{- with .File }}{{ $gname = .Dir }}{{ end -}}
+  {{- end -}}
+  {{- $sortkey := printf "%d|%s|%s|%s|%s" (index $ranks $matter) $gw $gname $w $name -}}
+  {{- $items = $items | append (dict "sortkey" $sortkey "Page" $p "Matter" $matter "Part" $part) -}}
+{{- end -}}
+{{- $items = sort $items "sortkey" -}}
+
+{{- $letters := split "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z" " " -}}
+{{- $main := 0 -}}
+{{- $app := 0 -}}
+{{- $out := slice -}}
+{{- range $i, $it := $items -}}
+  {{- $p := $it.Page -}}
+  {{- $unnumbered := partial "tufte/truthy.html" (index $p.Params "unnumbered") -}}
+  {{- $num := 0 -}}
+  {{- $display := "" -}}
+  {{- if not $unnumbered -}}
+    {{- if eq $it.Matter "main" -}}
+      {{- $main = add $main 1 -}}
+      {{- $num = $main -}}
+      {{- $display = string $main -}}
+    {{- else if eq $it.Matter "appendix" -}}
+      {{- $app = add $app 1 -}}
+      {{- $num = $app -}}
+      {{- if le $app (len $letters) -}}
+        {{- $display = index $letters (sub $app 1) -}}
+      {{- else -}}
+        {{- $display = string $app -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $nc := partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.numberchapters") (or $p.RelPermalink $p.Path) "book.numberchapters") -}}
+  {{- $numbered := and $nc (not $unnumbered) (in (slice "main" "appendix") $it.Matter) -}}
+  {{- $out = $out | append (dict
+    "Page" $p
+    "Matter" $it.Matter
+    "Num" $num
+    "Display" $display
+    "Numbered" $numbered
+    "Part" $it.Part
+    "Index" $i
+    "SortKey" $it.sortkey) -}}
+{{- end -}}
+{{- $memoRes = $out -}}
+{{- if not hugo.IsServer }}{{ $root.Store.Set "tufteMemoChapters" (dict "v" $memoRes) }}{{ end -}}
+{{- end -}}
+{{- return $memoRes -}}

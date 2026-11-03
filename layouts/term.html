@@ -1,26 +1,16 @@
 {{ define "main" }}
 {{- /* A taxonomy term (for example /tags/math/): its pages grouped by year,
-       newest first, with a link back to the taxonomy. */ -}}
+       newest first (undated pages last: tufte/archive-list.html), with a link back to the taxonomy. */ -}}
 <article>
-  <h1>{{ .Title }}</h1>
+  <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" .Title "heading" true) }}</h1>
   {{- with .Params.subtitle }}
   <p class="subtitle">{{ . }}</p>
   {{- end }}
   {{- with .Parent }}
   <p class="sans"><a href="{{ .RelPermalink }}">&larr;&nbsp;{{ .LinkTitle }}</a></p>
   {{- end }}
-  {{ partial "func/content.html" . }}
-  <div class="archive">
-    {{- range .Pages.GroupByDate "2006" }}
-    <section>
-      <h2 class="archive-year">{{ .Key }}</h2>
-      <ul class="archive-list">
-        {{- range .Pages }}
-        <li><time datetime="{{ .Date.Format "2006-01-02" }}">{{ partial "func/date.html" (dict "date" .Date "format" "Jan 2") }}</time> <a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></li>
-        {{- end }}
-      </ul>
-    </section>
-    {{- end }}
-  </div>
+  {{ partial "tufte/abstract.html" . }}
+  {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
+  {{ partial "tufte/archive-list.html" .Pages }}
 </article>
 {{ end }}

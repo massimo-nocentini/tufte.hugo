@@ -1,0 +1,15 @@
+{{- /*
+  The parts of a book in the order the print document prints them
+  (tufte/book/sequence.html): each before its first chapter, parts without
+  chapters at their place among the chapters. The print document gives
+  part K the id pK (K from 1).
+
+  Takes: the book root.
+  Returns: a slice of part section pages.
+  Callers: partialCached "tufte/book/print-parts.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- $parts := slice -}}
+{{- range partialCached "tufte/book/sequence.html" . (or .RelPermalink .Path) -}}
+  {{- if and (eq .Kind "part") (not (in $parts .Page)) }}{{ $parts = $parts | append .Page }}{{ end -}}
+{{- end -}}
+{{- return $parts -}}

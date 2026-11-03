@@ -1,49 +1,79 @@
 {{- /*
-  Shared figure renderer, used by the figure, marginfigure and
-  fullwidthfigure shortcodes and by the image render hook.
+  Shared float renderer: the figure, marginfigure, fullwidthfigure and fig
+  shortcodes, the image render hook (images), and the table, margintable,
+  fullwidthtable, listing and subfigures shortcodes and the table render
+  hook (Body).
 
-  Output, matching the Tufte CSS demo:
+  Output (SPEC.md, SPEC-LATEX §3.4). A captioned float is numbered: the
+  caption starts with the marker of tufte/caption-label.html, which
+  tufte/postprocess.html turns into "Figure 3:" (or removes on pages that are
+  not numbered, R12). K is Label, else "auto-<note id>".
 
-    main       <figure>
-                 <label for="mn-ID" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-ID" class="margin-toggle"/><span class="marginnote">CAPTION</span>
-                 <img …/>
+    main       <figure class="tufte-KIND[ caption-bottom][ CLASS]" id="K">
+                 <label for="mn-ID" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-ID" class="margin-toggle"/><span class="marginnote caption"[ style]>LABEL+CAPTION</span>
+                 <img …/> | BODY
                </figure>
-               (no caption: <figure><img …/></figure>)
-    fullwidth  <figure class="fullwidth"><img …/><figcaption>CAPTION</figcaption></figure>
-    margin     <p><label …>&#8853;</label><input …/><span class="marginnote"><img …/>CAPTION</span></p>
-               (with Inline = true the wrapping <p> is left out, for use inside a paragraph)
-    inline     <img …/> only (used by the image render hook for inline images)
+               (no caption: <figure class="tufte-KIND"><img …/></figure>)
+    fullwidth  <figure class="fullwidth tufte-KIND[ caption-bottom]" id="K"><img …/><figcaption class="caption-margin"[ style]>LABEL+CAPTION</figcaption></figure>
+               (caption-bottom: the figcaption comes before the img in
+               source order; CSS positions it)
+    margin     <p class="margin-figure-anchor[ CLASS]" id="K"><label …>&#8853;</label><input …/><span class="marginnote margin-figure"[ style]><img …/>LABEL+CAPTION</span></p>
+               (Inline = true: no <p>; the id goes on a <span class="tufte-anchor"> before the label)
+               With a Body (block content, e.g. a margin table) the margin
+               float is a margin block:
+               <div class="tufte-anchor" id="K"></div><label …>&#8853;</label><input …/><div class="marginnote margin-block margin-KIND"[ style]><p class="caption">LABEL+CAPTION</p>BODY</div>
+    inline     <img …/> only (image render hook, inline images)
 
-  The source is resolved as a page resource (page bundle), then as a global
-  resource under assets/, then used as a plain URL: a path that starts with
-  "/" is a static/ path made relative to baseURL; remote URLs pass through.
-  Raster resources get their intrinsic width and height unless given.
+  A labelled float without a number (Numbered false, or no caption) has
+  <i class="tufte-float" data-kind data-key[ data-short] data-name hidden></i>
+  right before its <img …/> or body, so that xref finds it by its name.
+
+  Sources: a page resource (page bundle), then a global resource under
+  assets/, then a plain URL (a path starting with "/" is a static/ path,
+  made relative to baseURL; remote URLs pass through). Raster resources get
+  their intrinsic width and height unless given.
 
   Takes a dict:
-    Page     the page being rendered (note ids, markdown rendering)  required
-    ResPage  the page to look up page resources in (default: Page)
-    Src      image path or URL                                       required
-    Alt      alt text (default: plain text of the caption)
-    Caption  caption, inline Markdown
-    Title    optional title, shown in bold before the caption
-    Attr     optional attribution appended to the caption; AttrLink links it
-    Link     URL the image links to
-    Type     "main" (default) | "margin" | "fullwidth" | "inline"
-    Width    width attribute of the img
-    Height   height attribute of the img
-    Class    extra classes (figure; for margin figures the wrapping p, or
-             the span.marginnote when Inline = true)
-    Inline   bool, margin figures only: omit the wrapping <p>
-    Attrs    map of extra attributes for the img (e.g. from Markdown attributes)
+    Page        the page being rendered (note ids, Markdown)       required
+    ResPage     the page to look up page resources in (default: Page)
+    Src         image path or URL               required unless Body
+    Body        pre-rendered HTML that replaces the image (tables, listings, grids)
+    Kind        "figure" (default) | "table" | "listing": counter and caption word
+    Alt         alt text (default: plain text of the caption, without notes
+                and toggles; cross-references resolved by postprocess)
+    Caption     caption, inline Markdown
+    CaptionHTML pre-rendered caption HTML (fig shortcode); wins over Caption
+    Title       optional title, shown in bold before the caption
+    Attr        optional attribution appended to the caption; AttrLink links it
+    Link        URL the image links to
+    Type        "main" (default) | "margin" | "fullwidth" | "inline"
+    Width, Height  img attributes
+    Class       extra classes (figure; margin: the wrapping p, or the
+                span.marginnote with Inline)
+    Style       a style attribute value for the figure (already safe, e.g. "--cols:2")
+    Inline      bool, margin figures only: omit the wrapping <p>
+    Attrs       map of extra attributes for the img (Markdown attributes)
+    Label       label key (normalised here with tufte/key.html)
+    Short       short caption for lists of figures/tables
+    Numbered    bool (default true): false = never numbered
+    CaptionPos  "top" (default) | "bottom" (not for margin floats: warned)
+    Offset      vertical offset of the caption (tufte/offset.html syntax: 1bl, -2rem…)
+    Cite        citation keys ("a,b" or a slice), appended as a citation block
+                (with the cites nested in the caption or body: tufte/cite-gather.html)
 */ -}}
 {{- $page := .Page -}}
+{{- $where := $page.RelPermalink -}}
+{{- with $page.File }}{{ $where = .Path }}{{ end -}}
 {{- $resPage := .ResPage | default $page -}}
 {{- $src := printf "%v" (.Src | default "") | strings.TrimSpace -}}
+{{- $body := .Body | default "" -}}
+{{- $kind := .Kind | default "figure" | lower -}}
 {{- $type := .Type | default "main" | lower -}}
 {{- if not (in (slice "main" "margin" "fullwidth" "inline") $type) -}}
-  {{- warnf "tufte/figure.html: unknown figure type %q for %q, using \"main\"" $type $src -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: unknown figure type %q for %q, using \"main\" (%s)" $type $src $where -}}
   {{- $type = "main" -}}
 {{- end -}}
+{{- if and $body (eq $type "inline") -}}{{- $type = "main" -}}{{- end -}}
 
 {{- /* Resolve the source. */ -}}
 {{- $url := $src -}}
@@ -80,12 +110,18 @@
 {{- end -}}
 
 {{- /* Caption: inline Markdown, never block elements (it sits in a span). */ -}}
+{{- $caption := "" -}}
+{{- if .CaptionHTML -}}
+  {{- $caption = string .CaptionHTML | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- end -}}
 {{- $raw := "" -}}
 {{- with .Title -}}
   {{- $raw = printf "**%s**" (strings.TrimSpace (printf "%v" .)) -}}
 {{- end -}}
-{{- with .Caption -}}
-  {{- $raw = strings.TrimSpace (printf "%s %s" $raw (strings.TrimSpace (printf "%v" .))) -}}
+{{- if not $caption -}}
+  {{- with .Caption -}}
+    {{- $raw = strings.TrimSpace (printf "%s %s" $raw (strings.TrimSpace (printf "%v" .))) -}}
+  {{- end -}}
 {{- end -}}
 {{- with .Attr -}}
   {{- $a := strings.TrimSpace (printf "%v" .) -}}
@@ -94,17 +130,69 @@
   {{- end -}}
   {{- $raw = strings.TrimSpace (printf "%s %s" $raw $a) -}}
 {{- end -}}
-{{- $caption := "" -}}
 {{- with $raw -}}
-  {{- /* Inline Markdown; HTML in the caption is kept as is (Goldmark would
-         drop it with markup.goldmark.renderer.unsafe = false). */ -}}
-  {{- $html := partial "tufte/render-inner.html" (dict "page" $page "text" .) -}}
-  {{- $caption = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace | safeHTML -}}
+  {{- $html := partial "tufte/render-inner.html" (dict "page" $page "inner" . "text" . "display" "inline" "shortcodes" "run") | string -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- /* A cite written in a caption= parameter runs without a parent, so it
+         made a citation sidenote: turn it into a nested citation, gathered
+         under the caption below like the cites of a fig caption. */ -}}
+  {{- if strings.Contains $html `class="sidenote citation"` -}}
+    {{- $html = replaceRE `(?s)<label for="[^"]*" class="margin-toggle sidenote-number"></label><input type="checkbox" id="[^"]*" class="margin-toggle"/><span class="sidenote citation"[^>]*>(.*?)</span><i class="sn-end" hidden></i>` `<span class="citation-block" data-nested="1">$1</span><i class="cite-end" hidden></i>` $html -}}
+  {{- end -}}
+  {{- if $caption -}}
+    {{- /* CaptionHTML plus Title/Attr: title first, attribution last. */ -}}
+    {{- $caption = printf "%s %s" $html $caption -}}
+  {{- else -}}
+    {{- $caption = $html -}}
+  {{- end -}}
+{{- end -}}
+{{- /* A sidenote or margin note in the caption cannot float inside it
+       (\caption in tufte-latex: "Float(s) lost"): its text stays inline. */ -}}
+{{- if strings.Contains $caption `class="margin-toggle` -}}
+  {{- $caption = partial "tufte/note-in-note.html" (dict "page" $page "html" $caption "holder" (printf "%s caption" $kind)) -}}
 {{- end -}}
 
 {{- $alt := .Alt | default "" -}}
 {{- if and (not $alt) $caption -}}
-  {{- $alt = $caption | plainify | htmlUnescape | strings.TrimSpace -}}
+  {{- /* Plain caption text, without what is not part of the caption's
+         wording: KaTeX's MathML copy (the TeX source would show up
+         twice), the toggles (label/input, "⊕") and the nested sidenotes,
+         margin notes, citation blocks and real-footnote markers
+         (span.tufte-fn) (spans balanced, so their own
+         nested spans do not end them early). Cross-reference markers are
+         kept as they are; the img printf escapes them and
+         tufte/postprocess.html replaces the escaped marker with the
+         resolved text ("Table 1"), as in the visible caption. So are
+         nobib citation numbers (cite-num spans, "[2]"): postprocess
+         fills the escaped span as it fills the visible one. */ -}}
+  {{- $buf := "" -}}
+  {{- $depth := 0 -}}
+  {{- $skip := 0 -}}
+  {{- $inLabel := false -}}
+  {{- range $t := findRE `(?s)<a class="xref"[^>]*>[^<]*</a>|<span class="cite-num"[^>]*></span>|<[^>]*>|[^<]+` $caption -}}
+    {{- if strings.HasPrefix $t `<span class="cite-num"` -}}
+      {{- if not (or (gt $skip 0) $inLabel) }}{{ $buf = printf "%s%s" $buf $t }}{{ end -}}
+    {{- else if strings.HasPrefix $t "<span" -}}
+      {{- $depth = add $depth 1 -}}
+      {{- if and (eq $skip 0) (findRE `^<span class="(?:sidenote|marginnote|note-in-note|katex-mathml|citation-block|tufte-fn)[" ]` $t 1) }}{{ $skip = $depth }}{{ end -}}
+    {{- else if eq $t "</span>" -}}
+      {{- if eq $skip $depth }}{{ $skip = 0 }}{{ end -}}
+      {{- $depth = sub $depth 1 -}}
+    {{- else if strings.HasPrefix $t "<label" -}}
+      {{- $inLabel = true -}}
+    {{- else if eq $t "</label>" -}}
+      {{- $inLabel = false -}}
+    {{- else if or (gt $skip 0) $inLabel -}}
+    {{- else if strings.HasPrefix $t `<a class="xref"` -}}
+      {{- $buf = printf "%s%s" $buf $t -}}
+    {{- else if not (strings.HasPrefix $t "<") -}}
+      {{- $buf = printf "%s%s" $buf (htmlUnescape $t) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* A shortcode in a Markdown image title is still Hugo's placeholder
+         here (see the caption markers below): it must not reach the
+         attribute, where Hugo would put the shortcode's HTML. */ -}}
+  {{- $alt = $buf | replaceRE `HAHAHUGOSHORTCODE\w*?HBHB` "" | replaceRE `\s+` " " | strings.TrimSpace -}}
 {{- end -}}
 
 {{- /* Extra img attributes, sanitised. */ -}}
@@ -119,52 +207,160 @@
 
 {{- $class := printf "%v" (.Class | default "") | strings.TrimSpace -}}
 {{- $link := .Link | default "" -}}
-{{- $id := "" -}}
-{{- if or (eq $type "margin") (and (eq $type "main") $caption) -}}
-  {{- $id = partial "func/note-id.html" $page -}}
+
+{{- /* Numbering, label, offset, citations (SPEC-LATEX §3.4). */ -}}
+{{- $numbered := true -}}
+{{- /* Unset (nil, or "" from a missing shortcode param) = numbered. */ -}}
+{{- with .Numbered -}}
+  {{- $numbered = partial "tufte/truthy.html" . -}}
+{{- else -}}
+  {{- if eq $.Numbered false }}{{ $numbered = false }}{{ end -}}
+{{- end -}}
+{{- $label := "" -}}
+{{- with .Label -}}
+  {{- $label = partial "tufte/label-key.html" (dict "key" . "where" (printf "%s in %s" (cond (ne $src "") $src $kind) $where)) -}}
+{{- end -}}
+{{- $bottom := eq (lower (printf "%v" (.CaptionPos | default "top"))) "bottom" -}}
+{{- with .CaptionPos -}}
+  {{- if not (in (slice "top" "bottom") (lower (printf "%v" .))) -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: captionpos must be \"top\" or \"bottom\", not %q (%s in %s)" . $src $where -}}
+  {{- end -}}
+{{- end -}}
+{{- if and $bottom (eq $type "margin") -}}
+  {{- /* A margin float's caption always follows its body (as in
+         tufte-latex, where \setfloatalignment only moves the captions of
+         text-column floats). */ -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: captionpos=\"bottom\" has no effect on a margin float (%s in %s)" (cond (ne $src "") $src (printf "margin %s" $kind)) $where -}}
+  {{- $bottom = false -}}
+{{- end -}}
+{{- $style := "" -}}
+{{- with .Offset -}}
+  {{- $style = partial "tufte/offset.html" (dict "value" (printf "%v" .) "page" $page "where" (printf "(%s)" (cond (ne $src "") $src (printf "%s float" $kind)))) -}}
+{{- end -}}
+{{- $cites := slice -}}
+{{- with .Cite -}}
+  {{- $list := . -}}
+  {{- if not (reflect.IsSlice .) }}{{ $list = split (printf "%v" .) "," }}{{ end -}}
+  {{- range $list -}}
+    {{- with strings.TrimSpace (printf "%v" .) }}{{ $cites = $cites | append (lower .) }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Citations: the cite shortcodes nested in the caption (fig) or the
+       body (table, listing, subfigures) are cut out where they stand and
+       merged with Cite into one block after the caption, as tufte-latex
+       prints the \cite keys of a \caption after it (tufte/cite-gather.html). */ -}}
+{{- $citeHTML := "" -}}
+{{- $split := "TUFTECAPBODYSPLIT" -}}
+{{- with partial "tufte/cite-gather.html" (dict "page" $page "html" (printf "%s%s%s" $caption $split (string $body)) "keys" $cites) -}}
+  {{- $parts := split .html $split -}}
+  {{- $caption = index $parts 0 | strings.TrimSpace -}}
+  {{- if $body }}{{ $body = index $parts 1 }}{{ end -}}
+  {{- $citeHTML = .block -}}
 {{- end -}}
 
-{{- if eq $type "inline" -}}
-  {{- with $link }}<a href="{{ . }}">{{ end -}}
-  <img src="{{ $url | safeURL }}" alt="{{ $alt }}"
-    {{- with $width }} width="{{ . }}"{{ end }}
-    {{- with $height }} height="{{ . }}"{{ end }}
-    {{- with $class }} class="{{ . }}"{{ end }}
-    {{- $extra | safeHTMLAttr }} loading="lazy"/>
-  {{- with $link }}</a>{{ end -}}
-{{- else -}}
-  {{- if eq $type "margin" -}}
-    {{- /* Class goes on the wrapping <p>; with Inline there is no <p>, so it
-           goes on the margin note span instead. */ -}}
-    {{- $spanClass := "marginnote" -}}
-    {{- if .Inline -}}
-      {{- $spanClass = printf "marginnote %s" $class | strings.TrimSpace -}}
-    {{- end -}}
-    {{- if not .Inline }}<p{{ with $class }} class="{{ . }}"{{ end }}>{{ end -}}
-    <label for="mn-{{ $id }}" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-{{ $id }}" class="margin-toggle"/><span class="{{ $spanClass }}">
-  {{- else -}}
-    {{- $figClass := $class -}}
-    {{- if eq $type "fullwidth" -}}
-      {{- $figClass = printf "fullwidth %s" $class | strings.TrimSpace -}}
-    {{- end -}}
-    <figure{{ with $figClass }} class="{{ . }}"{{ end }}>
-    {{- if and (eq $type "main") $caption -}}
-      <label for="mn-{{ $id }}" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-{{ $id }}" class="margin-toggle"/><span class="marginnote">{{ $caption }}</span>
-    {{- end -}}
+{{- $id := "" -}}
+{{- if or (eq $type "margin") (and (eq $type "main") (or $caption $citeHTML)) -}}
+  {{- $id = partial "func/note-id.html" $page -}}
+{{- end -}}
+{{- $key := "" -}}
+{{- if and $caption $numbered (ne $type "inline") -}}
+  {{- $key = $label -}}
+  {{- if not $key -}}
+    {{- $n := $id -}}
+    {{- if not $n }}{{ $n = partial "func/note-id.html" $page }}{{ end -}}
+    {{- $key = printf "auto-%s" $n -}}
   {{- end -}}
-  {{- with $link }}<a href="{{ . }}">{{ end -}}
-  <img src="{{ $url | safeURL }}" alt="{{ $alt }}"
-    {{- with $width }} width="{{ . }}"{{ end }}
-    {{- with $height }} height="{{ . }}"{{ end }}
-    {{- $extra | safeHTMLAttr }} loading="lazy"/>
-  {{- with $link }}</a>{{ end -}}
-  {{- if eq $type "margin" -}}
-    {{- $caption }}</span>
-    {{- if not .Inline }}</p>{{ end -}}
-  {{- else -}}
-    {{- if and (eq $type "fullwidth") $caption -}}
-      <figcaption>{{ $caption }}</figcaption>
-    {{- end -}}
-    </figure>
+  {{- $caption = partial "tufte/caption-label.html" (dict "page" $page "kind" $kind "key" $key "labeled" (ne $label "") "short" (.Short | default "") "caption" $caption) -}}
+{{- end -}}
+{{- $anchor := $key | default $label -}}
+{{- /* A labelled float without a number (numbered=false, or no caption)
+       still defines its key, through an inert marker before the image or
+       body that tufte/labels.html records (display "", name = short
+       caption, else caption, else alt: xref auto/full/name give the name)
+       and tufte/postprocess.html removes. It is not listed in the lists
+       of figures and tables (\caption* semantics). */ -}}
+{{- $mark := "" -}}
+{{- if and $label (not $key) (ne $type "inline") -}}
+  {{- $shortAttr := "" -}}
+  {{- with .Short }}{{ $shortAttr = printf ` data-short="%s"` (htmlEscape (printf "%v" .)) }}{{ end -}}
+  {{- $mark = printf `<i class="tufte-float" data-kind="%s" data-key="%s"%s data-name="%s" hidden></i>` (htmlEscape $kind) (htmlEscape $label) $shortAttr (htmlEscape ($caption | default (htmlEscape $alt) | replaceRE `HAHAHUGOSHORTCODE\w*?HBHB` "")) -}}
+{{- end -}}
+{{- if and $caption (strings.Contains $caption "HAHAHUGOSHORTCODE") -}}
+  {{- /* A shortcode written in a Markdown image title or a table caption=
+         attribute runs without a parent, after this hook: the caption holds
+         Hugo's placeholder for its output, so its notes cannot be cleaned
+         here. The caption and its citation block are marked; phase 1
+         (func/content-raw.html) then gathers its cites into the block and
+         turns its sidenotes and margin notes into inline text
+         (tufte/note-in-note.html), as for the caption= of a shortcode. */ -}}
+  {{- $caption = printf `<i class="tufte-capsc" hidden></i>%s<i class="tufte-capsc-mid" hidden></i>%s<i class="tufte-capsc-end" hidden></i>` $caption $citeHTML -}}
+{{- else -}}
+  {{- $caption = printf "%s%s" $caption $citeHTML -}}
+{{- end -}}
+
+{{- $figClass := printf "tufte-%s" $kind -}}
+{{- if eq $type "fullwidth" }}{{ $figClass = printf "fullwidth %s" $figClass }}{{ end -}}
+{{- if and $bottom (ne $type "margin") }}{{ $figClass = printf "%s caption-bottom" $figClass }}{{ end -}}
+{{- with $class }}{{ $figClass = printf "%s %s" $figClass . }}{{ end -}}
+
+{{- /* The image (or the body). */ -}}
+{{- $img := "" -}}
+{{- if $body -}}
+  {{- $img = string $body -}}
+{{- else -}}
+  {{- $imgClass := "" -}}
+  {{- if eq $type "inline" }}{{ $imgClass = $class }}{{ end -}}
+  {{- $img = printf `<img src="%s" alt="%s"%s%s%s%s loading="lazy"/>` (htmlEscape $url) (htmlEscape $alt) (cond (ne $width "") (printf ` width="%s"` (htmlEscape $width)) "") (cond (ne $height "") (printf ` height="%s"` (htmlEscape $height)) "") (cond (ne $imgClass "") (printf ` class="%s"` (htmlEscape $imgClass)) "") $extra -}}
+  {{- with $link -}}
+    {{- $href := printf "%v" . | strings.TrimSpace -}}
+    {{- /* As html/template would: no script URLs. */ -}}
+    {{- if findRE `(?i)^\s*(javascript|vbscript|data):` $href 1 }}{{ $href = "#ZgotmplZ" }}{{ end -}}
+    {{- $img = printf `<a href="%s">%s</a>` (htmlEscape $href) $img -}}
   {{- end -}}
 {{- end -}}
+{{- $img = printf "%s%s" $mark $img -}}
+{{- $styleAttr := "" -}}
+{{- with $style }}{{ $styleAttr = printf ` style="%s"` (htmlEscape (string .)) }}{{ end -}}
+{{- $figStyle := "" -}}
+{{- with .Style }}{{ $figStyle = printf ` style="%s"` (htmlEscape (string .)) }}{{ end -}}
+{{- $idAttr := "" -}}
+{{- with $anchor }}{{ $idAttr = printf ` id="%s"` (htmlEscape .) }}{{ end -}}
+{{- $toggle := "" -}}
+{{- with $id -}}
+  {{- $toggle = printf `<label for="mn-%s" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-%s" class="margin-toggle"/>` . . -}}
+{{- end -}}
+
+{{- $out := "" -}}
+{{- if eq $type "inline" -}}
+  {{- $out = $img -}}
+{{- else if eq $type "margin" -}}
+  {{- if $body -}}
+    {{- $anchorHTML := "" -}}
+    {{- with $anchor }}{{ $anchorHTML = printf `<div class="tufte-anchor" id="%s"></div>` (htmlEscape .) }}{{ end -}}
+    {{- $capHTML := "" -}}
+    {{- with $caption }}{{ $capHTML = printf `<p class="caption">%s</p>` . }}{{ end -}}
+    {{- $out = printf `%s%s<div class="marginnote margin-block margin-%s%s"%s>%s%s</div>` $anchorHTML $toggle $kind (cond (ne $class "") (printf " %s" (htmlEscape $class)) "") $styleAttr $capHTML $img -}}
+  {{- else if .Inline -}}
+    {{- /* No <p> for the id: an empty anchor span before the label. The
+           attribute order differs from the label shortcode's anchor on
+           purpose, so tufte/labels.html does not record the key twice. */ -}}
+    {{- $anchorHTML := "" -}}
+    {{- with $anchor }}{{ $anchorHTML = printf `<span id="%s" class="tufte-anchor"></span>` (htmlEscape .) }}{{ end -}}
+    {{- $out = printf `%s%s<span class="marginnote margin-figure%s"%s>%s%s</span>` $anchorHTML $toggle (cond (ne $class "") (printf " %s" (htmlEscape $class)) "") $styleAttr $img $caption -}}
+  {{- else -}}
+    {{- $out = printf `<p class="margin-figure-anchor%s"%s>%s<span class="marginnote margin-figure"%s>%s%s</span></p>` (cond (ne $class "") (printf " %s" (htmlEscape $class)) "") $idAttr $toggle $styleAttr $img $caption -}}
+  {{- end -}}
+{{- else if eq $type "fullwidth" -}}
+  {{- $cap := "" -}}
+  {{- with $caption }}{{ $cap = printf `<figcaption class="caption-margin"%s>%s</figcaption>` $styleAttr . }}{{ end -}}
+  {{- if $bottom -}}
+    {{- $out = printf `<figure class="%s"%s%s>%s%s</figure>` (htmlEscape $figClass) $idAttr $figStyle $cap $img -}}
+  {{- else -}}
+    {{- $out = printf `<figure class="%s"%s%s>%s%s</figure>` (htmlEscape $figClass) $idAttr $figStyle $img $cap -}}
+  {{- end -}}
+{{- else -}}
+  {{- $note := "" -}}
+  {{- with $caption }}{{ $note = printf `%s<span class="marginnote caption"%s>%s</span>` $toggle $styleAttr . }}{{ end -}}
+  {{- $out = printf `<figure class="%s"%s%s>%s%s</figure>` (htmlEscape $figClass) $idAttr $figStyle $note $img -}}
+{{- end -}}
+{{- return $out -}}

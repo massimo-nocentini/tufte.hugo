@@ -1,0 +1,7 @@
+{{- /*
+  Page break in print (block; \clearpage); nothing on screen. Put it on its
+  own line: {{< clearpage >}}
+
+  Output: <div class="page-break" aria-hidden="true"></div>
+*/ -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" `<div class="page-break" aria-hidden="true"></div>`) | safeHTML -}}

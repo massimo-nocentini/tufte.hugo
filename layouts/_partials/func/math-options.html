@@ -30,11 +30,11 @@
 */ -}}
 {{- $page := .Page -}}
 {{- $display := eq .Display true -}}
-{{- $cfg := site.Params.math | default (dict) -}}
+{{- $cfg := partialCached "func/math-config.html" "math" "math" -}}
 
 {{- $engine := lower (printf "%v" (index $cfg "engine" | default "server")) -}}
 {{- if not (in (slice "server" "client") $engine) -}}
-  {{- warnf "tufte.hugo: params.math.engine must be \"server\" or \"client\", not %q; using \"server\"" $engine -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: params.math.engine must be \"server\" or \"client\", not %q; using \"server\"" $engine -}}
   {{- $engine = "server" -}}
 {{- end -}}
 
@@ -53,7 +53,7 @@
       {{- else if and (reflect.IsMap .) (index . "name") -}}
         {{- $s.SetInMap "macros" (printf "%v" (index . "name")) (printf "%v" (index . "value" | default "")) -}}
       {{- else -}}
-        {{- warnf "tufte.hugo: ignoring math macro %v (expected [\"\\\\name\", \"expansion\"]) in %s" . $page.Path -}}
+        {{- warnidf "tufte-bad-option" "tufte.hugo: ignoring math macro %v (expected [\"\\\\name\", \"expansion\"]) in %s" . $page.Path -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
@@ -69,7 +69,7 @@
 {{- end -}}
 {{- $strict := lower (printf "%v" (index $cfg "strict" | default "error")) -}}
 {{- if not (in (slice "error" "ignore" "warn") $strict) -}}
-  {{- warnf "tufte.hugo: params.math.strict must be \"error\", \"ignore\" or \"warn\", not %q; using \"error\"" $strict -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: params.math.strict must be \"error\", \"ignore\" or \"warn\", not %q; using \"error\"" $strict -}}
   {{- $strict = "error" -}}
 {{- end -}}
 

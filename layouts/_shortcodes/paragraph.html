@@ -1,0 +1,38 @@
+{{- /*
+  Run-in paragraph heading (inline; \paragraph{…}): an italic title that
+  starts its paragraph. Write it at the start of the paragraph, on the
+  same line as the text:
+
+    {{< paragraph >}}Vertical alignment{{< /paragraph >}} Text of the paragraph …
+    {{< paragraph "Vertical alignment" />}} Text …
+    {{< paragraph label="par:valign" >}}Vertical alignment{{< /paragraph >}} …
+
+  A level-4 Markdown heading (#### Title) gives the same look as a block
+  heading; this shortcode is the exact inline form.
+
+  Named params: text (the title, when there is no inner content), label
+  (key for xref, \label: the id goes on the run-in span, and
+  {{< xref "KEY" "name" >}} gives the title, like \nameref; "auto" gives the
+  section number when headings are numbered, else the title).
+
+  Output (SPEC-LATEX §3.8): <span class="run-in"[ id="KEY"]>TITLE</span>
+*/ -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- $label := "" -}}
+{{- if .IsNamedParams -}}
+  {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
+  {{- $label = printf "%v" (.Get "label" | default "") -}}
+{{- else if not $text -}}
+  {{- $text = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with $text -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` " " | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- end -}}
+{{- $idAttr := "" -}}
+{{- with partial "tufte/label-key.html" (dict "key" $label "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+  {{- $idAttr = printf ` id="%s"` (htmlEscape .) -}}
+{{- end -}}
+{{- $out := printf `<span class="run-in"%s>%s</span>` $idAttr $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

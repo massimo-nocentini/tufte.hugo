@@ -41,10 +41,15 @@
       {{- $style = printf "--iframe-ratio: %g / %g;" $w $h -}}
     {{- end -}}
   {{- else -}}
-    {{- warnf "iframe shortcode: invalid ratio %q, expected W:H such as 4:3 (%s)" $r $.Position -}}
+    {{- warnidf "tufte-bad-option" "iframe shortcode: invalid ratio %q, expected W:H such as 4:3 (%s)" $r $.Position -}}
   {{- end -}}
 {{- end -}}
-<figure class="iframe-wrapper{{ with $class }} {{ . }}{{ end }}"{{ with $style }} style="{{ . | safeCSS }}"{{ end }}>
-<iframe src="{{ $src }}" title="{{ $title | default "Embedded content" }}" frameborder="0" loading="lazy"{{ with $allow }} allow="{{ . }}"{{ end }} allowfullscreen></iframe>
-</figure>
-{{- /* no trailing newline */ -}}
+{{- /* Built as a string (attributes escaped as html/template would, script
+       URLs refused) so that it goes through tufte/nest.html: nested in a
+       theme shortcode (fullwidth, marginblock, epigraph…) its HTML is
+       kept, also with markup.goldmark.renderer.unsafe = false. */ -}}
+{{- $url := printf "%v" $src | strings.TrimSpace -}}
+{{- if and (findRE `^[a-zA-Z][a-zA-Z0-9+.-]*:` $url 1) (not (findRE `(?i)^https?:` $url 1)) }}{{ $url = "#ZgotmplZ" }}{{ end -}}
+{{- $out := printf `<figure class="iframe-wrapper%s"%s>` (cond (ne (printf "%v" $class) "") (printf " %s" (htmlEscape (printf "%v" $class))) "") (cond (ne $style "") (printf ` style="%s"` (htmlEscape $style)) "") -}}
+{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" frameborder=\"0\" loading=\"lazy\"%s allowfullscreen></iframe>\n</figure>" $out (htmlEscape $url) (htmlEscape (printf "%v" ($title | default "Embedded content"))) (cond (ne (printf "%v" $allow) "") (printf ` allow="%s"` (htmlEscape (printf "%v" $allow))) "") -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

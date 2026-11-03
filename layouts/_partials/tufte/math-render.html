@@ -1,0 +1,116 @@
+{{- /*
+  Typesets one TeX expression with KaTeX (area B helper, shared by the
+  passthrough render hook and the equation shortcode). Sets Store
+  "hasMath" on the page.
+
+  Takes a dict:
+    page      the page                                       required
+    inner     the TeX                                        required
+    block     bool: display math
+    label     normalised key ("" = unnumbered); block only
+    position  text for warnings (e.g. .Position)
+
+  Returns the HTML string:
+    inline    KaTeX HTML+MathML (server) | <span class="math math-inline">\(TeX\)</span> (client)
+    display   <span class="math-display">KATEX</span>
+    numbered  <span class="math-display numbered[ leqno]" id="KEY">KATEX<span class="eq-number">(<span class="tufte-num" data-kind="eq" data-key="KEY" data-labeled="1"></span>)</span></span>
+    tagged    (label plus \tag{X} or \tag*{X}: KaTeX prints the tag, X is
+              the number, the counter does not step)
+              <span class="math-display tagged" id="KEY">KATEX<span class="tufte-num" data-kind="eq" data-key="KEY" data-labeled="1" data-number="X (HTML, escaped)" hidden></span></span>
+  where KATEX is the KaTeX display HTML (server) or
+  <span class="math math-display">\[TeX\]</span> (client).
+  Invalid TeX: warning plus <code class="math-error">TeX</code>.
+*/ -}}
+{{- $page := .page -}}
+{{- $inner := printf "%v" .inner -}}
+{{- $block := eq .block true -}}
+{{- $label := .label | default "" -}}
+{{- $position := .position | default "" -}}
+{{- $m := partial "func/math-options.html" (dict "Page" $page "Display" $block) -}}
+{{- $page.Store.Set "hasMath" true -}}
+{{- $out := "" -}}
+{{- $failed := false -}}
+{{- if eq $m.engine "client" -}}
+  {{- if $block -}}
+    {{- $out = printf `<span class="math math-display">\[%s\]</span>` (htmlEscape $inner) -}}
+  {{- else -}}
+    {{- $out = printf `<span class="math math-inline">\(%s\)</span>` (htmlEscape $inner) -}}
+  {{- end -}}
+{{- else -}}
+  {{- $html := "" -}}
+  {{- $err := "" -}}
+  {{- with try (transform.ToMath $inner $m.server) -}}
+    {{- with .Err -}}
+      {{- $err = printf "%v" . -}}
+    {{- else -}}
+      {{- $html = string .Value -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* With throwOnError = false KaTeX reports a parse error as
+         <span class="katex-error" title="ParseError: …">…</span>. */ -}}
+  {{- if and (not $err) (strings.Contains $html `class="katex-error"`) -}}
+    {{- $err = "KaTeX parse error" -}}
+    {{- with findRESubmatch `class="katex-error"[^>]*?\stitle="([^"]*)"` $html 1 -}}
+      {{- $err = index . 0 1 | htmlUnescape -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* An undefined control sequence becomes text in the errorColor
+         (HTML style "color:…", MathML mathcolor="…"), with no class. */ -}}
+  {{- if and (not $err) $m.sentinel (strings.Contains (lower $html) (lower $m.sentinel)) -}}
+    {{- $err = "undefined control sequence (a typo, or a macro that is not defined?)" -}}
+    {{- with findRESubmatch (printf `mathcolor="%s"[^>]*>\s*<mtext>([^<]*)</mtext>` $m.sentinel) $html 1 -}}
+      {{- $err = printf "undefined control sequence %s (a typo, or a macro that is not defined?)" (index . 0 1 | htmlUnescape) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $err -}}
+    {{- $failed = true -}}
+    {{- warnidf "tufte-math-error" "tufte.hugo: KaTeX could not render %q: %s (%s)" $inner $err $position -}}
+    {{- with $m.errorColor -}}
+      {{- $out = printf `<code class="math-error" style="color: %s" title="%s">%s</code>` (htmlEscape .) (htmlEscape $err) (htmlEscape $inner) -}}
+    {{- else -}}
+      {{- $out = printf `<code class="math-error" title="%s">%s</code>` (htmlEscape $err) (htmlEscape $inner) -}}
+    {{- end -}}
+  {{- else if $block -}}
+    {{- /* KaTeX adds the katex-display wrapper in display mode; add it if missing. */ -}}
+    {{- if not (strings.Contains $html "katex-display") -}}
+      {{- $html = printf `<span class="katex-display">%s</span>` $html -}}
+    {{- end -}}
+    {{- $out = $html -}}
+  {{- else -}}
+    {{- $out = $html -}}
+  {{- end -}}
+{{- end -}}
+{{- /* \tag{X} (or \tag*{X}) with a \label: as in amsmath, X is the
+       equation's number. KaTeX prints the tag; the theme adds no number
+       of its own and does not step the counter, and the label's display
+       (eqref "(X)", xref "X") is X, carried by a hidden token's
+       data-number (read by tufte/labels.html). Plain text stays text;
+       anything with TeX in it is typeset as KaTeX's tag is, \text{X}. */ -}}
+{{- $tag := "" -}}
+{{- $tagged := false -}}
+{{- if and $block $label -}}
+  {{- with findRESubmatch `\\tag\*?\s*\{((?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*)\}` $inner 1 -}}
+    {{- $tagged = true -}}
+    {{- $t := strings.TrimSpace (index . 0 1) -}}
+    {{- /* (The formula failed: it was reported, keep the source.) */ -}}
+    {{- if and (findRE `[\\$^_{}&%#~]` $t 1) (not $failed) -}}
+      {{- $tag = partial "tufte/math-render.html" (dict "page" $page "inner" (printf `\text{%s}` $t) "block" false "position" $position) -}}
+    {{- else -}}
+      {{- $tag = htmlEscape $t -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if $block -}}
+  {{- if $tagged -}}
+    {{- $k := htmlEscape $label -}}
+    {{- $out = printf `<span class="math-display tagged" id="%s">%s<span class="tufte-num" data-kind="eq" data-key="%s" data-labeled="1" data-number="%s" hidden></span></span>` $k $out $k (htmlEscape $tag) -}}
+  {{- else if $label -}}
+    {{- $k := htmlEscape $label -}}
+    {{- /* params.math.leqno moves the \label numbers too (class leqno,
+           tufte-latex.css), as LaTeX's leqno moves every number. */ -}}
+    {{- $out = printf `<span class="math-display numbered%s" id="%s">%s<span class="eq-number">(<span class="tufte-num" data-kind="eq" data-key="%s" data-labeled="1"></span>)</span></span>` (cond (eq $m.client.leqno true) " leqno" "") $k $out $k -}}
+  {{- else if or (ne $m.engine "client") (strings.HasPrefix $out "<code") -}}
+    {{- $out = printf `<span class="math-display">%s</span>` $out -}}
+  {{- end -}}
+{{- end -}}
+{{- return $out -}}

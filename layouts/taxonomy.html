@@ -2,16 +2,17 @@
 {{- /* A taxonomy (for example /tags/): every term, alphabetically, with the
        number of pages using it. */ -}}
 <article>
-  <h1>{{ .Title }}</h1>
+  <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" .Title "heading" true) }}</h1>
   {{- with .Params.subtitle }}
   <p class="subtitle">{{ . }}</p>
   {{- end }}
-  {{ partial "func/content.html" . }}
+  {{ partial "tufte/abstract.html" . }}
+  {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
   {{- with .Data.Terms.Alphabetical }}
   <section>
     <ul class="taxonomy-list">
       {{- range . }}
-      <li><a href="{{ .Page.RelPermalink }}">{{ .Page.LinkTitle }}</a> <span class="taxonomy-count">{{ .Count }}</span></li>
+      <li><a href="{{ .Page.RelPermalink }}">{{ partial "tufte/title-html.html" (dict "page" .Page) }}</a> <span class="taxonomy-count">{{ .Count }}</span></li>
       {{- end }}
     </ul>
   </section>

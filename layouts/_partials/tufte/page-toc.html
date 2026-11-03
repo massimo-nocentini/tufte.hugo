@@ -1,0 +1,63 @@
+{{- /*
+  The table of contents of one page (\tableofcontents in a handout):
+
+    <nav class="toc" aria-label="Contents"><p class="sans">Contents</p><ul>…</ul></nav>
+
+  Hugo's <nav id="TableOfContents"> wrapper is dropped, so the list sits
+  directly in nav.toc. Heading levels follow markup.tableOfContents.
+  Copies of margin material are removed from the heading texts (R27), so
+  the TOC never repeats sidenote ids or index anchors:
+    1. label/input pairs of margin toggles,
+    2. sidenote and margin note spans,
+    3. index anchors, label anchors and number tokens,
+    4. Hugo's shortcode placeholders (HAHAHUGOSHORTCODE…HBHB) left in the
+       texts and links of headings that hold a shortcode,
+    5. links inside the heading texts (Hugo 0.146), and raw or dropped
+       math replaced by the heading's typeset formula (tufte/toc-text.html),
+    6. empty items and lists (an h2 whose only subheading is a run-in h4).
+
+  Used by toc.html (front matter / site param `toc`) and by
+  tufte/postprocess.html for the `tableofcontents` placeholder outside a
+  book.
+
+  Takes: the page.
+  Returns: template.HTML ("" when the page has no headings).
+*/ -}}
+{{- $out := "" -}}
+{{- $toc := string .TableOfContents -}}
+{{- if findRE `<li>` $toc 1 -}}
+  {{- $toc = replaceRE `</?nav[^>]*>` "" $toc -}}
+  {{- $toc = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $toc -}}
+  {{- $toc = replaceRE `(?s)<span class="(?:sidenote|marginnote)[^"]*"[^>]*>.*?</span><i class="sn-end" hidden></i>` "" $toc -}}
+  {{- $toc = replaceRE `<span class="(?:sidenote|marginnote)[^"]*"[^>]*>[^<]*</span>` "" $toc -}}
+  {{- $toc = replaceRE `<span class="(?:index-anchor|tufte-anchor|tufte-num)[^>]*></span>` "" $toc -}}
+  {{- $toc = replaceRE `<i class="(?:sn-end|cap-end)" hidden></i>` "" $toc -}}
+  {{- /* Hugo's shortcode placeholders: Hugo builds the TOC from the heading
+         text before shortcodes run. Links lose them as render-heading.html
+         ids do (tufte/heading-id.html), texts lose them with the space before. */ -}}
+  {{- $toc = replaceRE `\s*HAHAHUGOSHORTCODE[0-9A-Za-z]*?HBHB` "" $toc -}}
+  {{- range findRE `href="#[^"]*hahahugoshortcode[^"]*"` $toc -}}
+    {{- $id := replaceRE `^href="#(.*)"$` "$1" . -}}
+    {{- $toc = replace $toc . (printf `href="#%s"` (partial "tufte/heading-id.html" $id)) -}}
+  {{- end -}}
+  {{- /* Entry texts (tufte/toc-text.html): links in the heading text are
+         unwrapped (Hugo 0.146 keeps them, and an <a> in the entry's <a>
+         splits it), and a heading with math gets its typeset formula
+         (Hugo leaves raw TeX, or drops it on 0.146). An entry ends at the
+         </a> followed by its sublist or </li>, so inner links are part of
+         its text. */ -}}
+  {{- range findRESubmatch `(?s)<li><a href="#([^"]*)">(.*?)</a>(\s*(?:<ul>|<ol>|</li>))` $toc -}}
+    {{- $m := index . 0 -}}
+    {{- $text := partial "tufte/toc-text.html" (dict "page" $ "id" (htmlUnescape (index . 1)) "text" (index . 2)) -}}
+    {{- $toc = replace $toc $m (printf `<li><a href="#%s">%s</a>%s` (index . 1) $text (index . 3)) -}}
+  {{- end -}}
+  {{- /* Empty items: a level with no entry of its own, e.g. an h2 whose
+         only subheading is a run-in h4 (#### Title) below the TOC levels. */ -}}
+  {{- range seq 3 -}}
+    {{- $toc = replaceRE `<li>\s*</li>` "" $toc -}}
+    {{- $toc = replaceRE `<(ul|ol)>\s*</(ul|ol)>` "" $toc -}}
+  {{- end -}}
+  {{- $label := T "tableOfContents" -}}
+  {{- if findRE `<li>` $toc 1 }}{{ $out = printf "<nav class=\"toc\" aria-label=\"%s\">\n  <p class=\"sans\">%s</p>\n  %s\n</nav>" (htmlEscape $label) (htmlEscape $label) (strings.TrimSpace $toc) }}{{ end -}}
+{{- end -}}
+{{- return ($out | safeHTML) -}}

@@ -14,13 +14,11 @@
   Output (Tufte CSS): <div class="fullwidth">…</div>
 */ -}}
 {{- $text := strings.TrimSpace .Inner -}}
-{{- /* Block Markdown; the HTML of nested shortcodes is kept as is. */ -}}
-{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "text" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+{{- /* Block Markdown; nested shortcodes are kept (nest tokens). */ -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "inner" $text "text" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
 {{- $class := "" -}}
 {{- if .IsNamedParams -}}
-  {{- $class = .Get "class" | default "" -}}
+  {{- $class = printf "%v" (.Get "class" | default "") | strings.TrimSpace -}}
 {{- end -}}
-<div class="fullwidth{{ with $class }} {{ . }}{{ end }}">
-{{ $html | safeHTML }}
-</div>
-{{- /* no trailing newline */ -}}
+{{- $out := printf "<div class=\"fullwidth%s\">\n%s\n</div>" (cond (ne $class "") (printf " %s" (htmlEscape $class)) "") $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

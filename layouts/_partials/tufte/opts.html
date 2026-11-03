@@ -1,0 +1,91 @@
+{{- /*
+  Every tufte option of a page, resolved once (SPEC-LATEX §3.0.6, R7): a
+  flat map of dotted lowercase keys ("book.numberchapters") to values, for
+  tufte/opt.html.
+
+  Levels, nearest first; the first level that sets a leaf wins (false and
+  "" count as set):
+    1. the page's top-level front matter, for the flat keys footnotes,
+       footnoteStyle, footnotePlacement and citeAs;
+    2. the page's `tufte` front matter;
+    3. the nearest part's `tufte` (a section between the page and its book
+       root), when the page is inside a part and is not that part;
+    4. the book root's `tufte`, when the page is in a book and is not the
+       root;
+    5. site [params.tufte];
+    6. site [params], for the same flat keys as level 1;
+    7. the defaults of the resolved style preset (tufte/defaults.html,
+       with the book flag).
+  `style` itself comes from levels 1–6 (default "css").
+
+  Memoized in the page's Store (one map per page): partialCached's
+  bounded cache (1000 entries) is not used for it. Not in `hugo server`,
+  where Store survives rebuilds (and an edited option must show).
+  `hugo --watch` also keeps Store across rebuilds but cannot be detected
+  from templates (hugo.IsServer is false): it is unsupported (README,
+  Books), and `hugo server` is the live-editing mode.
+
+  Takes: a page.
+  Returns: a map (flat dotted keys).
+*/ -}}
+{{- $page := . -}}
+{{- $memoKey := "tufteMemoOpts" -}}
+{{- $res := false -}}
+{{- with cond hugo.IsServer nil ($page.Store.Get $memoKey) -}}
+  {{- $res = .v -}}
+{{- else -}}
+  {{- $flatKeys := slice "footnotes" "footnotestyle" "footnoteplacement" "citeas" -}}
+  {{- $root := partialCached "tufte/book/root.html" $page (or $page.RelPermalink $page.Path) -}}
+  {{- $top := dict -}}
+  {{- range $fk := $flatKeys -}}
+    {{- with index $page.Params $fk }}{{ $top = merge $top (dict $fk .) }}{{ end -}}
+  {{- end -}}
+  {{- $levels := slice $top (partial "tufte/flatten.html" (dict "m" (index $page.Params "tufte"))) -}}
+  {{- with $root -}}
+    {{- if ne $page . -}}
+      {{- $part := false -}}
+      {{- $done := false -}}
+      {{- range $page.Ancestors -}}
+        {{- if not $done -}}
+          {{- if eq . $root -}}
+            {{- $done = true -}}
+          {{- else if and (not $part) .IsSection -}}
+            {{- $part = . -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- with $part }}{{ $levels = $levels | append (partial "tufte/flatten.html" (dict "m" (index .Params "tufte"))) }}{{ end -}}
+      {{- $levels = $levels | append (partial "tufte/flatten.html" (dict "m" (index .Params "tufte"))) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $levels = $levels | append (partial "tufte/flatten.html" (dict "m" (index site.Params "tufte"))) -}}
+  {{- $siteTop := dict -}}
+  {{- range $fk := $flatKeys -}}
+    {{- with index site.Params $fk }}{{ $siteTop = merge $siteTop (dict $fk .) }}{{ end -}}
+  {{- end -}}
+  {{- $levels = $levels | append $siteTop -}}
+
+  {{- /* Nearest first: a key already set is kept. */ -}}
+  {{- $S := newScratch -}}
+  {{- $S.Set "m" dict -}}
+  {{- range $levels -}}
+    {{- range $k, $v := . -}}
+      {{- if not (isset ($S.Get "m") $k) -}}
+        {{- $S.SetInMap "m" $k $v -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $m := $S.Get "m" -}}
+  {{- $style := lower (printf "%v" (index $m "style" | default "css")) -}}
+  {{- $book := false -}}
+  {{- with $root }}{{ $book = true }}{{ end -}}
+  {{- $defs := partial "tufte/flatten.html" (dict "m" (partialCached "tufte/defaults.html" (dict "style" $style "book" $book) $style $book)) -}}
+  {{- range $k, $v := $defs -}}
+    {{- if not (isset ($S.Get "m") $k) -}}
+      {{- $S.SetInMap "m" $k $v -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $res = $S.Get "m" -}}
+  {{- if not hugo.IsServer }}{{ $page.Store.Set $memoKey (dict "v" $res) }}{{ end -}}
+{{- end -}}
+{{- return $res -}}

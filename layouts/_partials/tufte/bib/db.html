@@ -1,0 +1,56 @@
+{{- /*
+  The bibliography database seen by a page (SPEC-LATEX §5.1).
+
+  Takes: a page.
+  Returns: a map  lowercased cite key → raw entry (native map or CSL item).
+  Callers cache it:  partialCached "tufte/bib/db.html" $page (or $page.RelPermalink $page.Path)
+
+  Sources, later ones winning on the same key:
+    1. the site database (site.Data at option bibliography.data);
+    2. in a book, the book root's front matter `bibliography` (file) and
+       `references` (inline entries);
+    3. the page's front matter `bibliography`: a path (or a list of paths)
+       to a page resource, else a global asset (assets/), in .json, .yaml,
+       .yml, .toml (decoded with transform.Unmarshal) or .bib (bibtex-lite);
+    4. the page's front matter `references`: a map key → entry, or a list
+       of CSL items.
+  This partial never reads page content, so cite shortcodes may call it
+  while the page is rendering.
+  Sources 3 and 4 come from tufte/bib/source-db.html, cached per source
+  page (and per file text), so a book's .bib file is parsed once per build.
+  A chapter without sources of its own (the usual case) shares its book
+  root's database instead of copying it.
+*/ -}}
+{{- $p := . -}}
+{{- $dk := partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.data" "default" "bibliography") (or $p.RelPermalink $p.Path) "bibliography.data" -}}
+{{- $dk = printf "%v" ($dk | default "bibliography") -}}
+{{- $own := partialCached "tufte/bib/source-db.html" $p (or $p.RelPermalink $p.Path) -}}
+
+{{- /* the base: the book root's database (site data + root sources) when
+       it reads the same site data, else the site data alone */ -}}
+{{- $base := false -}}
+{{- with partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- if ne (or .RelPermalink .Path) (or $p.RelPermalink $p.Path) -}}
+    {{- $rdk := partialCached "tufte/opt.html" (dict "page" . "key" "bibliography.data" "default" "bibliography") (or .RelPermalink .Path) "bibliography.data" -}}
+    {{- if eq (printf "%v" ($rdk | default "bibliography")) $dk -}}
+      {{- $base = partialCached "tufte/bib/db.html" . (or .RelPermalink .Path) -}}
+    {{- else -}}
+      {{- $R := newScratch -}}
+      {{- $R.Set "db" dict -}}
+      {{- range $k, $v := partialCached "tufte/bib/site-db.html" $dk $dk }}{{ $R.SetInMap "db" $k $v }}{{ end -}}
+      {{- range $k, $v := partialCached "tufte/bib/source-db.html" . (or .RelPermalink .Path) }}{{ $R.SetInMap "db" $k $v }}{{ end -}}
+      {{- $base = $R.Get "db" -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $base }}{{ $base = partialCached "tufte/bib/site-db.html" $dk $dk }}{{ end -}}
+
+{{- $out := $base -}}
+{{- if $own -}}
+  {{- $S := newScratch -}}
+  {{- $S.Set "db" dict -}}
+  {{- range $k, $v := $base }}{{ $S.SetInMap "db" $k $v }}{{ end -}}
+  {{- range $k, $v := $own }}{{ $S.SetInMap "db" $k $v }}{{ end -}}
+  {{- $out = $S.Get "db" -}}
+{{- end -}}
+{{- return $out -}}

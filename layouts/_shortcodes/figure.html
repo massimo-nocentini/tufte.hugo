@@ -3,17 +3,19 @@
   own line:
 
     {{< figure src="exports-imports.png" alt="Exports and imports" caption="From *The Visual Display of Quantitative Information*, page 92." >}}
+    {{< figure src="hilbert.svg" caption="Hilbert curves." label="fig:hilbert" captionpos="bottom" >}}
 
   Params (named):
     src      image: page resource, assets/ resource, static path or URL  (required)
     alt      alt text (default: the caption as plain text)
-    caption  caption, inline Markdown
+    caption  caption, inline Markdown (for a caption with shortcodes in it,
+             such as cite or xref, use the block form: the fig shortcode)
     title    shown in bold before the caption
     attr     attribution appended to the caption; attrlink links it
     link     URL the image links to
     type     "main" (default: main column, caption as a margin note)
              | "margin" (the image goes in the margin, see marginfigure)
-             | "fullwidth" (full width, caption in a figcaption, see fullwidthfigure)
+             | "fullwidth" (full width, caption in the margin, see fullwidthfigure)
     width, height  img attributes (default: intrinsic size of raster resources)
     class    extra classes
     inline   "true" (margin type only): leave out the wrapping <p>, for use
@@ -21,6 +23,16 @@
              the same line as the text). Without it a margin figure must be
              a paragraph of its own (blank line before and after), or the
              nested <p> breaks the surrounding paragraph apart.
+  LaTeX-like params (tufte-latex \caption, \label, \setfloatalignment):
+    label       key for xref ("fig:x" or "fig-x"); also the figure's id
+    short       short caption, for the list of figures (\caption[short]{…})
+    numbered    default true; false = never numbered ("Figure N:" is shown
+                in books, and on other pages only when the page has a label
+                or an xref: params.tufte.floats.number)
+    captionpos  "top" (default) | "bottom" (caption aligned with the bottom
+                of the image, \setfloatalignment{b})
+    offset      vertical shift of the caption: 1bl (one baseline), -2rem, 10px…
+    cite        citation keys ("tufte2006,tufte1990"), printed in the caption
 
   Rendering is done by the partial tufte/figure.html.
 */ -}}
@@ -31,7 +43,7 @@
 {{- if not $src -}}
   {{- errorf "figure shortcode: the src parameter is required (%s)" .Position -}}
 {{- end -}}
-{{- partial "tufte/figure.html" (dict
+{{- $out := partial "tufte/figure.html" (dict
   "Page" .Page
   "Src" $src
   "Alt" (.Get "alt" | default "")
@@ -44,5 +56,12 @@
   "Width" (.Get "width" | default "")
   "Height" (.Get "height" | default "")
   "Class" (.Get "class" | default "")
-  "Inline" (in (slice "true" "1" "yes") (printf "%v" (.Get "inline")))
+  "Inline" (partial "tufte/truthy.html" (.Get "inline"))
+  "Label" (.Get "label" | default "")
+  "Short" (.Get "short" | default "")
+  "Numbered" (.Get "numbered")
+  "CaptionPos" (.Get "captionpos" | default "")
+  "Offset" (.Get "offset" | default "")
+  "Cite" (.Get "cite" | default "")
 ) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

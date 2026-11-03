@@ -1,0 +1,34 @@
+{{- /*
+  Adds entries to the bibliography without citing them (inline; \nocite):
+
+    {{< nocite "tufte1997,bringhurst2005" >}}
+    {{< nocite "*" >}}                      every entry of the database
+
+  Positional keys (one or several args, comma-separated), or named
+  keys="a,b". Front matter `nocite: [a, b]` (or "*") does the same.
+
+  Output: one hidden marker per key, read by the bibliography generator:
+    <span class="nocite" data-cite="key" hidden></span>
+*/ -}}
+{{- $raw := slice -}}
+{{- if .IsNamedParams -}}
+  {{- $raw = $raw | append (printf "%v" (.Get "keys" | default "")) -}}
+{{- else -}}
+  {{- range .Params }}{{ $raw = $raw | append (printf "%v" .) }}{{ end -}}
+{{- end -}}
+{{- $out := "" -}}
+{{- $seen := slice -}}
+{{- range $raw -}}
+  {{- range split . "," -}}
+    {{- with strings.TrimSpace . | lower -}}
+      {{- if not (in $seen .) -}}
+        {{- $seen = $seen | append . -}}
+        {{- $out = printf `%s<span class="nocite" data-cite="%s" hidden></span>` $out (htmlEscape .) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $out -}}
+  {{- warnidf "tufte-empty" "nocite shortcode: no citation key (%s)" .Position -}}
+{{- end -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

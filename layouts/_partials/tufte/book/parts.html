@@ -1,0 +1,26 @@
+{{- /*
+  The parts of a book (\part): the sub-sections of the book root, in
+  weight order (weight 0 = last), then by directory name, numbered with
+  roman numerals (SPEC-LATEX §4.1).
+
+  Takes: the book root page.
+  Returns: a slice of dicts { Page, Num, Display, Index }, Display = "I",
+  "II", … (arabic beyond XX).
+  Callers: partialCached "tufte/book/parts.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- $roman := split "I II III IV V VI VII VIII IX X XI XII XIII XIV XV XVI XVII XVIII XIX XX" " " -}}
+{{- $items := slice -}}
+{{- range .Sections -}}
+  {{- $w := partial "tufte/book/weight-key.html" .Weight -}}
+  {{- $name := .Title -}}
+  {{- with .File }}{{ $name = .Dir }}{{ end -}}
+  {{- $items = $items | append (dict "sortkey" (printf "%s|%s" $w $name) "Page" .) -}}
+{{- end -}}
+{{- $out := slice -}}
+{{- range $i, $it := sort $items "sortkey" -}}
+  {{- $n := add $i 1 -}}
+  {{- $display := string $n -}}
+  {{- if le $n (len $roman) }}{{ $display = index $roman $i }}{{ end -}}
+  {{- $out = $out | append (dict "Page" $it.Page "Num" $n "Display" $display "Index" $i) -}}
+{{- end -}}
+{{- return $out -}}

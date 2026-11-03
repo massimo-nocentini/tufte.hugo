@@ -1,0 +1,31 @@
+{{- /*
+  Footnote mark without its text (inline; \footnotemark), for places where a
+  note cannot sit (a table cell, a heading): the text goes in a matching
+  footnotetext, placed after the table or paragraph.
+
+    | Front matter{{< footnotemark "fm" >}} | … |
+    …
+    {{< footnotetext "fm" >}}The front matter of a book …{{< /footnotetext >}}
+
+  Positional: the name; or named: name="fm". The name only pairs the mark
+  with its text (letters, digits, - and _).
+
+  No other numbered sidenote may sit between the mark and its text: the
+  number shown next to the text is the current value of the sidenote
+  counter, as in LaTeX.
+
+  Output: <label for="sn-HASH6-ft-NAME" class="margin-toggle sidenote-number"></label>
+*/ -}}
+{{- $name := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $name = printf "%v" (.Get "name" | default "") -}}
+{{- else -}}
+  {{- $name = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- $name = replaceRE `[^a-zA-Z0-9_-]` "-" (strings.TrimSpace $name) -}}
+{{- if not $name -}}
+  {{- errorf "footnotemark shortcode: a name is required, e.g. {{< footnotemark \"fm\" >}} (%s)" .Position -}}
+{{- end -}}
+{{- $hash := substr (md5 (or .Page.RelPermalink .Page.Path)) 0 6 -}}
+{{- $out := printf `<label for="sn-%s-ft-%s" class="margin-toggle sidenote-number"></label>` $hash $name -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

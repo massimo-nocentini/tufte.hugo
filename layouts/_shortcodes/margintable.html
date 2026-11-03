@@ -1,0 +1,17 @@
+{{- /*
+  Table in the margin (block; \begin{margintable}). Put it on its own lines,
+  at the top level of the content:
+
+    {{< margintable caption="Sizes." label="tab:sizes" offset="1bl" >}}
+    | a | b |
+    |---|---|
+    | 1 | 2 |
+    {{< /margintable >}}
+
+  Named params: caption, label, short, numbered, offset, cite, class.
+
+  Output (SPEC-LATEX §3.4):
+    <div class="tufte-anchor" id="K"></div><label …>&#8853;</label><input …/><div class="marginnote margin-block margin-table"[ style]><p class="caption">LABEL+CAPTION</p><div class="table-wrapper">…</div></div>
+*/ -}}
+{{- $out := partial "tufte/float-body.html" (dict "ctx" . "inner" .Inner "kind" "table" "type" "margin") -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

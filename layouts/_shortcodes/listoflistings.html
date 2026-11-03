@@ -1,0 +1,28 @@
+{{- /*
+  List of listings (block). Put it on its own line:
+
+    {{< listoflistings >}}
+    {{< listoflistings heading="" >}}   no heading
+
+  The list covers the whole book inside a book, else this page.
+
+  Output: a placeholder, replaced at render time (tufte/postprocess.html):
+    <div class="tufte-placeholder" data-what="lol"[ data-opts="k=v;k=v"]></div>
+*/ -}}
+{{- $opts := slice -}}
+{{- if .IsNamedParams -}}
+  {{- range $k := slice "heading" -}}
+    {{- if isset $.Params $k -}}
+      {{- $v := printf "%v" (index $.Params $k) | replaceRE `[;=]` "" | strings.TrimSpace -}}
+      {{- $opts = $opts | append (printf "%s=%s" $k $v) -}}
+    {{- end -}}
+  {{- end -}}
+{{- else if .Params -}}
+  {{- warnidf "tufte-bad-option" "listoflistings shortcode: use named parameters (%s)" .Position -}}
+{{- end -}}
+{{- $out := `<div class="tufte-placeholder" data-what="lol"` -}}
+{{- with $opts -}}
+  {{- $out = printf `%s data-opts="%s"` $out (htmlEscape (delimit . ";")) -}}
+{{- end -}}
+{{- $out = printf `%s></div>` $out -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

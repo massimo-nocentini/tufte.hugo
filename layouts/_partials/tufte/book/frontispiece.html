@@ -1,0 +1,32 @@
+{{- /*
+  The frontispiece of a book: the illustration on the page facing the
+  title page (tufte-book's front matter, page ii). Front matter
+  `frontispiece` of the book root:
+
+    frontispiece: {src: front.png, alt: "…", caption: "…"}   (or just a src string)
+
+  src is resolved like the figure shortcode's (a resource of the book
+  root's bundle, then assets/, then a static/ path or a URL); caption is
+  inline Markdown, set in the margin as for a main figure; alt defaults to
+  the plain caption. The frontispiece is never numbered (it is not a
+  Figure of the lists of figures).
+
+    <section class="frontispiece"><figure class="tufte-figure">[caption toggle + span.marginnote.caption]<img …/></figure></section>
+
+  Takes: the book root page.
+*/ -}}
+{{- $p := . -}}
+{{- with $p.Params.frontispiece -}}
+  {{- $src := "" }}{{ $alt := "" }}{{ $caption := "" -}}
+  {{- if reflect.IsMap . -}}
+    {{- $src = printf "%v" (.src | default "") -}}
+    {{- $alt = printf "%v" (.alt | default "") -}}
+    {{- $caption = printf "%v" (.caption | default "") -}}
+  {{- else -}}
+    {{- $src = printf "%v" . -}}
+  {{- end -}}
+  {{- with strings.TrimSpace $src -}}
+    {{- $fig := partial "tufte/figure.html" (dict "Page" $p "Src" . "Alt" $alt "Caption" $caption "Type" "main" "Numbered" false) }}
+<section class="frontispiece">{{ $fig | safeHTML }}</section>
+  {{- end -}}
+{{- end -}}

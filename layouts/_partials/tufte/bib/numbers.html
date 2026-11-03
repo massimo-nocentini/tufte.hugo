@@ -1,0 +1,75 @@
+{{- /*
+  Citation numbers for the bibliography scope of a page (SPEC-LATEX §5.4):
+  the book (tufte/scope.html: the landing body, the part pages and the
+  chapters, in reading order) or the page itself.
+
+  Takes: a page.
+  Returns: a map  lowercased cite key → int (1, 2, …), in order of first
+  appearance. This is also the order of the "tufte" bibliography style.
+  Callers cache it: partialCached "tufte/bib/numbers.html" $p (or $p.RelPermalink $p.Path)
+  (inside a book every chapter delegates to the book root, so the numbers
+  are computed once per book).
+
+  Order of keys, per scope page in reading order:
+    1. the page's front matter `nocite` (a list, a comma-separated string,
+       or "*"), like \nocite in the preamble;
+    2. every data-cite="…" in the page's phase-1 HTML (citations, bibentry,
+       nocite shortcodes), in document order.
+  Then, if any source asked for "*" (nocite "*" or front matter
+  nocite "*"), every remaining database key is appended in alphabetical
+  order. {{< bibliography all=true >}} is not read here: it widens only
+  its own list (tufte/bib/list.html appends the remaining keys there).
+  Reads only phase-1 content (func/content-raw.html), never postprocessed
+  HTML.
+*/ -}}
+{{- $p := . -}}
+{{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $S := newScratch -}}
+{{- $S.Set "n" dict -}}
+{{- if and $root (ne (or $root.RelPermalink $root.Path) (or $p.RelPermalink $p.Path)) -}}
+  {{- /* a chapter: the book root computes the numbers once */ -}}
+  {{- $S.Set "n" (partialCached "tufte/bib/numbers.html" $root (or $root.RelPermalink $root.Path)) -}}
+{{- else -}}
+
+{{- /* the book root (its landing body and its front matter nocite, which
+       applies to the whole book), the part pages and the chapters in
+       reading order (tufte/scope.html), else the page */ -}}
+{{- $pages := partial "tufte/scope.html" $p -}}
+
+{{- $S.Set "c" 0 -}}
+{{- $S.Set "all" false -}}
+
+{{- range $c := $pages -}}
+  {{- $keys := slice -}}
+  {{- with $c.Params.nocite -}}
+    {{- $list := . -}}
+    {{- if not (reflect.IsSlice $list) }}{{ $list = split (printf "%v" $list) "," }}{{ end -}}
+    {{- range $list }}{{ $keys = $keys | append (printf "%v" .) }}{{ end -}}
+  {{- end -}}
+  {{- $raw := printf "%s" (partialCached "func/content-raw.html" (dict "page" $c "summary" false) (or $c.RelPermalink $c.Path) false) -}}
+  {{- if strings.Contains $raw "data-cite=" -}}
+    {{- range findRESubmatch `data-cite="([^"]+)"` $raw -}}
+      {{- range split (htmlUnescape (index . 1)) "," }}{{ $keys = $keys | append . }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $keys -}}
+    {{- $k := lower (trim . " \t\n") -}}
+    {{- if not $k }}{{ continue }}{{ end -}}
+    {{- if eq $k "*" }}{{ $S.Set "all" true }}{{ continue }}{{ end -}}
+    {{- if not (isset ($S.Get "n") $k) -}}
+      {{- $S.Add "c" 1 -}}
+      {{- $S.SetInMap "n" $k ($S.Get "c") -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if $S.Get "all" -}}
+  {{- range $k, $_ := partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path) -}}
+    {{- if not (isset ($S.Get "n") $k) -}}
+      {{- $S.Add "c" 1 -}}
+      {{- $S.SetInMap "n" $k ($S.Get "c") -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}{{- /* chapter or scope root */ -}}
+{{- return ($S.Get "n") -}}

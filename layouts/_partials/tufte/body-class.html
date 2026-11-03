@@ -1,0 +1,63 @@
+{{- /*
+  The class list of <body>: the LaTeX document class and the class options
+  that are implemented in CSS (assets/css/tufte-latex.css).
+
+    tufte-book | tufte-handout   the page is inside a book (§4) or not
+    tufte-print-book             the whole-book print document (list.print.html)
+    tufte-style-latex            tufte.style = "latex"
+    tufte-justified              tufte.justified
+    tufte-hyphenate              tufte.hyphenate
+    tufte-indent                 tufte.indent
+    tufte-sf                     tufte.sfsidenotes
+    tufte-nols                   tufte.letterspacing = false
+    tufte-osf                    tufte.numerals = "oldstyle"
+    tufte-nocite-numbers         tufte.bibliography.margin = false
+    tufte-debug                  tufte.debug
+
+  Every option is read with tufte/opt.html (page → part → book → site →
+  style preset), so a book's `tufte:` front matter reaches its chapters.
+
+  Takes: the page.
+  Returns: the class string.
+*/ -}}
+{{- $p := . -}}
+{{- $classes := slice -}}
+{{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- if $root -}}
+  {{- $classes = $classes | append "tufte-book" -}}
+{{- else -}}
+  {{- $classes = $classes | append "tufte-handout" -}}
+{{- end -}}
+{{- /* The print output format: Hugo leaves the format being rendered out of
+       .AlternativeOutputFormats, so "html" is listed there only while the
+       print document is rendered. */ -}}
+{{- if and $root ($p.OutputFormats.Get "print") ($p.AlternativeOutputFormats.Get "html") -}}
+  {{- $classes = $classes | append "tufte-print-book" -}}
+{{- end -}}
+{{- $key := (or $p.RelPermalink $p.Path) -}}
+{{- $style := partialCached "tufte/opt.html" (dict "page" $p "key" "style") $key "style" -}}
+{{- if eq (lower (printf "%v" $style)) "latex" -}}
+  {{- $classes = $classes | append "tufte-style-latex" -}}
+{{- end -}}
+{{- range $opt := slice "justified" "hyphenate" "indent" "sfsidenotes" "debug" -}}
+  {{- $v := partialCached "tufte/opt.html" (dict "page" $p "key" $opt) $key $opt -}}
+  {{- if partial "tufte/truthy.html" $v -}}
+    {{- $name := cond (eq $opt "sfsidenotes") "sf" $opt -}}
+    {{- $classes = $classes | append (printf "tufte-%s" $name) -}}
+  {{- end -}}
+{{- end -}}
+{{- $ls := partialCached "tufte/opt.html" (dict "page" $p "key" "letterspacing") $key "letterspacing" -}}
+{{- if and (ne $ls nil) (not (partial "tufte/truthy.html" $ls)) -}}
+  {{- $classes = $classes | append "tufte-nols" -}}
+{{- end -}}
+{{- $num := lower (printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "numerals") $key "numerals")) -}}
+{{- if eq $num "oldstyle" -}}
+  {{- $classes = $classes | append "tufte-osf" -}}
+{{- else if and (ne $num "lining") (ne $num "") (ne $num "<nil>") -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.numerals must be \"lining\" or \"oldstyle\", not %q (%s)" $num (or (and $p.File $p.File.Path) $p.RelPermalink) -}}
+{{- end -}}
+{{- $margin := partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.margin") $key "bibliography.margin" -}}
+{{- if and (ne $margin nil) (not (partial "tufte/truthy.html" $margin)) -}}
+  {{- $classes = $classes | append "tufte-nocite-numbers" -}}
+{{- end -}}
+{{- return (delimit $classes " ") -}}

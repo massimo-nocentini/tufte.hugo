@@ -1,0 +1,66 @@
+{{- /*
+  Formats the entries of one citation, joined like tufte-common.def's \cite:
+  "E1", "E1; and E2", "E1; E2; and E3" (SPEC-LATEX §5.3).
+
+  Takes: dict
+    "page"     the citing page (its database: db.html)
+    "keys"     a slice of keys, or a comma-separated string
+    "postnote" optional, added to the last entry only (see format.html);
+               when empty, "page" / "note" build one: page "42" → "p. 42",
+               "42–45" → "pp. 42–45"; note is appended after it
+    "pagenum"  optional page locator (alias of the "page" above, since
+               "page" is the page object here)
+    "note"     optional free text
+    "margin"   bool, default true (entries in the margin: sidenotes,
+               bibentry); false for in-text use
+  Returns: HTML, a sequence of <span class="bib-entry" data-cite="key">.
+  Unknown keys render as [key?] and are reported with warnidf
+  "tufte-unknown-cite".
+*/ -}}
+{{- $p := .page -}}
+{{- $margin := true -}}
+{{- if isset . "margin" }}{{ $margin = .margin }}{{ end -}}
+{{- $keys := slice -}}
+{{- $raw := .keys -}}
+{{- if not (reflect.IsSlice $raw) }}{{ $raw = split (printf "%v" ($raw | default "")) "," }}{{ end -}}
+{{- range $raw -}}
+  {{- range split (printf "%v" .) "," -}}
+    {{- with lower (trim . " \t\n") }}{{ $keys = $keys | append . }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $post := .postnote -}}
+{{- if not $post -}}
+  {{- $parts := slice -}}
+  {{- with .pagenum -}}
+    {{- $pn := printf "%v" . -}}
+    {{- $pn = replaceRE `([0-9A-Za-z])\s*-{1,2}\s*([0-9A-Za-z])` "$1–$2" $pn -}}
+    {{- $parts = $parts | append (printf "%s %s" (cond (findRE `[–,]` $pn 1) "pp." "p.") $pn) -}}
+  {{- end -}}
+  {{- with .note }}{{ $parts = $parts | append (printf "%v" .) }}{{ end -}}
+  {{- $post = delimit $parts ", " -}}
+{{- end -}}
+
+{{- $db := partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $where := "" -}}
+{{- with $p.File }}{{ $where = .Path }}{{ else }}{{ $where = $p.RelPermalink }}{{ end -}}
+{{- $out := slice -}}
+{{- $n := len $keys -}}
+{{- $and := T "and" | default "and" -}}
+{{- range $i, $k := $keys -}}
+  {{- $raw := index $db $k -}}
+  {{- $e := false -}}
+  {{- if $raw -}}
+    {{- $e = partialCached "tufte/bib/normalize.html" (dict "entry" $raw "key" $k) (or $p.RelPermalink $p.Path) $k -}}
+  {{- else -}}
+    {{- warnidf "tufte-unknown-cite" "tufte.hugo: %s: unknown citation key %q (not in the bibliography database)" $where $k -}}
+  {{- end -}}
+  {{- $isLast := eq $i (sub $n 1) -}}
+  {{- $html := partial "tufte/bib/format.html" (dict "entry" $e "key" $k "postnote" (cond $isLast $post "") "margin" $margin "page" $p) -}}
+  {{- if and $isLast (gt $n 1) -}}
+    {{- $out = $out | append (printf "%s %s" $and $html) -}}
+  {{- else -}}
+    {{- $out = $out | append (printf "%s" $html) -}}
+  {{- end -}}
+{{- end -}}
+{{- return (delimit $out "; " | safeHTML) -}}

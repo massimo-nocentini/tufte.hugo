@@ -1,0 +1,39 @@
+{{- /*
+  Letterspaced text (inline; \textls[n]{…}):
+
+    {{< textls "100" >}}Letterspaced{{< /textls >}}       n/1000 em (\textls[100])
+    {{< textls "0.05em" >}}text{{< /textls >}}            a CSS length
+    {{< textls "100" "text" />}}                          one-line form
+    {{< textls amount="-20" >}}tight{{< /textls >}}       named form (amount, text)
+
+  The amount is thousandths of an em (as microtype's \textls) or a CSS
+  length (em, ex, rem, px, pt); anything else is ignored with a warning.
+
+  Output: <span class="ls" style="letter-spacing:0.1em">TEXT</span>
+*/ -}}
+{{- $amount := "" -}}{{- $text := strings.TrimSpace .Inner -}}
+{{- if .IsNamedParams -}}
+  {{- $amount = printf "%v" (.Get "amount" | default "") -}}
+  {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
+{{- else -}}
+  {{- $amount = printf "%v" (.Get 0 | default "") -}}
+  {{- if not $text }}{{ $text = printf "%v" (.Get 1 | default "") }}{{ end -}}
+{{- end -}}
+{{- $amount = strings.TrimSpace $amount -}}
+{{- $ls := "" -}}
+{{- if findRE `^-?[0-9]*\.?[0-9]+$` $amount 1 -}}
+  {{- $ls = printf "%gem" (div (float $amount) 1000.0) -}}
+{{- else if findRE `^-?[0-9]*\.?[0-9]+(em|ex|rem|px|pt)$` $amount 1 -}}
+  {{- $ls = $amount -}}
+{{- else if $amount -}}
+  {{- warnidf "tufte-bad-option" "textls shortcode: the amount must be thousandths of an em (\"100\") or a CSS length (\"0.1em\"), not %q (%s)" $amount .Position -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with $text -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- end -}}
+{{- $style := "" -}}
+{{- with $ls }}{{ $style = printf ` style="letter-spacing:%s"` . }}{{ end -}}
+{{- $out := printf `<span class="ls"%s>%s</span>` $style $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

@@ -1,0 +1,29 @@
+{{- /*
+  An anchor anywhere in the text (inline; \label), for xref:
+
+    {{< newthought >}}Too many floats{{< /newthought >}}{{< label "err:too-many-floats" >}} …
+    … see {{< xref "err:too-many-floats" "page" >}}
+
+  Positional: the key; or named: key="…". The reference text is the number
+  of the enclosing section (when sections are numbered), its name with
+  fmt="name" or fmt="page".
+
+  Output: <span class="tufte-anchor" id="KEY"></span>
+*/ -}}
+{{- $key := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $key = printf "%v" (.Get "key" | default "") -}}
+{{- else -}}
+  {{- $key = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- $k := partial "tufte/key.html" $key -}}
+{{- if not (strings.TrimSpace $key) -}}
+  {{- errorf "label shortcode: a key is required, e.g. {{< label \"sec:x\" >}} (%s)" .Position -}}
+{{- else if not $k -}}
+  {{- /* Punctuation only ("!!!"): the normalised key, the anchor id, is empty. */ -}}
+  {{- errorf "label shortcode: the key %q has no letter or digit, so it makes no anchor id; use letters, digits, \":\" and \"-\", e.g. {{< label \"sec:x\" >}} (%s)" $key .Position -}}
+{{- end -}}
+{{- with $k -}}
+  {{- $out := printf `<span class="tufte-anchor" id="%s"></span>` (htmlEscape .) -}}
+  {{- partial "tufte/nest.html" (dict "ctx" $ "html" $out) | safeHTML -}}
+{{- end -}}

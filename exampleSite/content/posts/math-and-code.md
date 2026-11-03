@@ -50,13 +50,19 @@ The KaTeX stylesheet is loaded only on pages that contain math.{{< marginnote >}
 
 ## Macros and equation numbers
 
-Macros keep notation short and consistent. The site defines `\RR`, `\NN` and `\abs` in `params.math.macros`, and this page adds `\E` and `\Var` in its front matter (`mathMacros`), so $x \in \RR$, $n \in \NN$ and $\abs{x - y}$ need no preamble.{{< sidenote >}}Hugo lowercases the keys of maps in the configuration and in front matter, so macros are written as a list of pairs, `[["\\RR", "\\mathbb{R}"]]`, which keeps the capital letters.{{< /sidenote >}} Equations are numbered with `\tag`, as in LaTeX:
+Macros keep notation short and consistent. The site defines `\RR`, `\NN` and `\abs` in `params.math.macros`, and this page adds `\E` and `\Var` in its front matter (`mathMacros`), so $x \in \RR$, $n \in \NN$ and $\abs{x - y}$ need no preamble.{{< sidenote >}}Hugo lowercases the keys of maps in the configuration and in front matter, so macros are written as a list of pairs, `[["\\RR", "\\mathbb{R}"]]`, which keeps the capital letters.{{< /sidenote >}} Equations are numbered as in LaTeX, with a `\label` inside the display:
 
 $$
-\Var(X) = \E\left[(X - \E[X])^2\right] = \E\left[X^2\right] - \E[X]^2 \tag{1}
+\Var(X) = \E\left[(X - \E[X])^2\right] = \E\left[X^2\right] - \E[X]^2 \label{eq:variance}
 $$
 
-The number sits at the right edge of the text column (set `params.math.leqno = true` for the left edge, and `params.math.fleqn = true` to set display math flush left). Environments such as `equation` and `align` number their lines too, but KaTeX counts each formula on its own, so every numbered formula starts again from (1): use `\tag` when a page has more than one.
+The theme numbers every labelled display in order, with one counter for the page (for the whole book in a book), sets the number at the right edge of the text column, and `{{</* eqref "eq:variance" */>}}` prints it, {{< eqref "eq:variance" >}}, wherever the text refers to it, as `\eqref` does. The `equation` shortcode does the same for a formula written between `{{</* equation label="eq:x" */>}}` and `{{</* /equation */>}}`; the [Equations section of the LaTeX cheat sheet](/posts/latex-to-hugo/#sec:equations) shows both. KaTeX's own environments (`equation`, `align`) number their lines too, but KaTeX counts each formula on its own, so each one starts again from (1): use `\label` or the shortcode for numbers that run through the page. Write `\tag{…}` only for a fixed tag, which no counter changes:
+
+$$
+e^{i\pi} + 1 = 0 \tag{A.1}
+$$
+
+KaTeX sets such a tag at the right edge as well; `params.math.leqno = true` moves tags to the left, and `params.math.fleqn = true` sets display math flush left.
 
 ## Math in captions
 

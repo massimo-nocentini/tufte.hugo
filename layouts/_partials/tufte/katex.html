@@ -8,23 +8,37 @@
     script that renders every .math element produced by
     render-passthrough.html with the page's options and macros (on the home
     and section pages, plus the mathMacros of every page in the pager, whose
-    summaries are typeset there). On a page
+    summaries are typeset there; on a book landing, whose print document
+    holds every chapter, the mathMacros of the chapters). On a page
     without such elements (a site that cannot enable the passthrough
     extension, with math: true in front matter) auto-render scans the
     article for $…$, $$…$$, \(…\) and \[…\].
 
-  URLs and SRI hashes come from data/tufte/vendor.toml (entries katex-css,
-  katex-js, katex-auto-render). params.math.katexVersion may name another
-  KaTeX version only together with its hashes: params.math.katexIntegrity
+  URLs and SRI hashes come from the [[katex]] entries of
+  data/tufte/vendor.toml. The KaTeX version follows the running Hugo, whose
+  transform.ToMath embeds KaTeX: the stylesheet must match the class names
+  of the HTML Hugo generates (KaTeX 0.18, embedded from Hugo 0.166.0,
+  renamed base, strut, tag and sizing to katex-base, katex-strut,
+  katex-tag and katex-sizing). So the theme loads KaTeX 0.16.21 on Hugo
+  0.146–0.165 and KaTeX 0.18.4 on Hugo 0.166 and later; the client engine
+  loads the scripts of the same release.
+
+  params.math.katexVersion = "" or "auto" (default) picks that version.
+  ("0.16.11", the default of earlier theme versions, counts as auto too.)
+  Another version listed in vendor.toml is used with its bundled hashes;
+  any other version also needs its hashes: params.math.katexIntegrity
   (CSS), katexJSIntegrity and, for the client engine,
-  katexAutoRenderIntegrity. params.math.katexCSS replaces the stylesheet
-  URL (with katexIntegrity as its hash). params.selfHosted = true serves the
-  files from the site (see tufte/vendor.html).
+  katexAutoRenderIntegrity. With the server engine, a version whose
+  major.minor differs from Hugo's embedded KaTeX gives the warning
+  tufte-katex-version (silence it with ignoreLogs). params.math.katexCSS
+  replaces the stylesheet URL (with katexIntegrity as its hash).
+  params.selfHosted = true serves the files from the site (see
+  tufte/vendor.html).
 
   Takes: the page.
 */ -}}
 {{- $page := . -}}
-{{- $cfg := site.Params.math | default (dict) -}}
+{{- $cfg := partialCached "func/math-config.html" "math" "math" -}}
 {{- $m := partial "func/math-options.html" (dict "Page" $page "Display" false) -}}
 {{- /* Client engine, list pages (home, section): the summaries keep their
        TeX for the browser, so the macros of every page in the current
@@ -32,34 +46,79 @@
        keys' case). Two pages defining the same macro differently: the
        later one in the pager wins. */ -}}
 {{- $macros := $m.client.macros | default (dict) -}}
-{{- if and (eq $m.engine "client") (or $page.IsHome (eq $page.Kind "section")) -}}
+{{- /* Book landings and parts list no summaries and have no paginator
+       (calling .Paginate there would publish /page/N/ copies); a book
+       landing's print document holds every chapter, so it takes the
+       chapters' macros instead. */ -}}
+{{- $inBook := partialCached "tufte/book/root.html" $page (or $page.RelPermalink $page.Path) -}}
+{{- if and (eq $m.engine "client") (or $page.IsHome (eq $page.Kind "section")) (or (not $inBook) (eq $inBook $page)) -}}
   {{- $ms := newScratch -}}
   {{- range $k, $v := $macros }}{{ $ms.SetInMap "macros" $k $v }}{{ end -}}
-  {{- range (partial "func/paginate.html" $page).Pages -}}
+  {{- $listed := slice -}}
+  {{- if $inBook -}}
+    {{- range partialCached "tufte/book/chapters.html" $page (or $page.RelPermalink $page.Path) }}{{ $listed = $listed | append .Page }}{{ end -}}
+  {{- else -}}
+    {{- $listed = (partial "func/paginate.html" $page).Pages -}}
+  {{- end -}}
+  {{- range $listed -}}
     {{- $pm := partial "func/math-options.html" (dict "Page" . "Display" false) -}}
     {{- range $k, $v := $pm.client.macros }}{{ $ms.SetInMap "macros" $k $v }}{{ end -}}
   {{- end -}}
   {{- $macros = $ms.Get "macros" | default (dict) -}}
 {{- end -}}
 {{- $vendor := partial "func/vendor-data.html" . -}}
-{{- $version := printf "%v" (index $cfg "katexversion" | default "") -}}
-{{- $items := slice (dict "name" "katex-css" "key" "katexintegrity" "defer" false) -}}
+{{- $entries := index $vendor "katex" | default slice -}}
+{{- if not $entries -}}
+  {{- errorf "tufte.hugo: the [[katex]] entries are missing from data/tufte/vendor.toml" -}}
+{{- end -}}
+{{- /* The release Hugo embeds: the first (newest) entry whose `hugo` is not
+       newer than the running Hugo. */ -}}
+{{- $auto := "" -}}
+{{- range $entries -}}
+  {{- if and (not $auto) (ge hugo.Version (printf "%v" (.hugo | default "0.0.0"))) -}}
+    {{- $auto = . -}}
+  {{- end -}}
+{{- end -}}
+{{- $auto = $auto | default (index $entries (sub (len $entries) 1)) -}}
+{{- $want := printf "%v" (index $cfg "katexversion" | default "") | strings.TrimSpace | strings.TrimPrefix "v" -}}
+{{- if in (slice "" "auto" "0.16.11") (lower $want) -}}
+  {{- $want = "" -}}
+{{- end -}}
+{{- $e := $auto -}}
+{{- $custom := false -}}
+{{- with $want -}}
+  {{- $found := "" -}}
+  {{- range $entries -}}
+    {{- if eq (printf "%v" .version) $want }}{{ $found = . }}{{ end -}}
+  {{- end -}}
+  {{- with $found -}}
+    {{- $e = . -}}
+  {{- else -}}
+    {{- $custom = true -}}
+  {{- end -}}
+  {{- if eq $m.engine "server" -}}
+    {{- $mm := replaceRE `^(\d+\.\d+).*$` "$1" $want -}}
+    {{- if ne $mm (replaceRE `^(\d+\.\d+).*$` "$1" (printf "%v" $auto.version)) -}}
+      {{- warnidf "tufte-katex-version" "tufte.hugo: params.math.katexVersion = %q, but Hugo %s renders math with KaTeX %s (transform.ToMath): the stylesheet may not match the generated HTML. Remove katexVersion (or set it to \"auto\") to follow Hugo." $want hugo.Version $auto.version -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $items := slice (dict "name" "css" "key" "katexintegrity" "defer" false) -}}
 {{- if eq $m.engine "client" -}}
-  {{- $items = $items | append (dict "name" "katex-js" "key" "katexjsintegrity" "defer" true) (dict "name" "katex-auto-render" "key" "katexautorenderintegrity" "defer" true) -}}
+  {{- $items = $items | append (dict "name" "js" "key" "katexjsintegrity" "defer" true) (dict "name" "autorender" "key" "katexautorenderintegrity" "defer" true) -}}
 {{- end -}}
 {{- range $it := $items -}}
-  {{- with $e := index $vendor $it.name -}}
-    {{- $url := printf "%v" $e.url -}}
-    {{- $integrity := printf "%v" ($e.integrity | default "") -}}
-    {{- $ver := printf "%v" ($e.version | default "") -}}
-    {{- if and $version $ver (ne $version $ver) -}}
-      {{- $url = replace $url (printf "@%s/" $ver) (printf "@%s/" $version) -}}
+  {{- with $f := index $e $it.name -}}
+    {{- $url := printf "%v" $f.url -}}
+    {{- $integrity := printf "%v" ($f.integrity | default "") -}}
+    {{- if $custom -}}
+      {{- $url = replace $url (printf "@%v/" $e.version) (printf "@%s/" $want) -}}
       {{- $integrity = printf "%v" (index $cfg $it.key | default "") -}}
       {{- if not $integrity -}}
-        {{- errorf "tufte.hugo: params.math.katexVersion = %q differs from the bundled KaTeX %s: set params.math.%s to the SRI hash of %s as well" $version $ver $it.key $url -}}
+        {{- errorf "tufte.hugo: params.math.katexVersion = %q is not one of the KaTeX releases in data/tufte/vendor.toml: set params.math.%s to the SRI hash of %s as well (or remove katexVersion to follow Hugo's embedded KaTeX %v)" $want $it.key $url $auto.version -}}
       {{- end -}}
     {{- end -}}
-    {{- if eq $it.name "katex-css" -}}
+    {{- if eq $it.name "css" -}}
       {{- with index $cfg "katexcss" -}}
         {{- if ne (printf "%v" .) $url -}}
           {{- $url = printf "%v" . -}}
@@ -69,7 +128,7 @@
     {{- end }}
 {{ partial "tufte/vendor.html" (dict "url" $url "integrity" $integrity "defer" $it.defer "dir" ($e.dir | default "katex")) }}
   {{- else -}}
-    {{- errorf "tufte.hugo: %q is missing from data/tufte/vendor.toml" $it.name -}}
+    {{- errorf "tufte.hugo: the KaTeX %v entry of data/tufte/vendor.toml has no %q file" $e.version $it.name -}}
   {{- end -}}
 {{- end -}}
 {{- if eq $m.engine "client" }}

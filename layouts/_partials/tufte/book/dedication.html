@@ -1,0 +1,12 @@
+{{- /*
+  The dedication page of a book: front matter `dedication` (Markdown) of
+  the book root, set in large italic, centred vertically.
+
+    <section class="dedication"><p>…</p></section>
+
+  Takes: the book root page.
+*/ -}}
+{{- with .Params.dedication -}}
+  {{- $html := $.RenderString (dict "display" "block") (printf "%v" .) | string | strings.TrimSpace }}
+<section class="dedication">{{ $html | safeHTML }}</section>
+{{- end -}}

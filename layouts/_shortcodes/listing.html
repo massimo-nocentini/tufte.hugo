@@ -1,0 +1,24 @@
+{{- /*
+  Numbered code listing with a margin caption (block; an algorithm/listing
+  float). Put it on its own lines with a fenced code block inside:
+
+    {{< listing caption="Hello in Lua." label="lst:hello" style="ruled" >}}
+    ```lua
+    print("hello")
+    ```
+    {{< /listing >}}
+
+  Named params: caption, label, short, type ("main" | "fullwidth"),
+  style ("plain" default | "ruled" | "boxed"), numbered, captionpos,
+  offset, cite, class.
+
+  Output: <figure class="tufte-listing ruled" id="K">…caption…<div class="highlight">…</div></figure>
+*/ -}}
+{{- $style := "" -}}
+{{- if .IsNamedParams }}{{ $style = lower (printf "%v" (.Get "style" | default "")) }}{{ end -}}
+{{- if and $style (not (in (slice "plain" "ruled" "boxed") $style)) -}}
+  {{- warnidf "tufte-bad-option" "listing shortcode: style must be plain, ruled or boxed, not %q (%s)" $style .Position -}}
+  {{- $style = "" -}}
+{{- end -}}
+{{- $out := partial "tufte/float-body.html" (dict "ctx" . "inner" .Inner "kind" "listing" "class" $style) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

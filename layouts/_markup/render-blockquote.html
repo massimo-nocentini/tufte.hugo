@@ -26,7 +26,7 @@
 {{- range $k, $v := .Attributes -}}
   {{- $val := printf "%v" $v -}}
   {{- if eq $k "author" -}}{{- $author = $val -}}
-  {{- else if eq $k "cite" -}}{{- $cite = $val -}}
+  {{- else if or (eq $k "cite") (eq $k "work") -}}{{- $cite = $val -}}
   {{- else if eq $k "url" -}}{{- $url = $val -}}
   {{- else if eq $k "footer" -}}{{- $footerRaw = $val -}}
   {{- else if eq $k "class" -}}{{- $class = $val -}}

@@ -2,18 +2,28 @@
 {{- /* Home page: optional title (only when content/_index.md sets one that
        differs from the site title, which the header already shows), the _index.md content as an
        introduction (Params.homeIntro, default true), then paginated summaries
-       of the posts in the main sections. */ -}}
+       of the posts in the main sections.
+       When content/_index.md sets `book: true` the whole site is one book
+       and the home page is its landing (tufte/book/landing.html), as for a
+       book section in list.html. */ -}}
+{{- $root := partialCached "tufte/book/root.html" . (or .RelPermalink .Path) -}}
+{{- if and $root (eq $root .) }}
+{{ partial "tufte/book/landing.html" . }}
+{{- else }}
 <article>
-  {{- with .Params.title }}
+  {{- /* .Title is the front matter title, or the site title when there is
+         none (.Params.title is deprecated since Hugo 0.169). */}}
+  {{- with .Title }}
   {{- if ne . site.Title }}
-  <h1>{{ . }}</h1>
+  <h1>{{ partial "tufte/title-html.html" (dict "page" $ "title" . "heading" true) }}</h1>
   {{- end }}
   {{- end }}
   {{- with .Params.subtitle }}
   <p class="subtitle">{{ . }}</p>
   {{- end }}
   {{- if ne site.Params.homeIntro false }}
-  {{ partial "func/content.html" . }}
+  {{ partial "tufte/abstract.html" . }}
+  {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
   {{- end }}
   {{- $pag := partial "func/paginate.html" . }}
   {{- range $pag.Pages }}
@@ -21,4 +31,5 @@
   {{- end }}
   {{ partial "paginator.html" . }}
 </article>
+{{- end }}
 {{ end }}

@@ -1,0 +1,22 @@
+{{- /*
+  The pages that make up the "document" of a page (SPEC-LATEX §4.1, R17),
+  in reading order: in a book, the book root (its landing body comes
+  first), then the part pages and chapters in the order of
+  tufte/book/sequence.html, which is the order of the whole-book print
+  document and of the continuous numbering (tufte/offsets.html,
+  tufte/book/labels.html); else just the page itself.
+  Used by the generators (lists of figures/tables/listings, bibliography
+  keys and numbers, index) so that they see every page the numbering and
+  the cross-references see.
+
+  Takes: a page.
+  Returns: a slice of pages.
+*/ -}}
+{{- $out := slice . -}}
+{{- with partialCached "tufte/book/root.html" . (or .RelPermalink .Path) -}}
+  {{- $out = slice . -}}
+  {{- range partialCached "tufte/book/sequence.html" . (or .RelPermalink .Path) -}}
+    {{- $out = $out | append .Page -}}
+  {{- end -}}
+{{- end -}}
+{{- return $out -}}

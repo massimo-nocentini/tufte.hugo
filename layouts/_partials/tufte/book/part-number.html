@@ -1,0 +1,21 @@
+{{- /*
+  The roman number of a part of a book (\part: I, II, …), from
+  tufte/book/parts.html (a slice of {Page, Display} dicts in weight order;
+  a plain slice of pages is accepted too).
+
+  Takes: a dict with
+    root  the book root
+    part  the part section page
+  Returns: the number string ("" when the page is not a part of the book).
+*/ -}}
+{{- $part := .part -}}
+{{- $roman := slice "I" "II" "III" "IV" "V" "VI" "VII" "VIII" "IX" "X" "XI" "XII" "XIII" "XIV" "XV" "XVI" "XVII" "XVIII" "XIX" "XX" -}}
+{{- $out := "" -}}
+{{- range $i, $e := partialCached "tufte/book/parts.html" .root (or .root.RelPermalink .root.Path) -}}
+  {{- if reflect.IsMap $e -}}
+    {{- if eq $e.Page $part }}{{ $out = printf "%v" $e.Display }}{{ end -}}
+  {{- else if eq $e $part -}}
+    {{- if lt $i (len $roman) }}{{ $out = index $roman $i }}{{ else }}{{ $out = printf "%d" (add $i 1) }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $out -}}

@@ -1,0 +1,172 @@
+{{- /*
+  Citation (inline; \cite). The full reference goes in the margin as a
+  numbered sidenote, as tufte-latex does:
+
+    … as Tufte argues{{< cite "tufte2006" >}}.
+    {{< cite "tufte2006,tufte1990" >}}           several keys
+    {{< cite "tufte2006" "tufte1990" >}}         several keys
+    {{< cite keys="tufte2006" page="42" offset="-1bl" >}}
+
+  Keys are looked up (case-insensitively) in the bibliography database
+  (data/bibliography.*, the page's `bibliography` file and `references`).
+
+  Named params (never mixed with positional ones):
+    keys    comma-separated keys
+    offset  vertical shift of the note (\cite[offset]{…}): "-1bl", "1rem"
+    page    a page number: ", p. 42" after the (last) reference
+    note    a free postnote: ", NOTE" (wins over page)
+    as      "sidenote" (default; site/page option citeAs) | "footnote": the
+            references go in a real footnote below the text (SPEC-LATEX §11)
+    mode    "margin" (default) | "text" (Author (Year)) | "paren" ((Author Year))
+            | "author" | "year": inline text, no sidenote (natbib)
+
+  Inside a sidenote, margin note, footnote, footnotetext, margin block, fig
+  caption, float caption or margintable/listing/subfigures float, the
+  references are gathered
+  under that note or caption, in one citation block after its text, with
+  those of its cite= parameter (\cite inside \sidenote, \marginnote,
+  \caption: tufte-common.def collects the keys and prints them after the
+  note). See tufte/cite-gather.html. A cite in a cell of a table or
+  fullwidthtable is not gathered: it stays a numbered sidenote in the cell,
+  as in a Markdown table. With
+  params.tufte.bibliography.margin = false (class option nobib) a citation is
+  a bracketed number "[3]" linked to the list of references.
+
+  Output, margin mode (SPEC-LATEX §3.7):
+    <label for="sn-ID" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-ID" class="margin-toggle"/><span class="sidenote citation"[ style]>ENTRIES</span><i class="sn-end" hidden></i>
+*/ -}}
+{{- $p := .Page -}}
+{{- $raw := slice -}}
+{{- $as := "" -}}
+{{- $offset := "" -}}{{- $pageNo := "" -}}{{- $noteText := "" -}}{{- $mode := "margin" -}}
+{{- if .IsNamedParams -}}
+  {{- $raw = $raw | append (printf "%v" (.Get "keys" | default (.Get "key") | default "")) -}}
+  {{- $offset = printf "%v" (.Get "offset" | default "") -}}
+  {{- $pageNo = printf "%v" (.Get "page" | default "") | strings.TrimSpace -}}
+  {{- $noteText = printf "%v" (.Get "note" | default "") | strings.TrimSpace -}}
+  {{- $mode = lower (printf "%v" (.Get "mode" | default "margin")) -}}
+  {{- $as = lower (printf "%v" (.Get "as" | default "")) -}}
+{{- else -}}
+  {{- range .Params }}{{ $raw = $raw | append (printf "%v" .) }}{{ end -}}
+{{- end -}}
+{{- $keys := slice -}}
+{{- range $raw -}}
+  {{- range split . "," -}}
+    {{- with strings.TrimSpace . | lower -}}
+      {{- if not (in $keys .) }}{{ $keys = $keys | append . }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $keys -}}
+  {{- errorf "cite shortcode: no citation key, e.g. {{< cite \"tufte2006\" >}} (%s)" .Position -}}
+{{- end -}}
+{{- if not (in (slice "margin" "text" "paren" "author" "year") $mode) -}}
+  {{- warnidf "tufte-bad-option" "cite shortcode: mode must be margin, text, paren, author or year, not %q; using margin (%s)" $mode .Position -}}
+  {{- $mode = "margin" -}}
+{{- end -}}
+{{- if not $as -}}
+  {{- $as = lower (printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "citeas" "default" "sidenote") (or $p.RelPermalink $p.Path) "citeas" | default "sidenote")) -}}
+{{- end -}}
+{{- if not (in (slice "sidenote" "footnote") $as) -}}
+  {{- warnidf "tufte-bad-option" "cite shortcode: as must be sidenote or footnote, not %q; using sidenote (%s)" $as .Position -}}
+  {{- $as = "sidenote" -}}
+{{- end -}}
+{{- $postnote := "" -}}
+{{- if $noteText -}}
+  {{- $postnote = $noteText -}}
+{{- else if $pageNo -}}
+  {{- $postnote = printf "p. %s" $pageNo -}}
+{{- end -}}
+
+{{- /* Containers whose text gets the references as a citation block.
+       Not table and fullwidthtable: their inner text is the table body, so
+       a cite in a cell stays a numbered sidenote in that cell, as in the
+       Markdown table form (a cite in their caption= or caption paragraph
+       is still gathered after the caption, by tufte/figure.html).
+       margintable stays a holder: it sits in the margin, where a sidenote
+       cannot float, so the references of its cells go after its caption. */ -}}
+{{- $holders := slice "sidenote" "marginnote" "footnotetext" "marginblock" "fig" "figure" "margintable" "listing" "subfigures" "footnote" -}}
+{{- $nested := false -}}
+{{- with .Parent -}}
+  {{- if in $holders .Name }}{{ $nested = true }}{{ end -}}
+{{- end -}}
+{{- $margin := partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.margin") (or $p.RelPermalink $p.Path) "bibliography.margin") -}}
+
+{{- $out := "" -}}
+{{- if ne $mode "margin" -}}
+  {{- /* natbib-style inline citation: Author (Year), (Author Year), Author, Year. */ -}}
+  {{- $db := partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- $parts := slice -}}
+  {{- range $i, $k := $keys -}}
+    {{- $who := $k -}}{{- $year := "" -}}{{- $cls := "citation-inline" -}}
+    {{- with index $db $k -}}
+      {{- $n := partial "tufte/bib/normalize.html" (dict "entry" . "key" $k) -}}
+      {{- $fams := slice -}}
+      {{- range $n.authors | default $n.editors -}}
+        {{- $fams = $fams | append (.family | default .literal | default "") -}}
+      {{- end -}}
+      {{- if eq (len $fams) 1 -}}
+        {{- $who = index $fams 0 -}}
+      {{- else if eq (len $fams) 2 -}}
+        {{- $who = printf "%s %s %s" (index $fams 0) (T "and" | default "and") (index $fams 1) -}}
+      {{- else if gt (len $fams) 2 -}}
+        {{- $who = printf "%s et al." (index $fams 0) -}}
+      {{- else -}}
+        {{- $who = $n.title | default $k -}}
+      {{- end -}}
+      {{- $year = printf "%v" ($n.year | default "") -}}
+    {{- else -}}
+      {{- warnidf "tufte-unknown-cite" "cite shortcode: unknown citation key %q (%s)" $k $.Position -}}
+      {{- $who = printf "[%s?]" $k -}}
+      {{- $cls = "citation-inline bib-missing" -}}
+    {{- end -}}
+    {{- $pn := "" -}}
+    {{- if and $postnote (eq $i (sub (len $keys) 1)) }}{{ $pn = printf ", %s" $postnote }}{{ end -}}
+    {{- $t := "" -}}
+    {{- if ne $cls "citation-inline" -}}
+      {{- /* unknown key: just the [key?] mark */ -}}
+      {{- $t = $who -}}
+    {{- else if eq $mode "text" -}}
+      {{- $t = printf "%s (%s%s)" $who $year $pn -}}
+    {{- else if eq $mode "paren" -}}
+      {{- $t = printf "%s %s%s" $who $year $pn -}}
+    {{- else if eq $mode "author" -}}
+      {{- $t = $who -}}
+    {{- else -}}
+      {{- $t = printf "%s%s" $year $pn -}}
+    {{- end -}}
+    {{- $parts = $parts | append (printf `<span class="%s" data-cite="%s">%s</span>` $cls (htmlEscape $k) (htmlEscape $t)) -}}
+  {{- end -}}
+  {{- $out = delimit $parts (cond (eq $mode "text") ", " "; ") -}}
+  {{- if eq $mode "paren" }}{{ $out = printf "(%s)" $out }}{{ end -}}
+{{- else if not $margin -}}
+  {{- /* nobib: [n] linked to the list; postprocess fills the numbers. */ -}}
+  {{- $refs := slice -}}
+  {{- range $keys -}}
+    {{- $refs = $refs | append (printf `<a class="citation-ref" href="#ref-%s" data-cite="%s"><span class="cite-num" data-key="%s"></span></a>` (htmlEscape .) (htmlEscape .) (htmlEscape .)) -}}
+  {{- end -}}
+  {{- $pn := "" -}}
+  {{- with $postnote }}{{ $pn = printf ", %s" (htmlEscape .) }}{{ end -}}
+  {{- $out = printf `[%s%s]` (delimit $refs ", ") $pn -}}
+{{- else -}}
+  {{- $entries := partial "tufte/bib/entries.html" (dict "page" $p "keys" $keys "postnote" $postnote) | string -}}
+  {{- if $nested -}}
+    {{- /* Cut out by the holder (tufte/cite-gather.html) and merged into one
+           block at the end of its note or caption. */ -}}
+    {{- $out = printf `<span class="citation-block" data-nested="1">%s</span><i class="cite-end" hidden></i>` $entries -}}
+  {{- else if eq $as "footnote" -}}
+    {{- /* A real footnote (SPEC-LATEX §11): the marker of the footnote shortcode. */ -}}
+    {{- $n := partial "func/note-id.html" $p -}}
+    {{- $out = printf `<span class="tufte-fn" data-key="s%s" hidden>%s</span>` (replaceRE `^.*-` "" $n) $entries -}}
+  {{- else -}}
+    {{- $style := "" -}}
+    {{- with $offset -}}
+      {{- with partial "tufte/offset.html" (dict "value" . "page" $p "where" (printf "(%s shortcode, line %d)" $.Name $.Position.LineNumber)) -}}
+        {{- $style = printf ` style="%s"` (htmlEscape (string .)) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $id := partial "func/note-id.html" $p -}}
+    {{- $out = printf `<label for="sn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote citation"%s>%s</span><i class="sn-end" hidden></i>` $id $id $style $entries -}}
+  {{- end -}}
+{{- end -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

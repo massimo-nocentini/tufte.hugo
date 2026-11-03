@@ -1,0 +1,31 @@
+{{- /*
+  Removes margin material from a piece of phase-1 HTML, for the names
+  tufte/labels.html records (a heading's or a run-in paragraph's title,
+  used by xref "name"/"page" and as the "where" of later labels):
+  margin-toggle label/input pairs, sidenotes, margin notes, citation
+  blocks and real-footnote markers (span.tufte-fn: the footnote shortcode,
+  cite as=footnote and Markdown footnotes kept as footnotes) with their
+  nested spans (math, small caps, a citation's own spans), and the
+  sn-end/fn-end markers. A margin note has no sn-end marker
+  (marginnote.html), so the end of each note is found by balancing its
+  spans, as tufte/resolve-refs.html and tufte/lists/render.html do: note
+  spans are renamed <tufnote>, then innermost elements are resolved
+  repeatedly (finished spans become <xspan>, finished notes are removed).
+
+  Takes: the HTML (string).
+  Returns: the HTML without margin material (string).
+*/ -}}
+{{- $h := string . -}}
+{{- $h = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $h -}}
+{{- if findRE `<span class="(?:sidenote|marginnote|citation-block|tufte-fn)` $h 1 -}}
+  {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<s[^p]|</[^s]|</s[^p])*` -}}
+  {{- $h = replaceRE `<span class="(sidenote|marginnote|citation-block|tufte-fn)` `<tufnote class="$1` $h -}}
+  {{- range seq 60 -}}
+    {{- if not (strings.Contains $h "<tufnote") }}{{ break }}{{ end -}}
+    {{- $h = replaceRE (printf `<tufnote[^>]*>%s</span>(?:<i class="[sf]n-end" hidden></i>)?` $C) "" $h -}}
+    {{- $h = replaceRE (printf `<span([^>]*)>(%s)</span>` $C) "<xspan$1>$2</xspan>" $h -}}
+  {{- end -}}
+  {{- $h = replace (replace $h "<xspan" "<span") "</xspan>" "</span>" -}}
+{{- end -}}
+{{- $h = replaceRE `<i class="[sf]n-end" hidden></i>` "" $h -}}
+{{- return $h -}}

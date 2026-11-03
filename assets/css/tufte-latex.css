@@ -1,0 +1,1985 @@
+/* tufte.hugo — tufte-latex.css
+ *
+ * The tufte-latex layer: what tufte-handout and tufte-book can do in LaTeX,
+ * expressed in CSS on top of tufte.css and theme.css (it is loaded right
+ * after theme.css in the same bundle, see _partials/css.html).
+ *
+ *   1. Variables         7. Title block, thanks, abstract
+ *   2. Notes             8. Equations
+ *   3. Floats            9. Bibliography, lists of floats, index
+ *   4. Labels, xrefs    9b. Footnotes  10. Book views
+ *   5. Typography       11. Small screens (screen and max-width: 760px)
+ *   6. Headings         12. Print (paper geometry from tufte-common.def)
+ *                       13. Debug (tufte.debug = true)
+ *
+ * Class options become body classes (tufte/body-class.html): tufte-book,
+ * tufte-handout, tufte-justified, tufte-hyphenate, tufte-indent, tufte-sf
+ * (sfsidenotes), tufte-nols, tufte-osf, tufte-nocite-numbers, tufte-debug,
+ * tufte-print-book, tufte-style-latex. Page-dependent values (alignment and
+ * font of the marginalia, paper size) are custom properties written by
+ * tufte/head-style.html after this stylesheet.
+ *
+ * Media queries: new desktop-only rules use "(width > 760px), print", new
+ * mobile rules "screen and (max-width: 760px)", so that print, whose page is
+ * narrower than 760px, never gets the phone layout from this file.
+ */
+
+/* ------------------------------------------------------------------ */
+/* 1. Variables                                                        */
+/* ------------------------------------------------------------------ */
+
+/* \marginnote[offset], \sidenote[][offset], \caption[][offset]: set inline
+   by the shortcodes (style="--tufte-offset:…", 1bl = 2rem = \baselineskip).
+   Not inherited, so a note nested in an offset note does not move twice. */
+@property --tufte-offset {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+
+:root {
+    --tufte-serif: et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif;
+    /* \allcapsspacing (\textls[200]), \smallcapsspacing (\textls[50]) and
+       \newthought: the values of the letterspace path that tufte-latex takes
+       under pdfLaTeX, not those of its soul fallback (0.15em, 0.075em). */
+    --tufte-allcaps-ls: 0.2em;
+    --tufte-smallcaps-ls: 0.05em;
+    --tufte-newthought-ls: 0.05em;
+    /* Book paragraph indent (\RaggedRightParindent = 1pc at 10pt). */
+    --tufte-parindent: 1.2em;
+}
+
+/* Class option nols: no letterspacing anywhere. */
+body.tufte-nols {
+    --tufte-allcaps-ls: normal;
+    --tufte-smallcaps-ls: normal;
+    --tufte-newthought-ls: normal;
+}
+
+/* Class option sfsidenotes: sans-serif marginalia. Through variables, so an
+   explicit tufte.X.font (--tufte-X-family / -size) still wins over it, as
+   \setsidenotefont wins over the class option in LaTeX. */
+body.tufte-sf {
+    --tufte-margin-family: var(--tufte-sans, "Gill Sans", "Gill Sans MT", Calibri, sans-serif);
+    --tufte-margin-size: 1rem;
+    --tufte-margin-ls: 0.02em;
+}
+
+/* marginals=auto follows the body: justified body, justified notes. The
+   head style normally resolves this already into --tufte-X-align. */
+body.tufte-justified {
+    --tufte-marginals-align: justify;
+}
+
+/* ------------------------------------------------------------------ */
+/* 2. Notes                                                            */
+/* ------------------------------------------------------------------ */
+
+/* \sidenote[*]{…} / [number]: a fixed mark that does not step the counter. */
+label.sidenote-number[data-number] {
+    counter-increment: none;
+}
+
+label.sidenote-number[data-number]::after {
+    content: attr(data-number);
+}
+
+.sidenote[data-number]::before {
+    content: attr(data-number) " ";
+}
+
+/* Offsets move the note down (positive) or up (negative) from its mark. */
+@media (width > 760px), print {
+    .sidenote,
+    .marginnote {
+        margin-top: calc(0.3rem + var(--tufte-offset, 0px));
+    }
+}
+
+/* Adjacent marks (\multfootsep): a superscript comma between them. */
+label.sidenote-number--multi::before {
+    content: ",";
+    position: relative;
+    vertical-align: baseline;
+    top: -0.5rem;
+    font-size: 0.9rem;
+}
+
+/* A citation nested in a note or caption: its own block, like the separate
+   \marginpar of tufte-latex. */
+.citation-block {
+    display: block;
+    margin-top: 0.5rem;
+}
+
+/* Safety net for notes left at section level (a shortcode alone on a line
+   loses its <p>) and for \thanks notes in the title block: the paragraph
+   geometry, expressed in section widths (27.5% = 50% of 55%; right edge at
+   88% = 55% + 60% of 55%). */
+section > .sidenote,
+section > .marginnote,
+header > .sidenote,
+header .sidenote {
+    width: 27.5%;
+    margin-right: 12%;
+}
+
+.sidenote,
+.marginnote,
+figcaption,
+.margin-block {
+    text-indent: 0;
+}
+
+/* Fonts and alignment of the marginalia: sidenote=, marginnote=, caption=,
+   citation= and \setXfont, from tufte/head-style.html. A family or colour
+   that is not set leaves the declaration invalid at computed-value time,
+   which inherits, so the defaults are tufte.css's. */
+.sidenote,
+blockquote .sidenote {
+    text-align: var(--tufte-sidenote-align, var(--tufte-marginals-align, left));
+    font-family: var(--tufte-sidenote-family, var(--tufte-margin-family));
+    font-style: var(--tufte-sidenote-style, normal);
+    font-size: var(--tufte-sidenote-size, var(--tufte-margin-size, 1.1rem));
+    letter-spacing: var(--tufte-margin-ls, normal);
+    color: var(--tufte-sidenote-color);
+    -webkit-hyphens: var(--tufte-margin-hyphens, manual);
+    hyphens: var(--tufte-margin-hyphens, manual);
+}
+
+.marginnote,
+blockquote .marginnote {
+    text-align: var(--tufte-marginnote-align, var(--tufte-marginals-align, left));
+    font-family: var(--tufte-marginnote-family, var(--tufte-margin-family));
+    font-style: var(--tufte-marginnote-style, normal);
+    font-size: var(--tufte-marginnote-size, var(--tufte-margin-size, 1.1rem));
+    letter-spacing: var(--tufte-margin-ls, normal);
+    color: var(--tufte-marginnote-color);
+    -webkit-hyphens: var(--tufte-margin-hyphens, manual);
+    hyphens: var(--tufte-margin-hyphens, manual);
+}
+
+.marginnote.caption,
+.marginnote.margin-figure,
+figcaption,
+.margin-block > p.caption {
+    text-align: var(--tufte-caption-align, var(--tufte-marginals-align, left));
+    font-family: var(--tufte-caption-family, var(--tufte-margin-family));
+    font-style: var(--tufte-caption-style, normal);
+    font-size: var(--tufte-caption-size, var(--tufte-margin-size, 1.1rem));
+    letter-spacing: var(--tufte-margin-ls, normal);
+    color: var(--tufte-caption-color);
+    -webkit-hyphens: var(--tufte-margin-hyphens, manual);
+    hyphens: var(--tufte-margin-hyphens, manual);
+}
+
+.sidenote.citation {
+    text-align: var(--tufte-citation-align, var(--tufte-marginals-align, left));
+    font-family: var(--tufte-citation-family, var(--tufte-margin-family));
+    font-style: var(--tufte-citation-style, normal);
+    font-size: var(--tufte-citation-size, var(--tufte-margin-size, 1.1rem));
+    color: var(--tufte-citation-color);
+}
+
+/* Nested in a note: everything not set explicitly comes from the note. */
+.citation-block {
+    text-align: var(--tufte-citation-align);
+    font-family: var(--tufte-citation-family);
+    font-style: var(--tufte-citation-style);
+    font-size: var(--tufte-citation-size);
+    color: var(--tufte-citation-color);
+}
+
+/* theme.css gives notes inside a .sans span the serif face back; keep that
+   default, but let the marginalia options through. */
+.sans .sidenote {
+    font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, var(--tufte-serif)));
+}
+
+.sans .marginnote {
+    font-family: var(--tufte-marginnote-family, var(--tufte-margin-family, var(--tufte-serif)));
+}
+
+.sans .marginnote.caption,
+.sans .marginnote.margin-figure {
+    font-family: var(--tufte-caption-family, var(--tufte-margin-family, var(--tufte-serif)));
+}
+
+/* The number at the start of a sidenote is set in the sidenote font
+   (\@makefntext: \@textsuperscript{\@tufte@sidenote@font\tiny\@thefnmark}),
+   so sfsidenotes and sidenote.font change it too; by default it stays in
+   old-style figures. The mark in the text (label.sidenote-number::after)
+   stays \normalfont. */
+.sidenote::before,
+.sidenote[data-number]::before {
+    font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, et-book-roman-old-style, et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif));
+}
+
+/* Notes nested in letterspaced or case-changing spans look like notes. */
+.allcaps .sidenote,
+.allcaps .marginnote,
+.smallcaps .sidenote,
+.smallcaps .marginnote,
+.sc .sidenote,
+.sc .marginnote {
+    text-transform: none;
+    font-variant-caps: normal;
+}
+
+/* \footnotemark … \footnotetext: the text sits in its own paragraph. */
+p.footnotetext-anchor {
+    margin: 0;
+    min-height: 0;
+}
+
+/* Block content in a note (a list, code block, quote or table in a
+   footnote turned sidenote, or in a sidenote/margin note): a <span> may
+   not hold blocks, so tufte/inline-blocks.html turns each block element
+   into a span[data-sn="TAG"], laid out here as the block it was. */
+span[data-sn] {
+    display: block;
+}
+span[data-sn="ul"],
+span[data-sn="ol"] {
+    padding-left: 1.2em;
+    margin: 0.2rem 0;
+}
+span[data-sn="li"] {
+    display: list-item;
+    list-style-type: disc;
+}
+span[data-sn="ol"] > span[data-sn="li"] {
+    list-style-type: decimal;
+}
+span[data-sn="pre"] {
+    white-space: pre;
+    overflow-x: auto;
+    margin: 0.2rem 0;
+    font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-size: 0.9em;
+}
+span[data-sn="pre"] > code {
+    font-size: inherit;
+}
+span[data-sn="blockquote"] {
+    margin: 0.2rem 0 0.2rem 1em;
+    font-style: italic;
+}
+span[data-sn="table"] {
+    display: table;
+    border-collapse: collapse;
+    margin: 0.2rem 0;
+}
+span[data-sn="thead"] { display: table-header-group; }
+span[data-sn="tbody"] { display: table-row-group; }
+span[data-sn="tfoot"] { display: table-footer-group; }
+span[data-sn="tr"] { display: table-row; }
+span[data-sn="th"],
+span[data-sn="td"] {
+    display: table-cell;
+    padding: 0 0.5em 0 0;
+}
+span[data-sn="th"] {
+    border-bottom: 1px solid currentColor;
+}
+span[data-sn="caption"] { display: table-caption; }
+span[data-sn="dd"] { margin-left: 1em; }
+span[data-sn="dt"],
+span[data-sn^="h"] {
+    font-style: italic;
+}
+
+/* Margin blocks (marginblock, margintable): block content in the margin.
+   The geometry is the section-level one (see the docs). */
+div.tufte-anchor {
+    height: 0;
+}
+
+.margin-block {
+    display: block;
+    float: right;
+    clear: right;
+    width: 27.5%;
+    margin-right: 12%;
+    font-size: var(--tufte-marginnote-size, var(--tufte-margin-size, 1.1rem));
+    line-height: 1.3;
+}
+
+.margin-block > :first-child {
+    margin-top: 0;
+}
+
+.margin-block p,
+.margin-block ul,
+.margin-block ol,
+.margin-block dl {
+    width: auto;
+    font-size: inherit;
+    line-height: inherit;
+    margin: 0 0 0.5rem;
+    padding: 0;
+}
+
+.margin-block ul,
+.margin-block ol {
+    padding-left: 1.2em;
+}
+
+.margin-block div.table-wrapper,
+.margin-block .math-display,
+.margin-block pre > code,
+.margin-block div.highlight > pre {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+}
+
+.margin-block div.table-wrapper > table {
+    width: 100%;
+    min-width: 0;
+    font-size: 1rem;
+}
+
+.margin-block div.table-wrapper th,
+.margin-block div.table-wrapper td {
+    padding: 0.2rem 0.4rem;
+}
+
+.margin-block img {
+    display: block;
+    max-width: 100%;
+}
+
+/* ------------------------------------------------------------------ */
+/* 3. Floats: numbered figures, tables, listings                       */
+/* ------------------------------------------------------------------ */
+
+/* "Figure 3:" — lining digits, like the caption counter of LaTeX. */
+.caption-label {
+    font-family: var(--tufte-caption-family, var(--tufte-margin-family, var(--tufte-serif)));
+}
+
+body.tufte-osf .caption-label {
+    font-family: var(--tufte-caption-family, var(--tufte-margin-family, et-book-roman-old-style, et-book, Palatino, "Palatino Linotype", Georgia, serif));
+}
+
+/* The automatic number when a key is unknown (or before postprocess). */
+.tufte-num:empty::after,
+.cite-num:empty::after {
+    content: "?";
+}
+
+@media (width > 760px), print {
+    /* \setfloatalignment{b}: caption bottom-aligned with the float (\smash:
+       it may overlap neighbouring marginalia, as in LaTeX). */
+    figure.caption-bottom {
+        position: relative;
+    }
+
+    figure.caption-bottom > span.marginnote {
+        position: absolute;
+        bottom: calc(-1 * var(--tufte-offset, 0px));
+        right: -60%;
+        float: none;
+        margin: 0;
+    }
+
+    /* figure*: the caption goes in the margin column under the figure (and
+       is not contained by it, so the text continues beside it, R20).
+       30.6% of the 90% figure = the 27.5% note column; 2.2% = the 2%
+       between the note column and the 90% edge. */
+    figure.fullwidth > figcaption.caption-margin {
+        float: right;
+        clear: right;
+        width: 30.6%;
+        max-width: 30.6%;
+        margin: calc(0.3rem + var(--tufte-offset, 0px)) 2.2% 0 0;
+    }
+
+    /* figure*[b]: caption above the figure, in the margin column. */
+    figure.fullwidth.caption-bottom {
+        position: relative;
+    }
+
+    figure.fullwidth.caption-bottom > figcaption.caption-margin {
+        position: absolute;
+        bottom: calc(100% - var(--tufte-offset, 0px));
+        right: 2.2%;
+        float: none;
+        margin: 0;
+    }
+}
+
+figure[id],
+p.margin-figure-anchor[id],
+div.tufte-anchor[id],
+span.tufte-anchor[id],
+span.index-anchor[id],
+span.run-in[id],
+label.sidenote-number[id],
+.math-display[id] {
+    scroll-margin-top: 1.5rem;
+}
+
+/* Tables and listings inside their float fill it. */
+figure.tufte-table div.table-wrapper,
+figure.tufte-listing div.highlight,
+figure div.table-wrapper {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+}
+
+figure.tufte-listing > div.highlight > pre,
+figure.tufte-listing > div.highlight > div,
+figure.tufte-listing pre > code {
+    width: auto;
+    margin-left: 0;
+}
+
+/* Listing styles (tufteplain, tufteruled, tufteboxed). */
+figure.tufte-listing.ruled > div.highlight,
+figure.tufte-listing.ruled > pre {
+    border-top: 1px solid currentColor;
+    border-bottom: 1px solid currentColor;
+    padding: 0.3rem 0;
+}
+
+figure.tufte-listing.boxed > div.highlight,
+figure.tufte-listing.boxed > pre {
+    border: 1px solid currentColor;
+    padding: 0.3rem 0.5rem;
+}
+
+/* Subfigures / image grids. */
+.figure-grid > .grid {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 2), 1fr);
+    gap: 1rem;
+    align-items: end;
+}
+
+/* If the images arrive wrapped in a paragraph, the grid sees the images. */
+.figure-grid > .grid > p {
+    display: contents;
+}
+
+.figure-grid > .grid img {
+    display: block;
+    width: 100%;
+}
+
+.figure-grid .subfigure {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+.figure-grid .subcaption {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 1.1rem;
+    line-height: 1.3;
+    text-align: center;
+}
+
+/* \FloatBarrier, \clearpage, \tuftebreak. */
+div.clear-margin {
+    clear: right;
+}
+
+div.tufte-break {
+    height: 2rem;
+}
+
+div.page-break {
+    height: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* 4. Labels and cross-references                                      */
+/* ------------------------------------------------------------------ */
+
+a.xref-missing,
+span.xref-missing {
+    color: var(--tufte-alert-caution, #a12a2a);
+}
+
+a.citation-ref:link,
+a.citation-ref:visited {
+    text-decoration: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* 5. Typography                                                       */
+/* ------------------------------------------------------------------ */
+
+/* \allcaps, \smallcaps, \textsc. */
+.allcaps {
+    text-transform: uppercase;
+    letter-spacing: var(--tufte-allcaps-ls);
+}
+
+.smallcaps {
+    text-transform: lowercase;
+    font-variant-caps: small-caps;
+    letter-spacing: var(--tufte-smallcaps-ls);
+}
+
+.sc {
+    font-variant-caps: small-caps;
+    letter-spacing: var(--tufte-smallcaps-ls);
+}
+
+.newthought {
+    letter-spacing: var(--tufte-newthought-ls);
+}
+
+/* \nohyphens. */
+.nohyphens {
+    -webkit-hyphens: none;
+    hyphens: none;
+}
+
+/* Class options hyphenate / justified, and {.justify} {.raggedright}
+   {.raggedleft} on a single block. */
+body.tufte-hyphenate section > p,
+body.tufte-hyphenate section > ul,
+body.tufte-hyphenate section > ol,
+body.tufte-hyphenate section > dl {
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+
+body.tufte-justified section > p,
+body.tufte-justified section > ul > li,
+body.tufte-justified section > ol > li,
+body.tufte-justified section > dl > dd {
+    text-align: justify;
+}
+
+.justify,
+section > p.justify {
+    text-align: justify;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+
+.raggedright,
+body.tufte-justified section > p.raggedright,
+body.tufte-justified section > ul.raggedright > li,
+body.tufte-justified section > ol.raggedright > li {
+    text-align: left;
+}
+
+.raggedleft,
+body.tufte-justified section > p.raggedleft,
+body.tufte-justified section > ul.raggedleft > li,
+body.tufte-justified section > ol.raggedleft > li {
+    text-align: right;
+}
+
+/* Book paragraphs (indent): no space between paragraphs, first-line
+   indent, no indent after a heading, a float or a break. */
+body.tufte-indent section > p {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+body.tufte-indent section > p + p {
+    text-indent: var(--tufte-parindent);
+}
+
+body.tufte-indent section > :not(p) + p,
+body.tufte-indent section > p:first-child {
+    margin-top: 1.4rem;
+}
+
+/* The anchors of margin figures and \footnotetext are not paragraphs of
+   text: the paragraph after them keeps its indent, they take no space. */
+body.tufte-indent section > p.margin-figure-anchor,
+body.tufte-indent section > p.footnotetext-anchor {
+    text-indent: 0;
+}
+
+/* \newthought starts with \tuftebreak (1\baselineskip) and \noindent. */
+body.tufte-indent section > p:has(> .newthought:first-child) {
+    margin-top: 2rem;
+    text-indent: 0;
+}
+
+body.tufte-indent section > div.tufte-break + p {
+    margin-top: 0;
+    text-indent: 0;
+}
+
+body.tufte-indent section > p:last-child {
+    margin-bottom: 1.4rem;
+}
+
+/* Old-style figures (numerals = "oldstyle"): digits from the old-style
+   ET Book faces (et-book.css, unicode-range limited to 0-9). */
+body.tufte-osf {
+    font-family: et-book-osf-digits, et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif;
+}
+
+body.tufte-sf .sidenote,
+body.tufte-sf .marginnote,
+body.tufte-sf figcaption,
+body.tufte-sf .citation-block,
+body.tufte-sf .margin-block {
+    line-height: 1.4;
+}
+
+/* Description lists (Goldmark definition lists). */
+section > dl {
+    width: 50%;
+}
+
+dl > dt {
+    font-style: italic;
+    font-weight: 400;
+}
+
+dl > dd {
+    margin-left: 1.5em;
+}
+
+/* verse. */
+div.verse {
+    margin: 1.4rem 0;
+}
+
+div.verse > p {
+    width: 55%;
+    margin: 0 0 1.4rem;
+}
+
+div.verse > p:last-child {
+    margin-bottom: 0;
+}
+
+.verse-line {
+    display: block;
+    padding-left: 2em;
+    text-indent: -1em;
+}
+
+body.tufte-indent div.verse > p {
+    text-indent: 0;
+}
+
+/* Safari only: punctuation hanging into the margins. */
+section > p {
+    hanging-punctuation: first last;
+}
+
+cite {
+    font-style: italic;
+}
+
+/* ------------------------------------------------------------------ */
+/* 6. Headings                                                         */
+/* ------------------------------------------------------------------ */
+
+/* \paragraph{…}: #### headings run into the following paragraph. */
+section > h4.run-in {
+    float: left;
+    margin: 1.4rem 1em 0 0;
+    font-size: 1.4rem;
+    line-height: 2rem;
+    font-style: italic;
+    font-weight: 400;
+}
+
+section > h4.run-in + p {
+    margin-top: 1.4rem;
+}
+
+body.tufte-indent section > h4.run-in + p {
+    text-indent: 0;
+}
+
+/* The paragraph shortcode (<p><span class="run-in">Title</span> Text…) is
+   the inline form of the same \paragraph: in indent mode it gets the
+   space before and no indent, like h4.run-in + p (tufte-common.def
+   \paragraph: indent \z@, space before). Outside indent mode tufte.css's
+   paragraph margins already give it the same 1.4rem. */
+body.tufte-indent section > p:has(> span.run-in:first-child) {
+    margin-top: 1.4rem;
+    text-indent: 0;
+}
+
+span.run-in {
+    font-style: italic;
+    margin-right: 1em;
+}
+
+/* Notes in section headings (## Title{{< sidenote >}}…). A heading is as
+   wide as its section, not 55% like a paragraph, so tufte.css's paragraph
+   geometry (50%, -60%) would put the note off the page: use the section
+   geometry of the safety net in §2 (27.5% wide, right edge at 88%). The
+   print block (§12) places them with --pw = 100, which is right for a
+   heading. */
+@media (width > 760px), print {
+    section > :is(h2, h3, h5, h6) :is(.sidenote, .marginnote) {
+        width: 27.5%;
+        margin-right: 12%;
+    }
+
+    /* The run-in h4 is a shrink-to-fit float: percentages would resolve
+       against its small box. Its notes are placed absolutely in section
+       coordinates instead, at the height of the heading line. Limit: an
+       absolutely placed note does not take part in the right-floats'
+       clear: right stacking, so it can overlap a long note of the
+       paragraph before it (move it with an offset, as \sidenote[][offset]). */
+    section:has(> h4.run-in :is(.sidenote, .marginnote)) {
+        position: relative;
+    }
+
+    section > h4.run-in :is(.sidenote, .marginnote) {
+        position: absolute;
+        right: 12%;
+        width: 27.5%;
+        margin-right: 0;
+    }
+}
+
+/* No \subsubsection in tufte-latex: h5 and h6 (warned at build time) look
+   like a plain italic paragraph heading. */
+section > h5,
+section > h6 {
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.4rem;
+    line-height: 2rem;
+    margin: 1.4rem 0 0;
+}
+
+/* secnumdepth: "3.1  Title". */
+.tufte-num[data-kind="sec"] {
+    margin-right: 0.5em;
+    font-style: normal;
+}
+
+/* ------------------------------------------------------------------ */
+/* 7. Title block, \thanks, abstract                                   */
+/* ------------------------------------------------------------------ */
+
+/* \maketitle of tufte-handout: \LARGE italic title, \Large italic author
+   and date (17.28pt and 14.4pt at a 10pt body of 1.4rem), \parskip 4pt. */
+.title-block.latex h1 {
+    font-style: italic;
+    font-size: 2.4rem;
+    line-height: 1.2;
+    margin-bottom: 0.4rem;
+}
+
+.title-block.latex .subtitle {
+    margin: 0.4rem 0;
+    font-size: 2rem;
+    line-height: 1.2;
+}
+
+.title-author,
+.title-date {
+    font-style: italic;
+    font-size: 2rem;
+    line-height: 1.2;
+    margin: 0.4rem 0;
+}
+
+.title-block.latex .post-meta {
+    margin-top: 1rem;
+}
+
+/* Author {name, thanks} notes in the post-meta line of the css title
+   block: the line is 55% wide like a paragraph, so the note takes the
+   tufte.css paragraph geometry rather than the header one. (Print uses
+   the --pw geometry of the print block, mobile the toggle rules.) */
+@media screen {
+    header p.post-meta .sidenote {
+        width: 50%;
+        margin-right: -60%;
+    }
+}
+
+/* sfsidenotes: the title block (\maketitle) in sans all-caps. Chapter
+   heads also carry .title-block but keep \titleformat{\chapter}: italic
+   serif (tufte-common.def changes only \maketitle under sfsidenotes). */
+body.tufte-sf .title-block:not(.chapter-head) > h1,
+body.tufte-sf .title-block:not(.chapter-head) > .subtitle,
+body.tufte-sf .title-block:not(.chapter-head) > .title-author,
+body.tufte-sf .title-block:not(.chapter-head) > .title-date {
+    font-family: var(--tufte-sans, "Gill Sans", "Gill Sans MT", Calibri, sans-serif);
+    text-transform: uppercase;
+    letter-spacing: var(--tufte-allcaps-ls);
+    font-style: normal;
+}
+
+/* The chapter title is 90% wide (full width): its \thanks note keeps the
+   note column (27.5% and 88% of the section): 27.5/90 wide, its right
+   edge (90 - 88)/90 inside the heading, as figure.fullwidth's
+   caption-margin. Desktop only (R21): on phones the opened note must stay
+   tufte.css's 95% block (.margin-toggle:checked + .sidenote has the same
+   specificity and comes earlier in the bundle). */
+@media (width > 760px), print {
+    .chapter-title .sidenote {
+        width: 30.6%;
+        margin-right: 2.2%;
+    }
+}
+
+/* A \thanks note inside the h1 must not take the heading's look. */
+header .sidenote {
+    font-style: var(--tufte-sidenote-style, normal);
+    font-size: var(--tufte-sidenote-size, var(--tufte-margin-size, 1.1rem));
+    line-height: 1.3;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+section.abstract {
+    padding-top: 0;
+}
+
+section.abstract > p {
+    width: 55%;
+    box-sizing: border-box;
+    padding: 0 2rem;
+    font-size: 1.25rem;
+    line-height: 1.8rem;
+}
+
+body.tufte-sf section.abstract {
+    font-family: var(--tufte-sans, "Gill Sans", "Gill Sans MT", Calibri, sans-serif);
+}
+
+/* ------------------------------------------------------------------ */
+/* 8. Equations                                                        */
+/* ------------------------------------------------------------------ */
+
+/* \begin{equation}\label{…}: the number at the right of the column. */
+.math-display.numbered {
+    display: flex;
+    align-items: center;
+}
+
+.math-display.numbered > .katex-display,
+.math-display.numbered > .katex,
+.math-display.numbered > .math {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.eq-number {
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 1rem;
+    font-family: var(--tufte-serif);
+    font-variant-numeric: lining-nums;
+}
+
+/* params.math.leqno (class option leqno): the number at the left, like
+   KaTeX's own \tag numbers (.katex-display.leqno). */
+.math-display.numbered.leqno > .eq-number,
+.math-display.numbered:has(> .katex-display.leqno) > .eq-number {
+    order: -1;
+    margin-left: 0;
+    margin-right: auto;
+    padding-left: 0;
+    padding-right: 1rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* 9. Bibliography, lists of floats, index                             */
+/* ------------------------------------------------------------------ */
+
+.bib-entry a {
+    overflow-wrap: anywhere;
+}
+
+.bib-missing {
+    color: var(--tufte-alert-caution, #a12a2a);
+}
+
+ol.bibliography-list {
+    box-sizing: border-box;
+    width: 55%;
+    list-style: none;
+    padding-left: 1.5em;
+    -webkit-padding-start: 1.5em;
+    text-indent: -1.5em;
+    font-size: 1.2rem;
+    line-height: 1.5;
+}
+
+ol.bibliography-list > li {
+    margin: 0.5rem 0;
+}
+
+ol.bibliography-list .bib-num {
+    font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* nobib: numbers are printed as text ([n]); the list itself stays plain. */
+body.tufte-nocite-numbers ol.bibliography-list {
+    list-style: none;
+}
+
+/* \listoffigures, \listoftables. */
+ol.tufte-lof {
+    box-sizing: border-box;
+    width: 55%;
+    list-style: none;
+    padding-left: 2em;
+    -webkit-padding-start: 2em;
+    text-indent: -2em;
+}
+
+ol.tufte-lof .lof-num {
+    display: inline-block;
+    min-width: 2em;
+    text-indent: 0;
+}
+
+ol.tufte-lof .lof-where {
+    margin-left: 1em;
+    font-style: italic;
+    font-size: 1.1rem;
+}
+
+ol.tufte-lof a {
+    text-decoration: none;
+}
+
+ol.tufte-lof a:hover {
+    text-decoration: underline;
+}
+
+/* \printindex: three columns, like the index of tufte-book. */
+.tufte-index {
+    column-count: 3;
+    column-gap: 2rem;
+    font-size: 1.2rem;
+    line-height: 1.5;
+}
+
+.index-list,
+.index-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    width: auto;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.index-list li {
+    padding-left: 2em;
+    text-indent: -2em;
+    margin-top: 0;
+    break-inside: avoid;
+}
+
+.index-list ul li {
+    padding-left: 3em;
+}
+
+.index-list li.index-gap {
+    margin-top: 1.5em;
+}
+
+.index-list a {
+    text-decoration: none;
+}
+
+.index-list a:hover {
+    text-decoration: underline;
+}
+
+/* ------------------------------------------------------------------ */
+/* 9b. Footnotes (real footnotes next to sidenotes, §11)               */
+/* ------------------------------------------------------------------ */
+/*
+ * <sup class="footnote-ref" id="fnref-…"><a href="#fn-…">a</a></sup> in the
+ * text; the list either in <section class="footnotes"> at the end of the
+ * article (footnoteplacement = "page") or at the end of each h2 section
+ * ("section"): <hr class="footnotes-sep"><ol class="footnotes-list">
+ * <li id="fn-…" class="footnote-item" value="N" | data-mark="a">.
+ * Marks are server-side text; non-arabic ones come from data-mark.
+ */
+
+section.footnotes {
+    clear: both;
+    padding-top: 0;
+}
+
+/* \footnoterule: a short rule, 0.4 of the text column. */
+hr.footnotes-sep {
+    width: 22%;
+    margin: 2.8rem 0 0.8rem;
+    border: 0;
+    border-top: 1px solid var(--tufte-rule, #ccc);
+}
+
+/* \footnotesize in the 55% text column (50% + 5% indent, as tufte's
+   section > ol). */
+ol.footnotes-list {
+    box-sizing: content-box;
+    width: 50%;
+    margin: 0 0 1.4rem;
+    padding-left: 5%;
+    -webkit-padding-start: 5%;
+    padding-inline-start: 5%;
+    font-size: 1.1rem;
+    line-height: 1.4;
+}
+
+ol.footnotes-list > li.footnote-item {
+    position: relative;
+    margin-top: 0.4rem;
+    scroll-margin-top: 1.5rem;
+}
+
+ol.footnotes-list > li::marker {
+    font-variant-numeric: lining-nums;
+}
+
+/* alpha / roman / symbol marks: the same text as the reference. */
+ol.footnotes-list > li[data-mark] {
+    list-style: none;
+}
+
+ol.footnotes-list > li[data-mark]::before {
+    content: attr(data-mark);
+    position: absolute;
+    right: 100%;
+    margin-right: 0.5em;
+    font-variant-numeric: lining-nums;
+    white-space: nowrap;
+}
+
+ol.footnotes-list p,
+ol.footnotes-list ul,
+ol.footnotes-list ol,
+ol.footnotes-list dl {
+    width: auto;
+    margin: 0 0 0.4rem;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+ol.footnotes-list li > p:last-child {
+    margin-bottom: 0;
+}
+
+ol.footnotes-list .math-display,
+ol.footnotes-list div.table-wrapper,
+ol.footnotes-list div.highlight > pre,
+ol.footnotes-list pre > code {
+    width: auto;
+    max-width: 100%;
+    margin-left: 0;
+}
+
+/* The reference: a small superscript that leaves the leading alone. */
+sup.footnote-ref {
+    font-size: 0.75em;
+    line-height: 0;
+    vertical-align: super;
+    font-variant-numeric: lining-nums;
+    scroll-margin-top: 1.5rem;
+}
+
+sup.footnote-ref > a,
+a.footnote-ref {
+    text-decoration: none;
+    padding: 0 0.05em;
+}
+
+sup.footnote-ref > a:hover,
+a.footnote-ref:hover {
+    text-decoration: underline;
+}
+
+a.footnote-backref:link,
+a.footnote-backref:visited {
+    margin-left: 0.25em;
+    font-family: var(--tufte-sans, "Gill Sans", "Gill Sans MT", Calibri, sans-serif);
+    font-size: 0.9em;
+    color: var(--tufte-muted, #595959);
+    text-decoration: none;
+}
+
+a.footnote-backref:hover {
+    color: var(--tufte-fg, #111);
+}
+
+/* Following a link lands on a highlighted note (and back). */
+li.footnote-item:target,
+sup.footnote-ref:target {
+    background-color: var(--tufte-mark, #fff1a8);
+    color: inherit;
+    border-radius: 2px;
+}
+
+li.footnote-item:target {
+    outline: 0.3rem solid var(--tufte-mark, #fff1a8);
+}
+
+/* A note inside a footnote or a section-level list item: back to the note
+   column, as a \sidenote in itemize. The list item is 50% of the section,
+   5% in, so 55% of it is 27.5% of the section and its right edge lands at
+   55% + 33% = 88%, as for a paragraph. The theme's own lists with another
+   width are left out. Notes in nested lists keep this geometry, measured
+   against the narrower nested item (a known limitation on screen). The
+   print block overrides all of this with its --pw/--pl geometry. */
+@media (width > 760px), print {
+    ol.footnotes-list .sidenote,
+    ol.footnotes-list .marginnote,
+    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters) > li .sidenote,
+    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters) > li .marginnote {
+        width: 55%;
+        min-width: 0;
+        margin-right: -66%;
+    }
+}
+
+body.tufte-justified ol.footnotes-list li {
+    text-align: justify;
+}
+
+body.tufte-hyphenate ol.footnotes-list li {
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+
+body.tufte-indent ol.footnotes-list p {
+    text-indent: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* 10. Book views                                                      */
+/* ------------------------------------------------------------------ */
+
+article.chapter header.chapter-head {
+    margin: 7rem 0 5.6rem;
+}
+
+.chapter-title {
+    font-style: italic;
+    font-weight: 400;
+    font-size: 2.8rem;
+    line-height: 1.5;
+    max-width: 90%;
+    margin: 0;
+}
+
+.chapter-number {
+    font-style: italic;
+    font-size: 2rem;
+    margin: 0 0 1rem;
+}
+
+article.part header.part-head {
+    margin: 7rem 0 4rem;
+}
+
+.part-number {
+    font-size: 2rem;
+    font-style: normal;
+    margin: 0 0 1rem;
+}
+
+.part-title {
+    font-style: normal;
+    font-weight: 400;
+    font-size: 3.6rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* \tableofcontents of tufte-book: italic, no leaders, no page numbers. */
+nav.book-toc {
+    width: 90%;
+    margin: 2rem 0 4rem;
+}
+
+.book-toc ol,
+ol.book-toc-chapters {
+    list-style: none;
+    padding: 0;
+    -webkit-padding-start: 0;
+    width: auto;
+}
+
+.book-toc li.toc-chapter,
+ol.book-toc-chapters > li {
+    font-style: italic;
+    font-size: 2.2rem;
+    line-height: 1.3;
+    margin-top: 1.5em;
+}
+
+.book-toc li.toc-part {
+    margin-top: 2.5rem;
+}
+
+.book-toc li.toc-part > .toc-part-title {
+    font-style: italic;
+    font-size: 2.6rem;
+    line-height: 1.3;
+}
+
+.book-toc .toc-sections {
+    font-size: 1.6rem;
+    line-height: 1.4;
+    padding-left: 2em;
+    margin-top: 0.3em;
+}
+
+.book-toc .toc-sections li {
+    margin-top: 0.2em;
+}
+
+.book-toc .toc-num {
+    display: inline-block;
+    min-width: 1.5em;
+    font-style: normal;
+}
+
+.book-toc a,
+ol.book-toc-chapters a {
+    text-decoration: none;
+}
+
+.book-toc a:hover,
+ol.book-toc-chapters a:hover {
+    text-decoration: underline;
+}
+
+/* \maketitlepage: author, title and publisher in sans all-caps, dark grey. */
+.title-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 80vh;
+    color: var(--tufte-muted, #444);
+    padding-top: 2rem;
+}
+
+/* \maketitlepage sizes at the theme's 10pt = 1.4rem (print: html 7.14pt):
+   author \fontsize{18}{20}, \vspace{11.5pc} (138pt), title
+   \fontsize{36}{40}, publisher \fontsize{14}{16}. Line heights are
+   unitless (20/18, 40/36, 16/14), so the mobile sizes keep the leading. */
+.title-page-author {
+    font-size: 2.52rem;
+    line-height: 1.111;
+    margin: 0;
+}
+
+.title-page-title {
+    font-size: 5.04rem;
+    line-height: 1.111;
+    font-weight: 400;
+    margin: 19.32rem 0 0;
+}
+
+.title-page-subtitle {
+    font-size: 2rem;
+    font-style: italic;
+    line-height: 1.3;
+    margin: 1.5rem 0 0;
+}
+
+.title-page-publisher {
+    font-size: 1.96rem;
+    line-height: 1.143;
+    margin-top: auto;
+}
+
+/* The title page is in sans all-caps, its sidenote (\thanks) is not. */
+.title-page .sidenote {
+    font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, var(--tufte-serif)));
+}
+
+/* \openepigraph. */
+.open-epigraphs {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 70vh;
+}
+
+.open-epigraph blockquote p,
+.open-epigraph blockquote footer {
+    width: 90%;
+    font-family: var(--tufte-sans, "Gill Sans", "Gill Sans MT", Calibri, sans-serif);
+    text-transform: uppercase;
+    /* \allcaps: \allcapsspacing, off under nols. */
+    letter-spacing: var(--tufte-allcaps-ls);
+    line-height: 2;
+    font-style: normal;
+    text-align: left;
+}
+
+.open-epigraph blockquote footer cite {
+    font-style: normal;
+}
+
+section.copyright-page {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 50vh;
+}
+
+section.copyright-page > p {
+    width: 90%;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin: 0 0 1.6rem;
+}
+
+section.dedication {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 50vh;
+}
+
+section.dedication > p {
+    font-style: italic;
+    font-size: 1.8rem;
+    line-height: 2.2;
+    -webkit-hyphens: none;
+    hyphens: none;
+    width: 55%;
+}
+
+section.half-title > p {
+    font-size: 2.4rem;
+    font-style: italic;
+}
+
+/* The frontispiece (book root `frontispiece`), the verso facing the title
+   page: an unnumbered main figure with its caption in the margin. */
+section.frontispiece {
+    padding: 2rem 0;
+}
+
+.print-only {
+    display: none;
+}
+
+/* Previous / contents / next between chapters. */
+nav.book-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    clear: both;
+    width: 55%;
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--tufte-rule, #ccc);
+    font-family: var(--tufte-sans, "Gill Sans", "Gill Sans MT", Calibri, sans-serif);
+    font-size: 1.1rem;
+    line-height: 1.5;
+    letter-spacing: 0.03em;
+}
+
+nav.book-nav a:link,
+nav.book-nav a:visited {
+    text-decoration: none;
+}
+
+nav.book-nav a:hover {
+    text-decoration: underline;
+}
+
+nav.book-nav .prev {
+    flex: 1 1 40%;
+    text-align: left;
+}
+
+nav.book-nav .contents {
+    flex: 0 0 auto;
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.06em;
+}
+
+nav.book-nav .next {
+    flex: 1 1 40%;
+    text-align: right;
+}
+
+/* ------------------------------------------------------------------ */
+/* 11. Small screens                                                   */
+/* ------------------------------------------------------------------ */
+
+@media screen and (max-width: 760px) {
+    .margin-block {
+        display: none;
+    }
+
+    .margin-toggle:checked + .margin-block {
+        display: block;
+        float: left;
+        clear: both;
+        width: 95%;
+        margin: 1rem 2.5%;
+    }
+
+    ol.bibliography-list,
+    ol.tufte-lof,
+    div.verse > p,
+    nav.book-nav,
+    nav.book-toc {
+        width: 100%;
+    }
+
+    section.abstract > p {
+        width: 100%;
+        padding: 0 1rem;
+    }
+
+    section > dl {
+        width: 90%;
+    }
+
+    .tufte-index {
+        column-count: 1;
+    }
+
+    ol.footnotes-list {
+        width: 90%;
+    }
+
+    hr.footnotes-sep {
+        width: 40%;
+    }
+
+    .title-block.latex h1 {
+        font-size: 2rem;
+    }
+
+    .title-author,
+    .title-date,
+    .title-block.latex .subtitle {
+        font-size: 1.6rem;
+    }
+
+    article.chapter header.chapter-head,
+    article.part header.part-head {
+        margin: 3rem 0 2.5rem;
+    }
+
+    .chapter-title {
+        font-size: 2.2rem;
+        line-height: 1.3;
+        max-width: 100%;
+    }
+
+    .part-title {
+        font-size: 2.6rem;
+        line-height: 1.3;
+    }
+
+    .book-toc li.toc-chapter,
+    ol.book-toc-chapters > li {
+        font-size: 1.7rem;
+    }
+
+    .book-toc li.toc-part > .toc-part-title {
+        font-size: 2rem;
+    }
+
+    .book-toc .toc-sections {
+        font-size: 1.3rem;
+        padding-left: 1em;
+    }
+
+    .title-page {
+        min-height: 60vh;
+    }
+
+    /* The desktop sizes scaled by the same factor (2.4 / 5.04): a long
+       all-caps word at 5.04rem would not fit a phone's column. */
+    .title-page-author {
+        font-size: 1.2rem;
+    }
+
+    .title-page-title {
+        font-size: 2.4rem;
+        margin-top: 9.2rem;
+    }
+
+    .title-page-publisher {
+        font-size: 0.93rem;
+    }
+
+    .open-epigraph blockquote p,
+    .open-epigraph blockquote footer,
+    section.copyright-page > p,
+    section.dedication > p {
+        width: 100%;
+    }
+
+    .open-epigraphs,
+    section.dedication,
+    section.copyright-page {
+        min-height: 0;
+    }
+
+    nav.book-nav {
+        flex-wrap: wrap;
+    }
+
+    /* A note opened in a run-in h4: the heading stops running in, so the
+       note gets the full width below it instead of the float's small box. */
+    section > h4.run-in:has(> input.margin-toggle:checked) {
+        float: none;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* 12. Print                                                           */
+/* ------------------------------------------------------------------ */
+/*
+ * The geometry of tufte-common.def. Widths are percentages of the page
+ * area (text + gap + margin column), from unitless custom properties:
+ *   --pt  text width            (letter 26pc of 40pc = 65)
+ *   --pm  margin column width   (letter 12pc of 40pc = 30)
+ *   --pw  width of the element a note sits in (its containing block)
+ *   --pl  left offset of that element (lists, quotations)
+ * A note is then pm/pw of its container wide and is pushed right by
+ * (100 - pl - pw)/pw of it, so it always lands in the margin column.
+ * The paper (letter, a4, b5) is set by tufte/head-style.html, which writes
+ * @page and the --pt/--pm/--print-page-h values after this stylesheet;
+ * the values below are the letter defaults.
+ *
+ * tufte.css's max-width: 760px rules also fire on paper (a page is about
+ * 640px wide): the rules here outrank them.
+ */
+
+@media print {
+    @page {
+        size: letter;
+        margin: 1.58in 0.86in 0.9in 1in;
+    }
+
+    :root {
+        --pt: 65;
+        --pm: 30;
+        --print-page-h: 8.52in;
+    }
+
+    /* Body 1.4rem = 10pt, leading 2rem = 14.3pt (\baselineskip 14pt),
+       notes 1.1rem = 7.9pt (\footnotesize 8pt). */
+    html {
+        font-size: 7.14pt;
+    }
+
+    body {
+        --pw: 100;
+        --pl: 0;
+    }
+
+    /* The text column. */
+    hr,
+    section > p,
+    section > footer,
+    section > table,
+    section > details,
+    p.post-meta,
+    .post-meta,
+    nav.toc,
+    .toc,
+    section > .math-display,
+    article > .math-display,
+    section > div.table-wrapper,
+    article > div.table-wrapper,
+    blockquote.alert,
+    ul.archive-list,
+    ol.archive-list,
+    ul.taxonomy-list,
+    ol.taxonomy-list,
+    ol.bibliography-list,
+    ol.tufte-lof,
+    section.abstract > p,
+    div.verse > p,
+    section.dedication > p,
+    .not-found p {
+        width: calc(var(--pt) * 1%);
+        max-width: none;
+        --pw: var(--pt);
+        --pl: 0;
+    }
+
+    figure:not(.fullwidth) {
+        width: calc(var(--pt) * 1%);
+        max-width: none;
+        --pw: var(--pt);
+        --pl: 0;
+    }
+
+    /* Lists: 5% indent inside the text column. */
+    section > ul,
+    section > ol,
+    section > dl,
+    div.footnotes > ol {
+        width: calc((var(--pt) - 5) * 1%);
+        max-width: none;
+        padding-left: 5%;
+        -webkit-padding-start: 5%;
+        padding-inline-start: 5%;
+        --pw: calc(var(--pt) - 5);
+        --pl: 5;
+    }
+
+    /* Quotations (quote, quotation): indented 3.5% on both sides of the
+       text column. */
+    blockquote {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    blockquote p,
+    blockquote footer,
+    blockquote:not(.alert) > .math-display,
+    blockquote:not(.alert) > div.table-wrapper {
+        width: calc((var(--pt) - 7) * 1%);
+        margin-left: 3.5%;
+        margin-right: 0;
+        --pw: calc(var(--pt) - 7);
+        --pl: 3.5;
+    }
+
+    blockquote.alert {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    blockquote.alert p,
+    blockquote.alert footer {
+        width: auto;
+        margin-left: 0;
+        --pw: var(--pt);
+        --pl: 0;
+    }
+
+    /* Full width: text + gap + margin column. */
+    figure.fullwidth,
+    div.fullwidth,
+    div.table-wrapper.fullwidth,
+    div.table-wrapper:has(> table.fullwidth),
+    div.fullwidth:has(> div.highlight),
+    div.highlight.fullwidth,
+    pre.fullwidth,
+    .tufte-index,
+    nav.book-toc {
+        width: 100%;
+        max-width: 100%;
+        --pw: 100;
+        --pl: 0;
+    }
+
+    header,
+    section > .margin-block {
+        --pw: 100;
+        --pl: 0;
+    }
+
+    /* Code: tufte's 2.5% indent inside the text column. */
+    pre > code,
+    section > div.highlight > pre,
+    section > div.highlight > div,
+    article > div.highlight > pre,
+    article > div.highlight > div {
+        width: calc((var(--pt) - 2.5) * 1%);
+        margin-left: 2.5%;
+    }
+
+    blockquote:not(.alert) > div.highlight > pre,
+    blockquote:not(.alert) > div.highlight > div {
+        width: calc((var(--pt) - 9.5) * 1%);
+        margin-left: 6%;
+    }
+
+    pre.fullwidth > code {
+        width: auto;
+        margin-left: 0;
+    }
+
+    /* Tables keep their natural width (booktabs), not the phone's 100%. */
+    div.table-wrapper > table {
+        min-width: 50%;
+    }
+
+    figure div.table-wrapper > table,
+    .margin-block div.table-wrapper > table {
+        min-width: 0;
+    }
+
+    img {
+        width: auto;
+        max-width: 100%;
+    }
+
+    /* Every note, margin note, caption and margin block in the margin
+       column, whatever its container (see the formula above). */
+    .sidenote,
+    .marginnote,
+    figure.fullwidth > figcaption.caption-margin {
+        display: block !important;
+        float: right !important;
+        clear: right !important;
+        position: relative;
+        left: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        width: calc(var(--pm) / var(--pw) * 100%) !important;
+        margin-right: calc((var(--pw) + var(--pl) - 100) / var(--pw) * 100%) !important;
+        margin-left: 0 !important;
+        margin-top: calc(0.3rem + var(--tufte-offset, 0px)) !important;
+    }
+
+    /* Bottom-aligned captions: absolutely placed in the margin column. */
+    figure.caption-bottom > span.marginnote {
+        float: none !important;
+        position: absolute;
+        right: calc((var(--pw) + var(--pl) - 100) / var(--pw) * 100%);
+        margin-right: 0 !important;
+    }
+
+    /* Notes in a run-in h4: absolutely placed in the section (§6), whose
+       right edge is the right edge of the margin column on paper (the
+       width above resolves to --pm of the section, as --pw is 100). */
+    section > h4.run-in :is(.sidenote, .marginnote) {
+        right: 0;
+    }
+
+    figure.fullwidth.caption-bottom > figcaption.caption-margin {
+        float: none !important;
+        position: absolute;
+        right: 0;
+        margin-right: 0 !important;
+    }
+
+    label.margin-toggle:not(.sidenote-number),
+    input.margin-toggle {
+        display: none !important;
+    }
+
+    figure,
+    table,
+    .math-display,
+    .margin-block {
+        break-inside: avoid;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        break-after: avoid;
+    }
+
+    p {
+        orphans: 2;
+        widows: 2;
+    }
+
+    /* A tufte-book PDF has no site chrome: without the header the first
+       chapter (or the half-title) is the first box, so its forced break
+       does not leave a page holding only the site title. */
+    body.tufte-book .site-header,
+    body.tufte-book .site-footer {
+        display: none !important;
+    }
+
+    /* Book: chapters and the front-matter pages start on a new page. */
+    article.chapter {
+        break-before: page;
+    }
+
+    /* Each front-matter page has a page to itself (\cleardoublepage
+       before the dedication in sample-book.tex): break before as well as
+       after, so a page following the contents never starts under it. */
+    .title-page,
+    .copyright-page,
+    .open-epigraphs,
+    .frontispiece,
+    .dedication,
+    .half-title {
+        min-height: var(--print-page-h);
+        break-before: page;
+        break-after: page;
+        box-sizing: border-box;
+    }
+
+    /* The landing's contents (not a tableofcontents shortcode inside a
+       chapter) ends its page: the dedication, the landing content or the
+       first chapter starts on the next one. */
+    article.book-landing > nav.book-toc {
+        break-after: page;
+    }
+
+    .copyright-page {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+    }
+
+    section.half-title {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .print-only {
+        display: block;
+    }
+
+    div.page-break {
+        break-after: page;
+    }
+
+    article.chapter header.chapter-head {
+        margin-top: 4rem;
+    }
+
+    /* Chapter titles are set full width (\titleformat … {fullwidth}). */
+    .chapter-title,
+    .part-title {
+        max-width: none;
+    }
+
+    /* URLs of external links in the text column, not in the marginalia,
+       and not after a link whose text already is its address (class url,
+       from render-link: autolinks, \url), which prints it once. */
+    section a[href^="http"]:not(.xref):not(.url)::after {
+        content: " (" attr(href) ")";
+        font-family: var(--tufte-sans, "Gill Sans", "Gill Sans MT", Calibri, sans-serif);
+        font-size: 0.8em;
+        overflow-wrap: anywhere;
+        color: var(--tufte-muted, #444);
+    }
+
+    /* The exclusions repeat the URL rule's :not() chain, and :is() adds a
+       class, so they always outweigh it (0,4,3 against 0,3,3). */
+    section :is(.sidenote, .marginnote, .bib-entry, .citation-block, .margin-block, figcaption, .tufte-index) a[href^="http"]:not(.xref):not(.url)::after {
+        content: none;
+    }
+
+    nav.book-nav,
+    .heading-anchor {
+        display: none !important;
+    }
+
+    /* Footnotes stay at the end of their section or article (no browser
+       implements float: footnote). */
+    hr.footnotes-sep {
+        width: calc(var(--pt) * 0.4%);
+        --pw: calc(var(--pt) * 0.4);
+    }
+
+    ol.footnotes-list {
+        width: calc((var(--pt) - 5) * 1%);
+        padding-left: 5%;
+        --pw: calc(var(--pt) - 5);
+        --pl: 5;
+    }
+
+    ol.footnotes-list > li {
+        break-inside: avoid;
+    }
+
+    a.footnote-backref,
+    a.footnote-backref:link,
+    a.footnote-backref:visited {
+        display: none;
+    }
+
+    li.footnote-item:target,
+    sup.footnote-ref:target {
+        background: none;
+        outline: 0;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* 13. Debug (tufte.debug = true)                                      */
+/* ------------------------------------------------------------------ */
+
+body.tufte-debug section > * {
+    outline: 1px dashed rgba(255, 0, 0, 0.4);
+}
+
+body.tufte-debug .sidenote,
+body.tufte-debug .marginnote,
+body.tufte-debug figcaption,
+body.tufte-debug .margin-block {
+    outline: 1px dashed rgba(0, 0, 255, 0.5);
+}
+
+/* The text column (55%) and the note column (60.5%–88%) of each section. */
+body.tufte-debug section {
+    background-image: linear-gradient(to right,
+        rgba(0, 0, 255, 0.04) 0, rgba(0, 0, 255, 0.04) 55%,
+        transparent 55%, transparent 60.5%,
+        rgba(0, 160, 0, 0.06) 60.5%, rgba(0, 160, 0, 0.06) 88%,
+        transparent 88%);
+}
+
+body.tufte-debug .tufte-anchor::before,
+body.tufte-debug .index-anchor::before {
+    font-family: var(--tufte-mono, monospace);
+    font-size: 0.7rem;
+    font-style: normal;
+    vertical-align: super;
+    color: #b00;
+}
+
+body.tufte-debug .tufte-anchor::before {
+    content: "\2693\00a0" attr(id);
+}
+
+body.tufte-debug .index-anchor::before {
+    content: "\2192\00a0" attr(data-index);
+    color: #070;
+}
+
+body.tufte-debug figure[id]::before,
+body.tufte-debug p.margin-figure-anchor[id]::before,
+body.tufte-debug .math-display[id]::before,
+body.tufte-debug label.sidenote-number[id]::before {
+    content: "#" attr(id);
+    font-family: var(--tufte-mono, monospace);
+    font-size: 0.7rem;
+    color: #b00;
+}
+
+body.tufte-debug .tufte-num:empty,
+body.tufte-debug .xref-missing,
+body.tufte-debug .bib-missing,
+body.tufte-debug .cite-num:empty {
+    background: rgba(255, 0, 0, 0.2);
+    outline: 1px solid red;
+}
+
+@media print {
+    body.tufte-debug section {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        background-image: linear-gradient(to right,
+            rgba(0, 0, 255, 0.04) 0, rgba(0, 0, 255, 0.04) calc(var(--pt) * 1%),
+            transparent calc(var(--pt) * 1%), transparent calc((100 - var(--pm)) * 1%),
+            rgba(0, 160, 0, 0.06) calc((100 - var(--pm)) * 1%), rgba(0, 160, 0, 0.06) 100%);
+    }
+}

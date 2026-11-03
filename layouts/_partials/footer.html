@@ -2,7 +2,7 @@
        footer_custom.html, rendered right after this element. */ -}}
 {{- $author := "" -}}
 {{- $authorURL := "" -}}
-{{- with site.Params.author -}}
+{{- with partial "func/site-author.html" . -}}
   {{- $author = .name -}}
   {{- $authorURL = .url -}}
 {{- end -}}

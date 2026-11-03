@@ -35,7 +35,8 @@
 {{- with $end }}{{ $q = $q | append (printf "end=%s" (urlquery (printf "%v" .))) }}{{ end -}}
 {{- $src := printf "https://www.youtube-nocookie.com/embed/%s" (urlquery $id) -}}
 {{- with $q }}{{ $src = printf "%s?%s" $src (delimit . "&") }}{{ end -}}
-<figure class="iframe-wrapper{{ with $class }} {{ . }}{{ end }}">
-<iframe src="{{ $src }}" title="{{ $title | default "YouTube video" }}" frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-</figure>
-{{- /* no trailing newline */ -}}
+{{- /* Built as a string so that it goes through tufte/nest.html (kept
+       when nested in fullwidth, marginblock…, also with unsafe = false). */ -}}
+{{- $out := printf `<figure class="iframe-wrapper%s">` (cond (ne (printf "%v" $class) "") (printf " %s" (htmlEscape (printf "%v" $class))) "") -}}
+{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" frameborder=\"0\" loading=\"lazy\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen></iframe>\n</figure>" $out (htmlEscape $src) (htmlEscape (printf "%v" ($title | default "YouTube video"))) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

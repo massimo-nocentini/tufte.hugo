@@ -1,0 +1,48 @@
+{{- /*
+  Text of a footnotemark (block; \footnotetext[offset]{…}). Put it on its own
+  lines, after the paragraph or table that holds the mark:
+
+    {{< footnotetext name="fm" offset="-7bl" >}}The front matter …{{< /footnotetext >}}
+    {{< footnotetext "fm" >}}…{{< /footnotetext >}}         (positional: the name)
+
+  Named params: name (required), offset (vertical shift: "-7bl" raises the
+  note by seven baselines, next to its mark), text (instead of the inner
+  text). The inner text is inline Markdown.
+
+  Output (SPEC-LATEX §3.3):
+    <p class="footnotetext-anchor"><input type="checkbox" id="sn-HASH6-ft-NAME" class="margin-toggle"/><span class="sidenote"[ style]>TEXT</span></p>
+*/ -}}
+{{- $p := .Page -}}
+{{- $name := "" -}}{{- $offset := "" -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- if .IsNamedParams -}}
+  {{- $name = printf "%v" (.Get "name" | default "") -}}
+  {{- $offset = printf "%v" (.Get "offset" | default "") -}}
+  {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
+{{- else -}}
+  {{- $name = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- $name = replaceRE `[^a-zA-Z0-9_-]` "-" (strings.TrimSpace $name) -}}
+{{- if not $name -}}
+  {{- errorf "footnotetext shortcode: a name is required, e.g. {{< footnotetext \"fm\" >}}…{{< /footnotetext >}} (%s)" .Position -}}
+{{- end -}}
+{{- if not $text -}}
+  {{- warnidf "tufte-empty" "footnotetext shortcode: empty text for %q in %s" $name .Position -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with $text -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- /* A sidenote or margin note nested in it cannot float. */ -}}
+  {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $.Name) "where" $.Position) -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- with partial "tufte/cite-gather.html" (dict "page" $p "html" $html) }}{{ $html = printf "%s%s" .html .block }}{{ end -}}
+{{- end -}}
+{{- $style := "" -}}
+{{- with $offset -}}
+  {{- with partial "tufte/offset.html" (dict "value" . "page" $.Page "where" (printf "(%s shortcode, line %d)" $.Name $.Position.LineNumber)) -}}
+    {{- $style = printf ` style="%s"` (htmlEscape (string .)) -}}
+  {{- end -}}
+{{- end -}}
+{{- $hash := substr (md5 (or $p.RelPermalink $p.Path)) 0 6 -}}
+{{- $out := printf `<p class="footnotetext-anchor"><input type="checkbox" id="sn-%s-ft-%s" class="margin-toggle"/><span class="sidenote"%s>%s</span></p>` $hash $name $style $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

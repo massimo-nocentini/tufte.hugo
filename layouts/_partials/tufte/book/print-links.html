@@ -1,0 +1,50 @@
+{{- /*
+  Whole-book print document: turns the links to pages of the book into
+  in-document anchors.
+
+    href="CHAPTER/#x"  → href="#tufte-cM-x"      href="CHAPTER/" → href="#tufte-cM"
+    href="PART/"       → href="#tufte-pK"
+
+  Both root-relative links (/books/b/ch2/, as the theme's generators and
+  render hooks write them) and relative links (../ch2/#x, as authors write
+  them; resolved against the page they appear on) are handled. Relative
+  links to other pages become root-relative, since the print document
+  lives at another URL (…/print.html).
+
+  Takes: a dict with
+    html  the HTML string
+    page  the page whose content it is (base of relative links)
+    root  the book root
+  Returns: the HTML string.
+*/ -}}
+{{- $html := .html | string -}}
+{{- $p := .page -}}
+{{- $root := .root -}}
+{{- /* Target paths (no trailing slash) → anchor ids, built once per book. */ -}}
+{{- $targets := partialCached "tufte/book/print-targets.html" $root (or $root.RelPermalink $root.Path) -}}
+{{- $base := $p.RelPermalink -}}
+{{- if not (strings.HasSuffix $base "/") }}{{ $base = printf "%s/" (path.Dir $base) }}{{ end -}}
+{{- range uniq (findRE `href="[^"#?:]*(?:#[^"]*)?"` $html) -}}
+  {{- $url := replaceRE `^href="(.*)"$` "$1" . -}}
+  {{- $pathPart := replaceRE `#.*$` "" $url -}}
+  {{- $frag := "" -}}
+  {{- if strings.Contains $url "#" }}{{ $frag = replaceRE `^[^#]*#` "" $url }}{{ end -}}
+  {{- if $pathPart -}}
+    {{- $abs := $pathPart -}}
+    {{- if not (strings.HasPrefix $abs "/") }}{{ $abs = printf "%s%s" $base $abs }}{{ end -}}
+    {{- $abs = path.Clean $abs -}}
+    {{- with index $targets $abs -}}
+      {{- $new := cond (ne $frag "") (printf `href="#%s-%s"` . $frag) (printf `href="#%s"` .) -}}
+      {{- $html = replace $html (printf `href="%s"` $url) $new -}}
+    {{- else -}}
+      {{- /* Another page: a relative link must not be resolved against
+             …/print.html, so make it root-relative. */ -}}
+      {{- if not (strings.HasPrefix $pathPart "/") -}}
+        {{- if strings.HasSuffix $pathPart "/" }}{{ $abs = printf "%s/" (strings.TrimSuffix "/" $abs) }}{{ end -}}
+        {{- with $frag }}{{ $abs = printf "%s#%s" $abs . }}{{ end -}}
+        {{- $html = replace $html (printf `href="%s"` $url) (printf `href="%s"` $abs) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $html -}}

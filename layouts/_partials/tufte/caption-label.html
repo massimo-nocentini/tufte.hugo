@@ -1,0 +1,41 @@
+{{- /*
+  Caption label marker of a numbered float (SPEC-LATEX §3.0.1):
+
+    <span class="caption-label">WORD&nbsp;<span class="tufte-num" data-kind="KIND" data-key="KEY"[ data-labeled="1"][ data-short="SHORT"]></span>:</span>{{" "}}
+
+  With a caption (key "caption", HTML), the caption text and its end marker
+  follow, giving the whole marker:
+
+    …:</span> <span class="caption-text">CAPTION</span><i class="cap-end" hidden></i>
+
+  WORD is the i18n word of the kind ("Figure", "Table", "Listing").
+  tufte/postprocess.html fills the number token (or removes the whole
+  caption-label when the page is not numbered, R12) and strips cap-end;
+  tufte/labels.html reads the caption text between the label and cap-end
+  for lists of figures and for xref names.
+
+  Takes a dict:
+    page     the page (unused today; kept for the contract)
+    kind     "figure" | "table" | "listing"          (default "figure")
+    key      the normalised key (tufte/key.html)     required
+    labeled  bool: the key comes from an explicit label
+    short    short caption ("" = none), plain text
+    caption  optional caption HTML
+
+  Returns: the marker HTML (string).
+*/ -}}
+{{- $kind := .kind | default "figure" -}}
+{{- $words := dict "figure" "Figure" "table" "Table" "listing" "Listing" -}}
+{{- $word := T $kind | default (index $words $kind) | default $kind -}}
+{{- $attrs := printf ` data-kind="%s" data-key="%s"` (htmlEscape $kind) (htmlEscape .key) -}}
+{{- if .labeled -}}
+  {{- $attrs = printf `%s data-labeled="1"` $attrs -}}
+{{- end -}}
+{{- with .short -}}
+  {{- $attrs = printf `%s data-short="%s"` $attrs (htmlEscape (printf "%v" .)) -}}
+{{- end -}}
+{{- $out := printf `<span class="caption-label">%s&nbsp;<span class="tufte-num"%s></span>:</span> ` (htmlEscape $word) $attrs -}}
+{{- if isset . "caption" -}}
+  {{- $out = printf `%s<span class="caption-text">%s</span><i class="cap-end" hidden></i>` $out (string .caption) -}}
+{{- end -}}
+{{- return $out -}}

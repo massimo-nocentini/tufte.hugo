@@ -1,0 +1,36 @@
+{{- /*
+  The site's math settings as a map (the theme's [params.math] table).
+
+  A site may set math as a single value instead of a table, as Hugo's own
+  "Mathematics in Markdown" guide and many themes do:
+    [params]
+      math = true
+  The site value then replaces the theme's [params.math] table (Hugo cannot
+  merge a bool into a map), so every reader of the settings goes through
+  this helper:
+    a map                          → itself
+    true / false / "auto" (also the strings "true", "false", e.g. from
+    HUGO_PARAMS_MATH=true)         → {enable = that value}; the other
+                                     settings keep their defaults
+    unset                          → {} (all defaults)
+    anything else                  → {} and the warning tufte-bad-option
+
+  Takes: anything (unused): partialCached "func/math-config.html" "math" "math".
+  Returns: a map (keys lowercased, as in site params).
+*/ -}}
+{{- $raw := site.Params.math -}}
+{{- $cfg := dict -}}
+{{- $t := printf "%T" $raw -}}
+{{- if reflect.IsMap $raw -}}
+  {{- $cfg = $raw -}}
+{{- else if ne $t "<nil>" -}}
+  {{- $v := lower (strings.TrimSpace (printf "%v" $raw)) -}}
+  {{- if eq $v "auto" -}}
+    {{- $cfg = dict "enable" "auto" -}}
+  {{- else if in (slice "true" "false") $v -}}
+    {{- $cfg = dict "enable" (eq $v "true") -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: params.math must be a table ([params.math] with enable, engine, macros…) or true, false or \"auto\", not %q (%s); using the defaults" (printf "%v" $raw) $t -}}
+  {{- end -}}
+{{- end -}}
+{{- return $cfg -}}

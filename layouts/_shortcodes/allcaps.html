@@ -1,0 +1,23 @@
+{{- /*
+  All capitals, letterspaced (inline; \allcaps):
+
+    {{< allcaps >}}nasa{{< /allcaps >}}
+    {{< allcaps "nasa" />}}                   one-line form
+
+  Output: <span class="allcaps">TEXT</span>
+*/ -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- if not $text -}}
+  {{- if .IsNamedParams -}}
+    {{- $text = printf "%v" (.Get "text" | default "") -}}
+  {{- else -}}
+    {{- $text = printf "%v" (.Get 0 | default "") -}}
+  {{- end -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with $text -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- end -}}
+{{- $out := printf `<span class="allcaps">%s</span>` $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

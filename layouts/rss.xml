@@ -1,0 +1,79 @@
+{{- /*
+  RSS feed (home, sections, taxonomies, terms): Hugo's embedded rss.xml,
+  except that each item's description is the theme's processed summary
+  (func/content.html with "summary" true, the one list pages show), not
+  the raw .Summary. The raw one still holds the theme's phase-1 markup:
+  placeholders of generated lists, empty figure-number tokens ("Figure :"),
+  unresolved cross-references (the label key as link text) and hidden
+  sidenote-end markers. Summaries resolve numbers and references against
+  the full page; links are relative to the site, as on the list pages.
+  The language tag comes from func/lang.html (Hugo 0.158 renamed
+  LanguageCode to Locale).
+*/ -}}
+{{- $authorEmail := "" }}
+{{- with site.Params.author }}
+  {{- if reflect.IsMap . }}
+    {{- with .email }}
+      {{- $authorEmail = . }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- $authorName := "" }}
+{{- with site.Params.author }}
+  {{- if reflect.IsMap . }}
+    {{- with .name }}
+      {{- $authorName = . }}
+    {{- end }}
+  {{- else }}
+    {{- $authorName = . }}
+  {{- end }}
+{{- end }}
+
+{{- $pctx := . }}
+{{- if .IsHome }}{{ $pctx = .Site }}{{ end }}
+{{- $pages := slice }}
+{{- if or $.IsHome $.IsSection }}
+  {{- $pages = $pctx.RegularPages }}
+{{- else }}
+  {{- $pages = $pctx.Pages }}
+{{- end }}
+{{- /* Pages without a URL (build.render = never) cannot be linked. */}}
+{{- $linked := slice }}
+{{- range $pages }}{{ if .Permalink }}{{ $linked = $linked | append . }}{{ end }}{{ end }}
+{{- $pages = $linked }}
+{{- $limit := .Site.Config.Services.RSS.Limit }}
+{{- if ge $limit 1 }}
+  {{- $pages = $pages | first $limit }}
+{{- end }}
+{{- $lang := partial "func/lang.html" site.Language }}
+{{- printf "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>" | safeHTML }}
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    {{- /* The channel title is the plain title (tufte/plain-title.html), as in <title>. */}}
+    {{- $chTitle := "" }}{{ if ne .Title site.Title }}{{ with .Title }}{{ $chTitle = partial "tufte/plain-title.html" (dict "page" $ "title" .) }}{{ end }}{{ end }}
+    <title>{{ with $chTitle }}{{ . }} on {{ end }}{{ site.Title }}</title>
+    <link>{{ .Permalink }}</link>
+    <description>Recent content {{ with $chTitle }}in {{ . }} {{ end }}on {{ site.Title }}</description>
+    <generator>Hugo</generator>
+    <language>{{ $lang.locale }}</language>{{ with $authorEmail }}
+    <managingEditor>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</managingEditor>{{ end }}{{ with $authorEmail }}
+    <webMaster>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</webMaster>{{ end }}{{ with site.Copyright }}
+    <copyright>{{ . }}</copyright>{{ end }}{{ if and (not .Date.IsZero) $pages }}
+    <lastBuildDate>{{ (index $pages.ByLastmod.Reverse 0).Lastmod.Format "Mon, 02 Jan 2006 15:04:05 -0700" | safeHTML }}</lastBuildDate>{{ end }}
+    {{- with .OutputFormats.Get "rss" }}
+    {{ printf "<atom:link href=%q rel=\"self\" type=%q />" .Permalink .MediaType | safeHTML }}
+    {{- end }}
+    {{- range $pages }}
+    {{- $summary := partialCached "func/content.html" (dict "page" . "summary" true) (or .RelPermalink .Path) true }}
+    <item>
+      <title>{{ partial "tufte/plain-title.html" (dict "page" . "title" .Title) }}</title>
+      <link>{{ .Permalink }}</link>
+      <pubDate>{{ .PublishDate.Format "Mon, 02 Jan 2006 15:04:05 -0700" | safeHTML }}</pubDate>
+      {{- with $authorEmail }}<author>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</author>{{ end }}
+      <guid>{{ .Permalink }}</guid>
+      <description>{{ string $summary | transform.XMLEscape | safeHTML }}</description>
+    </item>
+    {{- end }}
+  </channel>
+</rss>

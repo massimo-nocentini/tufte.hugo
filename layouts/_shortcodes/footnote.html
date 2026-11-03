@@ -1,0 +1,70 @@
+{{- /*
+  A real footnote (inline), collected below the text as in a standard LaTeX
+  article, on the same page as sidenotes (SPEC-LATEX §11). Use it inside a
+  paragraph, right after the word it annotates:
+
+    The proof is classical{{< footnote >}}See Hardy and Wright, ch. 2.{{< /footnote >}}.
+    {{< footnote label="fn:proof" >}}…{{< /footnote >}}     xref "fn:proof" → its mark
+    {{< footnote "One-line text." />}}
+
+  Note: tufte-latex's \footnote is a *sidenote*: use the sidenote shortcode
+  (or [^x]) for that. This shortcode gives a classic footnote; Markdown
+  footnotes [^fn-x] (labels starting with fn-) do the same.
+  A footnote inside a footnote is moved out of it: its mark follows the
+  outer footnote's mark in the text.
+
+  The inner text is inline Markdown and may contain math, cite, xref and
+  other inline shortcodes. Numbering (arabic, a b c…, symbols) and the list
+  (end of the page or of the section: params footnotestyle,
+  footnoteplacement) are done by func/footnotes.html.
+
+  Named params: text, label.
+
+  Output: an inert marker, replaced by the reference mark; its content goes
+  to the footnote list:
+    <span class="tufte-fn" data-key="KEY"[ data-label="LABEL"] hidden>TEXT</span>
+  KEY = "s" + the page's note counter (unique per page; ids become
+  fn-HASH6-KEY / fnref-HASH6-KEY), LABEL = the normalised label key.
+*/ -}}
+{{- $p := .Page -}}
+{{- $text := strings.TrimSpace .Inner -}}
+{{- $label := "" -}}
+{{- if .IsNamedParams -}}
+  {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
+  {{- $label = printf "%v" (.Get "label" | default "") | strings.TrimSpace -}}
+{{- else if not $text -}}
+  {{- $text = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- if not $text -}}
+  {{- warnidf "tufte-empty" "footnote shortcode: empty footnote in %s" .Position -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with $text -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "blocks" "keep" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- with partial "tufte/cite-gather.html" (dict "page" $p "html" $html) }}{{ $html = printf "%s%s" .html .block }}{{ end -}}
+{{- end -}}
+{{- $n := partial "func/note-id.html" $p -}}
+{{- $key := printf "s%s" (replaceRE `^.*-` "" $n) -}}
+{{- $attrs := printf ` data-key="%s"` $key -}}
+{{- with partial "tufte/label-key.html" (dict "key" $label "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+  {{- $attrs = printf `%s data-label="%s"` $attrs (htmlEscape .) -}}
+{{- end -}}
+{{- /* A footnote inside a footnote cannot live in the outer note's text
+       (the markers do not nest): the inner one hands its marker up as a
+       TUFTEFNHOIST token, and the outer one moves it right after its own
+       marker, so its mark follows the outer mark in the text. */ -}}
+{{- $hoistRE := `TUFTEFNHOIST[0-9a-f]{16}END` -}}
+{{- $hoisted := "" -}}
+{{- range findRE $hoistRE $html -}}
+  {{- $hoisted = printf "%s%s" $hoisted (index ($p.Store.Get "tufteNest" | default dict) (substr . 12 16) | default "") -}}
+{{- end -}}
+{{- $html = replaceRE $hoistRE "" $html -}}
+{{- $out := printf `<span class="tufte-fn"%s hidden>%s</span>` $attrs $html -}}
+{{- if and .Parent (eq .Parent.Name "footnote") -}}
+  {{- $all := printf "%s%s" $out $hoisted -}}
+  {{- $h := substr (md5 $all) 0 16 -}}
+  {{- $p.Store.SetInMap "tufteNest" $h $all -}}
+  {{- printf "TUFTEFNHOIST%sEND" $h | safeHTML -}}
+{{- else -}}
+  {{- partial "tufte/nest.html" (dict "ctx" . "html" (printf "%s%s" $out $hoisted)) | safeHTML -}}
+{{- end -}}

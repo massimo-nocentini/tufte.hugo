@@ -24,7 +24,7 @@
   showWordCount = false
   showPostNav = true            # previous / next links at the end of posts
   toc = false                   # table of contents (front matter `toc` overrides)
-  readMore = true               # "Read more" link under summaries
+  readMore = true               # "Read more" link under summaries Hugo cut (.Truncated)
   homeIntro = true              # render content/_index.md above the home list
   customCSS = []                # paths under the site's assets/, appended to the CSS bundle
   copyright = ""                # footer text; default "© YEAR Author"
@@ -55,7 +55,7 @@
     errorColor = ""             # colour of invalid TeX ("" = the theme's red, adapted to dark mode)
     strict = "error"            # KaTeX strict mode: "error" | "ignore" | "warn"
     minRuleThickness = 0.04     # minimum fraction-line thickness, in em
-    katexVersion = "0.16.11"    # another version needs katexIntegrity, katexJSIntegrity, katexAutoRenderIntegrity too
+    katexVersion = "auto"       # "auto": the KaTeX release Hugo embeds (0.16.21 on Hugo < 0.166, 0.18.4 from 0.166); another version needs katexIntegrity, katexJSIntegrity, katexAutoRenderIntegrity unless listed in data/tufte/vendor.toml
     katexCSS = ""               # optional: another KaTeX stylesheet URL (with katexIntegrity)
     katexIntegrity = ""
     katexJSIntegrity = ""
@@ -76,3 +76,26 @@
 
   [params.comments]
     enable = true               # front matter `comments` overrides
+
+  # tufte-latex parity. Only the style preset is set here: every other
+  # [params.tufte] key is optional and its default comes from the preset
+  # (layouts/_partials/tufte/defaults.html), so that `style = "latex"` can
+  # change them. Setting a leaf here would hide the preset's value. All keys
+  # are documented in README.md ("tufte-latex parity").
+  [params.tufte]
+    style = "css"               # "css" (Tufte CSS look) | "latex" (tufte-handout / tufte-book look)
+
+# Single-document print view of a book: a book root with
+# `outputs: [html, print]` gets /…/print.html (layouts/list.print.html).
+[outputFormats]
+  [outputFormats.print]
+    mediaType = "text/html"
+    baseName = "print"
+    isHTML = true
+    permalinkable = false
+    notAlternative = true
+
+# BibTeX databases as page resources or assets (`bibliography: refs.bib`).
+[mediaTypes]
+  [mediaTypes."text/x-bibtex"]
+    suffixes = ["bib"]

@@ -1,0 +1,110 @@
+{{- /*
+  Real footnotes of a page: numbering and ids (SPEC-LATEX §11.2). Pure;
+  read on the phase-1 HTML of the full content, so the page, its summary,
+  xrefs and the print book agree.
+
+  Footnotes are numbered in document order (Markdown footnotes kept as
+  footnotes and footnote shortcodes interleaved), restarting on every page
+  (also in books). Style, option `footnotestyle` (front matter, else
+  tufte.footnoteStyle via tufte/opt.html):
+    auto    arabic when the page has no numbered sidenotes, else alpha
+    arabic  1 2 3          alpha   a b … z aa ab …
+    roman   i ii iii …     symbol  * † ‡ § ¶ ‖ ** †† ‡‡, then alpha
+
+  Takes: a page.
+  Returns: dict
+    style    the resolved style (never "auto")
+    items    slice of dict { ident, n, mark, id, key } in number order;
+             id = "HASH6-NAME" (the list item is fn-<id>, the first
+             reference fnref-<id>, later ones fnref-<id>-2 …)
+    byIdent  map ident → item (ident as in tufte/fn-split.html)
+  Callers: partialCached "tufte/fn-model.html" $p (or $p.RelPermalink $p.Path)
+*/ -}}
+{{- /* Memoized in the page's Store (not in hugo server): see
+       tufte/opts.html. */ -}}
+{{- $memoRes := false -}}
+{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoFnModel") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $p := . -}}
+{{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) (or $p.RelPermalink $p.Path) false | string -}}
+{{- $at := $p.RelPermalink -}}
+{{- with $p.File }}{{ $at = .Path }}{{ end -}}
+{{- $hash := substr (md5 (printf "%s" (or $p.RelPermalink $p.Path))) 0 6 -}}
+
+{{- $style := "" -}}
+{{- with index $p.Params "footnotestyle" -}}
+  {{- $style = . -}}
+{{- else -}}
+  {{- $style = partialCached "tufte/opt.html" (dict "page" $p "key" "footnotestyle" "default" "auto") (or $p.RelPermalink $p.Path) "footnotestyle" -}}
+{{- end -}}
+{{- $style = lower (printf "%v" $style) -}}
+{{- if not (in (slice "auto" "arabic" "alpha" "roman" "symbol") $style) -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: footnoteStyle must be auto, arabic, alpha, roman or symbol, not %q, in %s; using auto" $style $at -}}
+  {{- $style = "auto" -}}
+{{- end -}}
+{{- if eq $style "auto" -}}
+  {{- $style = "arabic" -}}
+  {{- if gt (partialCached "tufte/counts.html" $p (or $p.RelPermalink $p.Path)).sidenote 0 }}{{ $style = "alpha" }}{{ end -}}
+{{- end -}}
+
+{{- $letters := split "a b c d e f g h i j k l m n o p q r s t u v w x y z" " " -}}
+{{- $symbols := slice "*" "†" "‡" "§" "¶" "‖" "**" "††" "‡‡" -}}
+{{- $romanV := slice 1000 900 500 400 100 90 50 40 10 9 5 4 1 -}}
+{{- $romanS := slice "m" "cm" "d" "cd" "c" "xc" "l" "xl" "x" "ix" "v" "iv" "i" -}}
+
+{{- $S := newScratch -}}
+{{- $S.Set "by" dict -}}
+{{- $S.Set "used" dict -}}
+{{- $items := slice -}}
+{{- $n := 0 -}}
+{{- range (partial "tufte/fn-split.html" $raw).items -}}
+  {{- if not (index ($S.Get "by") .ident) -}}
+    {{- $n = add $n 1 -}}
+    {{- /* Mark. */ -}}
+    {{- $alpha := "" -}}
+    {{- $r := $n -}}
+    {{- range seq 6 -}}
+      {{- if gt $r 0 -}}
+        {{- $r = sub $r 1 -}}
+        {{- $alpha = printf "%s%s" (index $letters (mod $r 26)) $alpha -}}
+        {{- $r = div $r 26 -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $mark := string $n -}}
+    {{- if eq $style "alpha" -}}
+      {{- $mark = $alpha -}}
+    {{- else if eq $style "symbol" -}}
+      {{- $mark = $alpha -}}
+      {{- if le $n (len $symbols) }}{{ $mark = index $symbols (sub $n 1) }}{{ end -}}
+    {{- else if and (eq $style "roman") (lt $n 4000) -}}
+      {{- $mark = "" -}}
+      {{- $r = $n -}}
+      {{- range $i, $v := $romanV -}}
+        {{- range seq 3 -}}
+          {{- if ge $r $v -}}
+            {{- $mark = printf "%s%s" $mark (index $romanS $i) -}}
+            {{- $r = sub $r $v -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- /* Id: the Markdown label, else the shortcode's identity key, else
+           the number. The xref key: the shortcode's label, else a
+           non-numeric Markdown label. */ -}}
+    {{- $name := .md | default .key | default (printf "n%d" $n) -}}
+    {{- $name = replaceRE `[^a-zA-Z0-9_-]` "-" $name -}}
+    {{- if isset ($S.Get "used") $name }}{{ $name = printf "%s-x%d" $name $n }}{{ end -}}
+    {{- $S.SetInMap "used" $name true -}}
+    {{- $key := "" -}}
+    {{- with .label }}{{ $key = partial "tufte/key.html" . }}{{ end -}}
+    {{- if and (not $key) .md (not (findRE `^[0-9]+$` .md 1)) }}{{ $key = partial "tufte/key.html" .md }}{{ end -}}
+    {{- $it := dict "ident" .ident "n" $n "mark" $mark "id" (printf "%s-%s" $hash $name) "key" $key -}}
+    {{- $S.SetInMap "by" .ident $it -}}
+    {{- $items = $items | append $it -}}
+  {{- end -}}
+{{- end -}}
+{{- $memoRes = dict "style" $style "items" $items "byIdent" ($S.Get "by") -}}
+{{- if not hugo.IsServer }}{{ $p.Store.Set "tufteMemoFnModel" (dict "v" $memoRes) }}{{ end -}}
+{{- end -}}
+{{- return $memoRes -}}

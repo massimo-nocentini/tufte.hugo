@@ -1,18 +1,27 @@
 {{- /*
-  Small-caps opening words of a new thought (inline), as in Tufte's books:
+  Small-caps opening words of a new thought (inline; \newthought), as in
+  Tufte's books:
 
     {{< newthought >}}In his later books{{< /newthought >}}, Tufte starts …
+    {{< newthought "In his later books" />}}, Tufte starts …
 
-  Do not mix this technique with h2 section headings: pick one.
-
-  The inner text is inline Markdown; nested inline shortcodes (e.g. a
-  sidenote) are kept.
+  Do not mix this technique with h2 section headings: pick one. The inner
+  text is inline Markdown; nested inline shortcodes are kept.
 
   Output (Tufte CSS): <span class="newthought">TEXT</span>
 */ -}}
 {{- $text := strings.TrimSpace .Inner -}}
-{{- /* Inline Markdown; the HTML of nested shortcodes is kept as is. */ -}}
-{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "text" $text "where" (printf "%s shortcode in %v" .Name .Position)) -}}
-{{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
-<span class="newthought">{{ $html | safeHTML }}</span>
-{{- /* no trailing newline */ -}}
+{{- if not $text -}}
+  {{- if .IsNamedParams -}}
+    {{- $text = printf "%v" (.Get "text" | default "") -}}
+  {{- else -}}
+    {{- $text = printf "%v" (.Get 0 | default "") -}}
+  {{- end -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with $text -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- end -}}
+{{- $out := printf `<span class="newthought">%s</span>` $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

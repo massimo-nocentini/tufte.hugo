@@ -1,0 +1,59 @@
+{{- /*
+  Gathers the citations of a note or caption into one citation block at its
+  end, as tufte-latex does: inside \sidenote, \marginnote and \caption,
+  \cite only collects its keys, and \@tufte@print@citations prints them all
+  after the note, joined "E1; E2; and E3" (SPEC-LATEX §3.7).
+
+  A cite nested in a holder (cite.html) emits, through the nest protocol,
+    <span class="citation-block" data-nested="1">ENTRIES</span><i class="cite-end" hidden></i>
+  where it stands. The holder (sidenote, marginnote, footnotetext, footnote,
+  marginblock, and every float through tufte/figure.html) passes its
+  rendered text here: the nested blocks are cut out (with the white space
+  before them, so "see {{< cite "x" >}}." reads "see.") and merged, after
+  them the references of the holder's own cite= parameter.
+
+  Takes a dict:
+    page  the page (its bibliography database)            required
+    html  the rendered text (string)
+    keys  optional slice of extra keys (the cite= parameter), lowercased
+  Returns: dict
+    html   the text without the nested blocks
+    block  <span class="citation-block">E1; E2; and E3</span>, or "" when
+           there is no citation
+*/ -}}
+{{- $html := string (.html | default "") -}}
+{{- $pieces := slice -}}
+{{- $re := `(?s)\s*<span class="citation-block" data-nested="1">(.*?)</span><i class="cite-end" hidden></i>` -}}
+{{- if strings.Contains $html `class="cite-end"` -}}
+  {{- range findRESubmatch $re $html -}}
+    {{- $pieces = $pieces | append (index . 1) -}}
+  {{- end -}}
+  {{- $html = replaceRE $re "" $html -}}
+{{- end -}}
+{{- with .keys -}}
+  {{- $pieces = $pieces | append (string (partial "tufte/bib/entries.html" (dict "page" $.page "keys" . "postnote" ""))) -}}
+{{- end -}}
+{{- $block := "" -}}
+{{- if eq (len $pieces) 1 -}}
+  {{- $block = index $pieces 0 -}}
+{{- else if gt (len $pieces) 1 -}}
+  {{- /* Each piece is "E1", "E1; and E2" or "E1; E2; and E3" (entries.html):
+         drop the inner "and", join, and put one "and" before the last. */ -}}
+  {{- $and := T "and" | default "and" -}}
+  {{- $sep := `; <span class="bib-entry` -}}
+  {{- $flat := slice -}}
+  {{- range $pieces -}}
+    {{- $flat = $flat | append (replace . (printf `; %s <span class="bib-entry` $and) $sep) -}}
+  {{- end -}}
+  {{- $all := delimit $flat "; " -}}
+  {{- $parts := split $all $sep -}}
+  {{- $n := len $parts -}}
+  {{- if gt $n 1 -}}
+    {{- $all = printf `%s; %s <span class="bib-entry%s` (delimit (first (sub $n 1) $parts) $sep) $and (index $parts (sub $n 1)) -}}
+  {{- end -}}
+  {{- $block = $all -}}
+{{- end -}}
+{{- with $block -}}
+  {{- $block = printf `<span class="citation-block">%s</span>` . -}}
+{{- end -}}
+{{- return (dict "html" $html "block" $block) -}}

@@ -1,0 +1,25 @@
+{{- /*
+  Nest-token protocol, child side (SPEC-LATEX §3.0.4, R3).
+
+  Hugo renders nested shortcodes before their parent and puts their output
+  in the parent's .Inner. A parent that renders .Inner as Markdown would
+  lose that HTML (unsafe = false) or mangle it. So a shortcode that has a
+  parent stores its final HTML in .Page.Store (map "tufteNest", keyed by
+  the first 16 hex chars of the md5 of the HTML, so storing is idempotent)
+  and emits the ASCII token TUFTENEST<16 hex>END instead. The parent
+  renders its inner text through tufte/render-inner.html, which swaps the
+  tokens back; func/content-raw.html swaps any token left over.
+
+  Takes a dict:
+    ctx   the shortcode context (.)
+    html  the shortcode's final HTML (string or template.HTML)
+  Returns: html unchanged when the shortcode is not nested, else the token.
+*/ -}}
+{{- $out := .html -}}
+{{- with .ctx.Parent -}}
+  {{- $html := string $out -}}
+  {{- $h := substr (md5 $html) 0 16 -}}
+  {{- $.ctx.Page.Store.SetInMap "tufteNest" $h $html -}}
+  {{- $out = printf "TUFTENEST%sEND" $h -}}
+{{- end -}}
+{{- return $out -}}

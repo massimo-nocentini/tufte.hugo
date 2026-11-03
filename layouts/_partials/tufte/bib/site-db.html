@@ -1,0 +1,93 @@
+{{- /*
+  Finds bibliography entries in decoded data (SPEC-LATEX §5.1).
+
+  Takes one of:
+    - a string: a key of site.Data, dotted for subdirectories
+      ("bibliography" = data/bibliography.{yaml,json,toml} or the directory
+      data/bibliography/; "refs.main" = data/refs/main.yaml);
+    - decoded data (a map or a slice), e.g. a transform.Unmarshal result or
+      front matter `references`;
+    - anything else (e.g. a page): the site option
+      params.tufte.bibliography.data, default "bibliography".
+  Callers cache the string form:
+    partialCached "tufte/bib/site-db.html" $dataKey $dataKey
+
+  Returns: a map  lowercased cite key → raw entry (a native map or a CSL
+  item; normalize.html understands both). Recognised shapes:
+    - a slice of CSL items (CSL-JSON, `pandoc -t csljson`), keyed by `id`;
+    - a native map  key → {type, title, author, …}  (a value that is a map
+      with a string `title` or `type` is an entry);
+    - maps of the above, up to three levels deep: a data directory with one
+      file per database, CSL-YAML `references: [...]`, and mixes.
+  Data that exists but yields no entry is reported with warnidf
+  "tufte-bib-format". Missing data is not an error.
+*/ -}}
+{{- $data := . -}}
+{{- $label := "" -}}
+{{- if not (or (reflect.IsMap $data) (reflect.IsSlice $data)) -}}
+  {{- $dk := "" -}}
+  {{- if eq (printf "%T" $data) "string" -}}
+    {{- $dk = $data -}}
+  {{- else -}}
+    {{- with site.Params.tufte }}{{ with .bibliography }}{{ with .data }}{{ $dk = printf "%v" . }}{{ end }}{{ end }}{{ end -}}
+  {{- end -}}
+  {{- $dk = $dk | default "bibliography" -}}
+  {{- $label = printf "data/%s" (replace $dk "." "/") -}}
+  {{- /* site.Data is deprecated from Hugo 0.156 (hugo.Data); methods are
+         resolved at run time, so only the branch that runs must exist */ -}}
+  {{- if ge hugo.Version "0.156.0" -}}
+    {{- $data = hugo.Data -}}
+  {{- else -}}
+    {{- $data = site.Data -}}
+  {{- end -}}
+  {{- range split $dk "." -}}
+    {{- if reflect.IsMap $data -}}
+      {{- $data = index $data . -}}
+    {{- else -}}
+      {{- $data = false -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $S := newScratch -}}
+{{- $S.Set "db" dict -}}
+{{- if or (reflect.IsMap $data) (reflect.IsSlice $data) -}}
+  {{- $frontier := slice (dict "v" $data) -}}
+  {{- range seq 4 -}}
+    {{- $next := slice -}}
+    {{- range $frontier -}}
+      {{- $v := .v -}}
+      {{- if reflect.IsSlice $v -}}
+        {{- range $v -}}
+          {{- if reflect.IsMap . -}}
+            {{- $id := index . "id" -}}
+            {{- if $id -}}
+              {{- $S.SetInMap "db" (lower (printf "%v" $id)) . -}}
+            {{- else -}}
+              {{- $next = $next | append (dict "v" .) -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- else if reflect.IsMap $v -}}
+        {{- range $k, $e := $v -}}
+          {{- if reflect.IsMap $e -}}
+            {{- $t := index $e "title" -}}
+            {{- $ty := index $e "type" -}}
+            {{- if or (eq (printf "%T" $t) "string") (eq (printf "%T" $ty) "string") -}}
+              {{- $S.SetInMap "db" (lower (printf "%v" $k)) $e -}}
+            {{- else -}}
+              {{- $next = $next | append (dict "v" $e) -}}
+            {{- end -}}
+          {{- else if reflect.IsSlice $e -}}
+            {{- $next = $next | append (dict "v" $e) -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $frontier = $next -}}
+  {{- end -}}
+  {{- if and (eq (len ($S.Get "db")) 0) (gt (len $data) 0) -}}
+    {{- warnidf "tufte-bib-format" "tufte.hugo: no bibliography entries found in %s (expected a map key → {type, title, author, …} or a CSL-JSON list of items with an id)" ($label | default "the bibliography data") -}}
+  {{- end -}}
+{{- end -}}
+{{- return ($S.Get "db") -}}

@@ -1,0 +1,7 @@
+{{- /*
+  Pushes the following text below every pending margin note and figure
+  (block; \FloatBarrier). Put it on its own line: {{< clearmargin >}}
+
+  Output: <div class="clear-margin"></div>
+*/ -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" `<div class="clear-margin"></div>`) | safeHTML -}}

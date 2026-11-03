@@ -1,0 +1,49 @@
+{{- /*
+  Counter offsets of a page (SPEC-LATEX §4.1, §6.5): inside a book with
+  book.continuous on (the default), the sums of tufte/counts.html over the
+  pages printed before it in the whole-book document (list.print.html), so
+  sidenote, figure, table, listing and equation numbers run through the
+  whole book and every page shows the numbers the print document shows.
+  That reading order is:
+    1. the book landing (its own body; the title page's \thanks take no
+       number, as tufte-book's \maketitlepage prints \thanklesstitle and
+       swallows them; without a title page, book.titlepage = false, the
+       \maketitle block's \thanks are notes 1..k),
+    2. the chapters in reading order, each part page (\part, with its own
+       content) right before the first chapter of the part, and the parts
+       without chapters at their place (tufte/book/sequence.html).
+  Zeros otherwise: handouts, book.continuous = false (every page restarts
+  at 1, and the print document resets the counter per chapter and part),
+  and the book landing itself (it comes first).
+
+  Takes: a page.
+  Returns: dict sidenote figure table listing eq (ints).
+  Callers: partialCached "tufte/offsets.html" $p (or $p.RelPermalink $p.Path)
+*/ -}}
+{{- /* Memoized in the page's Store (not in hugo server): see
+       tufte/opts.html. */ -}}
+{{- $memoRes := false -}}
+{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoOffsets") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $p := . -}}
+{{- $sn := 0 -}}{{- $fig := 0 -}}{{- $tab := 0 -}}{{- $lst := 0 -}}{{- $eq := 0 -}}
+{{- with partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- $root := . -}}
+  {{- if and (ne $root $p) (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.continuous") (or $p.RelPermalink $p.Path) "book.continuous")) -}}
+    {{- /* The running sums over the print order (same walk as
+           list.print.html), computed once per book. */ -}}
+    {{- $map := partialCached "tufte/book/offset-map.html" $root (or $root.RelPermalink $root.Path) -}}
+    {{- with index $map (printf "%s|%s" $p.Path (or $p.RelPermalink "")) -}}
+      {{- $sn = .sidenote -}}
+      {{- $fig = .figure -}}
+      {{- $tab = .table -}}
+      {{- $lst = .listing -}}
+      {{- $eq = .eq -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $memoRes = dict "sidenote" $sn "figure" $fig "table" $tab "listing" $lst "eq" $eq -}}
+{{- if not hugo.IsServer }}{{ $p.Store.Set "tufteMemoOffsets" (dict "v" $memoRes) }}{{ end -}}
+{{- end -}}
+{{- return $memoRes -}}

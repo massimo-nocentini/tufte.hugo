@@ -1,0 +1,179 @@
+{{- /*
+  bibtex-lite: parses the text of a .bib file into the theme's native
+  bibliography map (SPEC-LATEX §5.1).
+
+  Takes: a string (the content of a .bib file).
+  Returns: a map  lowercased cite key → map of fields, where every field
+  name is lowercased and "type" holds the lowercased entry type
+  (book, article, misc, …).
+
+  Supported:
+    - @string{name = "value"} macros, @comment and @preamble are skipped;
+    - field values in {braces} (up to three nesting levels), "quotes",
+      bare numbers, bare macros (months jan…dec, @string names), and
+      concatenation with # ;
+    - LaTeX accents (\'e, {\"o}, \c{c}, \v{s}, \ss, \o, …), dashes, ~,
+      \&, \LaTeX, \url{x}, \texttt{x} and similar one-argument commands.
+  Braces left after that are removed, except in author and editor, where
+  they protect literal names ({Barnes and Noble}); normalize.html strips
+  them there.
+  Kept as written: math ($…$, $$…$$, \(…\); format.html typesets it with
+  the page's math engine), the arguments of \url{…} and \nolinkurl{…}
+  (format.html links them), a literal \$ (still escaped, so it is not
+  read as math), and the whole value of url, doi and eprint (no TeX
+  clean-up: "~user" and "a--b" in a URL or DOI stay as they are; only a
+  \url{…} around the value is removed).
+  Not supported: crossref, @string macros used before their definition,
+  nested quotes inside "…" values.
+*/ -}}
+{{- $text := printf "%s" . -}}
+{{- $text = replace $text "\r\n" "\n" -}}
+{{- $text = printf "\n%s" $text -}}
+{{- /* one chunk per @entry */ -}}
+{{- $chunks := split (replaceRE `\n[ \t]*@` "\x1d@" $text) "\x1d" -}}
+{{- $S := newScratch -}}
+{{- $S.Set "db" dict -}}
+{{- $S.Set "macros" (dict
+  "jan" "January" "feb" "February" "mar" "March" "apr" "April"
+  "may" "May" "jun" "June" "jul" "July" "aug" "August"
+  "sep" "September" "oct" "October" "nov" "November" "dec" "December") -}}
+
+{{- /* value part: {…} with up to 3 levels, "…", or a bare word */ -}}
+{{- $part := `(?:\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}|"(?:[^"\\]|\\.)*"|[\w.:/+-]+)` -}}
+{{- $fieldRE := printf `(?s)([A-Za-z][\w-]*)\s*=\s*(%s(?:\s*#\s*%s)*)` $part $part -}}
+
+{{- /* accent tables: command character → base letter → result */ -}}
+{{- $acc := dict
+  "'" (dict "a" "á" "e" "é" "i" "í" "o" "ó" "u" "ú" "y" "ý" "c" "ć" "n" "ń" "s" "ś" "z" "ź" "A" "Á" "E" "É" "I" "Í" "O" "Ó" "U" "Ú" "Y" "Ý" "C" "Ć" "N" "Ń" "S" "Ś" "Z" "Ź")
+  "`" (dict "a" "à" "e" "è" "i" "ì" "o" "ò" "u" "ù" "A" "À" "E" "È" "I" "Ì" "O" "Ò" "U" "Ù")
+  "^" (dict "a" "â" "e" "ê" "i" "î" "o" "ô" "u" "û" "A" "Â" "E" "Ê" "I" "Î" "O" "Ô" "U" "Û")
+  "\"" (dict "a" "ä" "e" "ë" "i" "ï" "o" "ö" "u" "ü" "y" "ÿ" "A" "Ä" "E" "Ë" "I" "Ï" "O" "Ö" "U" "Ü")
+  "~" (dict "a" "ã" "o" "õ" "n" "ñ" "A" "Ã" "O" "Õ" "N" "Ñ")
+  "=" (dict "a" "ā" "e" "ē" "i" "ī" "o" "ō" "u" "ū")
+  "." (dict "z" "ż" "Z" "Ż" "e" "ė" "I" "İ")
+  "c" (dict "c" "ç" "C" "Ç" "s" "ş" "S" "Ş")
+  "v" (dict "c" "č" "s" "š" "z" "ž" "r" "ř" "e" "ě" "n" "ň" "C" "Č" "S" "Š" "Z" "Ž" "R" "Ř" "E" "Ě" "N" "Ň")
+  "u" (dict "a" "ă" "g" "ğ" "A" "Ă" "G" "Ğ")
+  "H" (dict "o" "ő" "u" "ű" "O" "Ő" "U" "Ű")
+  "r" (dict "a" "å" "u" "ů" "A" "Å" "U" "Ů")
+  "k" (dict "a" "ą" "e" "ę" "A" "Ą" "E" "Ę") -}}
+{{- $sym := dict
+  "\\ss" "ß" "\\ae" "æ" "\\AE" "Æ" "\\oe" "œ" "\\OE" "Œ" "\\aa" "å" "\\AA" "Å"
+  "\\o" "ø" "\\O" "Ø" "\\l" "ł" "\\L" "Ł" -}}
+
+{{- range $chunks -}}
+  {{- $c := trim . " \t\n" -}}
+  {{- $head := findRESubmatch `^@\s*(\w+)\s*[{(]\s*` $c 1 -}}
+  {{- if not $head }}{{ continue }}{{ end -}}
+  {{- $type := lower (index (index $head 0) 1) -}}
+  {{- if in (slice "comment" "preamble") $type }}{{ continue }}{{ end -}}
+  {{- $key := "" -}}
+  {{- $body := "" -}}
+  {{- if eq $type "string" -}}
+    {{- $body = replaceRE `^@\s*\w+\s*[{(]` "" $c -}}
+  {{- else -}}
+    {{- $km := findRESubmatch `^@\s*\w+\s*[{(]\s*([^,\s]+)\s*,` $c 1 -}}
+    {{- if not $km }}{{ continue }}{{ end -}}
+    {{- $key = lower (index (index $km 0) 1) -}}
+    {{- $body = replaceRE `^@\s*\w+\s*[{(]\s*[^,\s]+\s*,` "" $c -}}
+  {{- end -}}
+
+  {{- $E := newScratch -}}
+  {{- $E.Set "type" $type -}}
+  {{- range findRESubmatch $fieldRE $body -}}
+    {{- $name := lower (index . 1) -}}
+    {{- $val := "" -}}
+    {{- /* concatenation: evaluate each part */ -}}
+    {{- range findRE $part (index . 2) -}}
+      {{- $v := . -}}
+      {{- if and (hasPrefix $v "{") (hasSuffix $v "}") -}}
+        {{- $v = substr $v 1 (sub (len $v) 2) -}}
+      {{- else if and (hasPrefix $v "\"") (hasSuffix $v "\"") -}}
+        {{- $v = substr $v 1 (sub (len $v) 2) -}}
+      {{- else if not (findRE `^[0-9]+$` $v 1) -}}
+        {{- with index ($S.Get "macros") (lower $v) }}{{ $v = . }}{{ end -}}
+      {{- end -}}
+      {{- $val = printf "%s%s" $val $v -}}
+    {{- end -}}
+
+    {{- if eq $type "string" -}}
+      {{- $S.SetInMap "macros" $name $val -}}
+      {{- continue -}}
+    {{- end -}}
+
+    {{- /* url, doi, eprint: verbatim (a ~user path or a -- in a DOI is
+           not TeX), only a \url{…} around the value is removed */ -}}
+    {{- if in (slice "url" "doi" "eprint") $name -}}
+      {{- $val = replaceRE `^\s*\\(?:url|nolinkurl)\s*\{([^{}]*)\}\s*$` "$1" $val -}}
+      {{- $E.Set $name (trim $val " \t\n") -}}
+      {{- continue -}}
+    {{- end -}}
+
+    {{- /* LaTeX → text, outside math ($…$, \(…\)) and \url{…} /
+           \nolinkurl{…} arguments, which are kept as written
+           (tufte/bib/tex-split.html; format.html typesets and links them);
+           a literal \$ stays escaped so it never reads as math. */ -}}
+    {{- $segs := slice (dict "k" "t" "s" $val) -}}
+    {{- if findRE `\$|\\\(|\\(?:url|nolinkurl)\b` $val 1 }}{{ $segs = partial "tufte/bib/tex-split.html" $val }}{{ end -}}
+    {{- $joined := "" -}}
+    {{- range $segs -}}
+      {{- if ne .k "t" }}{{ $joined = printf "%s%s" $joined .s }}{{ continue }}{{ end -}}
+      {{- $val = replace .s `\$` "\x1a" -}}
+      {{- /* LaTeX → text */ -}}
+      {{- if strings.Contains $val "\\" -}}
+        {{- /* \'{\i} and \'\i → \'i */ -}}
+        {{- $val = replaceRE `\\i\b\s*` "i" $val -}}
+        {{- $val = replaceRE `\\j\b\s*` "j" $val -}}
+        {{- /* {\'e}, \'{e}, {\'{e}} → \'e (symbol accents) */ -}}
+        {{- $val = replaceRE "\\{\\\\(['`^\"~=.])\\s*\\{?([a-zA-Z])\\}?\\}" "\\$1$2" $val -}}
+        {{- $val = replaceRE "\\\\(['`^\"~=.])\\s*\\{([a-zA-Z])\\}" "\\$1$2" $val -}}
+        {{- /* letter accents: \c{c}, \c c, {\c c} → \c{c} */ -}}
+        {{- $val = replaceRE `\{\\([cvuHrk])(?:\{([a-zA-Z])\}|\s+([a-zA-Z]))\}` "\\$1{$2$3}" $val -}}
+        {{- $val = replaceRE `\\([cvuHrk])(?:\{([a-zA-Z])\}|\s+([a-zA-Z]))` "\\$1{$2$3}" $val -}}
+        {{- range $cmd, $letters := $acc -}}
+          {{- range $l, $r := $letters -}}
+            {{- if findRE `^[cvuHrk]$` $cmd 1 -}}
+              {{- $val = replace $val (printf "\\%s{%s}" $cmd $l) $r -}}
+            {{- else -}}
+              {{- $val = replace $val (printf "\\%s%s" $cmd $l) $r -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+        {{- range $cmd, $r := $sym -}}
+          {{- $val = replaceRE (printf `\{?%s\}?(?:\b|\s+)` (replace $cmd "\\" "\\\\")) $r $val -}}
+        {{- end -}}
+        {{- $val = replace $val "\\LaTeX" "LaTeX" -}}
+        {{- $val = replace $val "\\TeX" "TeX" -}}
+        {{- $val = replace $val "\\BibTeX" "BibTeX" -}}
+        {{- $val = replace $val "\\&" "&" -}}
+        {{- $val = replace $val "\\%" "%" -}}
+        {{- $val = replace $val "\\_" "_" -}}
+        {{- $val = replace $val "\\#" "#" -}}
+        {{- /* \href{url}{text} → text; one-argument commands → their argument */ -}}
+        {{- $val = replaceRE `\\href\s*\{[^{}]*\}\s*\{([^{}]*)\}` "$1" $val -}}
+        {{- $val = replaceRE `\\(?:url|texttt|textit|textbf|textsc|textsf|textrm|emph|mbox|textup|textmd|textsl|text|nolinkurl|doi)\s*\{([^{}]*)\}` "$1" $val -}}
+        {{- /* control space, \@ and any other command name */ -}}
+        {{- $val = replaceRE `\\ ` " " $val -}}
+        {{- $val = replaceRE `\\[@/]` "" $val -}}
+        {{- $val = replaceRE `\\[a-zA-Z]+\s*` "" $val -}}
+        {{- $val = replace $val "\\" "" -}}
+      {{- end -}}
+      {{- $val = replace $val "---" "—" -}}
+      {{- $val = replace $val "--" "–" -}}
+      {{- $val = replace $val "~" " " -}}
+      {{- if not (in (slice "author" "editor") $name) -}}
+        {{- $val = replaceRE `[{}]` "" $val -}}
+      {{- end -}}
+      {{- if not (in (slice "author" "editor") $name) -}}
+        {{- $val = replaceRE `[{}]` "" $val -}}
+      {{- end -}}
+      {{- $joined = printf "%s%s" $joined (replace $val "\x1a" `\$`) -}}
+    {{- end -}}
+    {{- $val = trim (replaceRE `\s+` " " $joined) " " -}}
+    {{- $E.Set $name $val -}}
+  {{- end -}}
+  {{- if $key -}}
+    {{- $S.SetInMap "db" $key $E.Values -}}
+  {{- end -}}
+{{- end -}}
+{{- return ($S.Get "db") -}}

@@ -11,6 +11,16 @@
   Sets Store "hasMath" on the page, so the head loads the KaTeX stylesheet
   (and, with the client engine, the KaTeX scripts): see tufte/katex.html.
 
+  Numbered display equations (LaTeX \label, SPEC-LATEX §3.11): a block
+  with \label{eq:x} in its TeX (or an {#eq:x} block attribute) is numbered,
+  and {{< eqref "eq:x" >}} / {{< xref "eq:x" >}} refer to it:
+    $$ e^{i\pi} + 1 = 0 \label{eq:euler} $$
+    → <span class="math-display numbered" id="eq-euler">KATEX<span class="eq-number">(<span class="tufte-num" data-kind="eq" data-key="eq-euler" data-labeled="1"></span>)</span></span>
+  (the \label is removed before KaTeX sees it). Numbers run through the
+  page, or the book with continuous numbering.
+
+  The rendering itself is done by the partial tufte/math-render.html.
+
   params.math.engine = "server" (default): rendered at build time with
   transform.ToMath (no JavaScript). Options come from func/math-options.html:
   throwOnError = false, errorColor, fleqn, leqno, minRuleThickness, strict,
@@ -26,6 +36,17 @@
   errorColor: KaTeX gets a sentinel colour (func/math-options.html) that
   the hook looks for.
 
+  Equation numbers and cross-references (\label, SPEC-LATEX §3.11): a
+  display formula with \label{eq:x} (or a {#eq:x} attribute) is numbered,
+  "(3)", and can be referenced with {{< eqref "eq:x" >}}:
+    <span class="math-display numbered" id="eq-x">KATEX<span class="eq-number">(N)</span></span>
+  The \label is removed before KaTeX sees it. KaTeX's own \tag{…} still
+  works for a fixed tag; with a \label as well, the tag is the number (as
+  in amsmath): no eq-number, no counter step, eqref prints "(tag)" (see
+  tufte/math-render.html, "tagged"). A display gets one number: in an aligned/align
+  block with a \label per row, only the first is kept, and the others are
+  reported (tufte-bad-option); write one display per numbered row.
+
   params.math.engine = "client": the TeX is kept, escaped, for KaTeX in the
   browser (the head loads katex.min.js and auto-render with the same
   options and macros):
@@ -33,60 +54,25 @@
     display  <span class="math math-display">\[TeX\]</span>
 */ -}}
 {{- $block := eq .Type "block" -}}
-{{- $m := partial "func/math-options.html" (dict "Page" .Page "Display" $block) -}}
-{{- .Page.Store.Set "hasMath" true -}}
-{{- if eq $m.engine "client" -}}
-  {{- if $block -}}
-    <span class="math math-display">\[{{ .Inner }}\]</span>
-  {{- else -}}
-    <span class="math math-inline">\({{ .Inner }}\)</span>
-  {{- end -}}
-{{- else -}}
-  {{- $html := "" -}}
-  {{- $err := "" -}}
-  {{- with try (transform.ToMath .Inner $m.server) -}}
-    {{- with .Err -}}
-      {{- $err = printf "%v" . -}}
-    {{- else -}}
-      {{- $html = .Value -}}
+{{- $inner := .Inner -}}
+{{- $label := "" -}}
+{{- if $block -}}
+  {{- with findRESubmatch `\\label\{([^}]+)\}` $inner -}}
+    {{- $label = index . 0 1 -}}
+    {{- $inner = replaceRE `\\label\{[^}]+\}` "" $inner -}}
+    {{- /* The theme numbers a display, not its rows: a second \label (one
+           per row of aligned/align, as in LaTeX) has no number to name. */ -}}
+    {{- if gt (len .) 1 -}}
+      {{- $extra := slice -}}
+      {{- range after 1 . }}{{ $extra = $extra | append (index . 1) }}{{ end -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: a display equation gets one number, so only its first \\label{%s} is kept; \\label{%s} is ignored and references to it are undefined: split the display into one $$…$$ per numbered row (%v)" $label (delimit $extra "}, \\label{") $.Position -}}
     {{- end -}}
   {{- end -}}
-  {{- /* With throwOnError = false KaTeX reports a parse error as
-         <span class="katex-error" title="ParseError: …">…</span>. */ -}}
-  {{- if and (not $err) (strings.Contains (string $html) `class="katex-error"`) -}}
-    {{- $err = "KaTeX parse error" -}}
-    {{- with findRESubmatch `class="katex-error"[^>]*?\stitle="([^"]*)"` (string $html) 1 -}}
-      {{- $err = index . 0 1 | htmlUnescape -}}
+  {{- with .Attributes -}}
+    {{- with index . "id" -}}
+      {{- if not $label }}{{ $label = printf "%v" . }}{{ end -}}
     {{- end -}}
   {{- end -}}
-  {{- /* An undefined control sequence becomes text in the errorColor
-         (HTML style "color:…", MathML mathcolor="…"), with no class. */ -}}
-  {{- if and (not $err) $m.sentinel (strings.Contains (lower (string $html)) (lower $m.sentinel)) -}}
-    {{- $err = "undefined control sequence (a typo, or a macro that is not defined?)" -}}
-    {{- with findRESubmatch (printf `mathcolor="%s"[^>]*>\s*<mtext>([^<]*)</mtext>` $m.sentinel) (string $html) 1 -}}
-      {{- $err = printf "undefined control sequence %s (a typo, or a macro that is not defined?)" (index . 0 1 | htmlUnescape) -}}
-    {{- end -}}
-  {{- end -}}
-  {{- if $err -}}
-    {{- warnf "tufte.hugo: KaTeX could not render %q: %s (%s)" .Inner $err .Position -}}
-    {{- $code := "" -}}
-    {{- with $m.errorColor -}}
-      {{- $code = printf `<code class="math-error" style="color: %s" title="%s">%s</code>` (htmlEscape .) (htmlEscape $err) (htmlEscape $.Inner) -}}
-    {{- else -}}
-      {{- $code = printf `<code class="math-error" title="%s">%s</code>` (htmlEscape $err) (htmlEscape $.Inner) -}}
-    {{- end -}}
-    {{- if $block -}}
-      <span class="math-display">{{ $code | safeHTML }}</span>
-    {{- else -}}
-      {{- $code | safeHTML -}}
-    {{- end -}}
-  {{- else if $block -}}
-    {{- /* KaTeX adds the katex-display wrapper in display mode; add it if missing. */ -}}
-    {{- if not (strings.Contains (string $html) "katex-display") -}}
-      {{- $html = printf `<span class="katex-display">%s</span>` $html | safeHTML -}}
-    {{- end -}}
-    <span class="math-display">{{ $html }}</span>
-  {{- else -}}
-    {{- $html -}}
-  {{- end -}}
+  {{- $label = partial "tufte/label-key.html" (dict "key" $label "where" (printf "display math at %v" .Position)) -}}
 {{- end -}}
+{{- partial "tufte/math-render.html" (dict "page" .Page "inner" $inner "block" $block "label" $label "position" (printf "%v" .Position)) | safeHTML -}}

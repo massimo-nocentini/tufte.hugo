@@ -1,0 +1,60 @@
+{{- /*
+  Default values of every [params.tufte] option, per style preset
+  (SPEC-LATEX §2.2, R8). The theme hugo.toml sets only
+  [params.tufte] style = "css"; all other defaults live here so that
+  `style = "latex"` can flip them.
+
+  Takes a dict:
+    style  "css" (default) | "latex"
+    book   bool: the page is inside a book (bibliography.list → false,
+           floats.number → true)
+  Returns: a nested map with lowercase keys (dotted option keys flattened
+  as nested maps): index it with the segments of the lowercased key, e.g.
+  index $d "bibliography" "style".
+*/ -}}
+{{- $style := lower (printf "%v" (.style | default "css")) -}}
+{{- $latex := eq $style "latex" -}}
+{{- $book := eq .book true -}}
+{{- $note := dict "align" "" "font" "" -}}
+{{- $sty := "css" -}}{{- $tb := "css" -}}{{- $num := "lining" -}}{{- $bst := "tufte" -}}
+{{- if $latex -}}
+  {{- $sty = "latex" -}}{{- $tb = "latex" -}}{{- $num = "oldstyle" -}}{{- $bst = "plainnat" -}}
+{{- end -}}
+{{- $floats := "auto" -}}
+{{- if or $latex $book }}{{ $floats = true }}{{ end -}}
+{{- $d := dict
+  "style" $sty
+  "titleblock" $tb
+  "justified" false
+  "hyphenate" $latex
+  "indent" $latex
+  "sfsidenotes" false
+  "letterspacing" true
+  "numerals" $num
+  "marginals" "auto"
+  "footnotestyle" "auto"
+  "footnoteplacement" "page"
+  "debug" false
+  "sidenote" $note
+  "marginnote" $note
+  "caption" $note
+  "citation" $note
+  "floats" (dict "number" $floats)
+  "headings" (dict "number" 0 "strict" false)
+  "bibliography" (dict
+    "data" "bibliography"
+    "style" $bst
+    "list" (not $book)
+    "margin" true
+    "heading" "")
+  "book" (dict
+    "numberchapters" false
+    "continuous" true
+    "toc" true
+    "tocdepth" 0
+    "titlepage" true)
+  "print" (dict
+    "paper" "letter"
+    "runningheads" $latex)
+-}}
+{{- return $d -}}

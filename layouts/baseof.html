@@ -10,10 +10,14 @@
 <head>
 {{ partial "head.html" . }}
 </head>
-<body>
-<a class="skip-link" href="#main">{{ T "skipToContent" }}</a>
+{{- /* Document class and class options as body classes (tufte-book or
+       tufte-handout, tufte-justified, …): tufte/body-class.html. */}}
+<body class="{{ partial "tufte/body-class.html" . }}">
+{{- /* The landmark id is in the theme's tufte- namespace, so a heading
+       or label named "main" cannot collide with it. */}}
+<a class="skip-link" href="#tufte-main">{{ T "skipToContent" }}</a>
 {{ partial "header.html" . }}
-<main id="main">
+<main id="tufte-main">
 {{ block "main" . }}{{ end }}
 </main>
 {{ partial "footer.html" . }}

@@ -1,0 +1,16 @@
+{{- /*
+  Abstract (block; the abstract environment). Put it on its own lines,
+  usually first in the content:
+
+    {{< abstract >}}
+    This handout shows the Tufte style in HTML …
+    {{< /abstract >}}
+
+  Front matter `abstract:` (Markdown) gives the same output right after the
+  title block.
+
+  Output: <section class="abstract">BLOCKS</section>
+*/ -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "inner" (strings.TrimSpace .Inner) "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
+{{- $out := printf "<section class=\"abstract\">\n%s\n</section>" $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

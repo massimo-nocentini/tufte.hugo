@@ -1,29 +1,57 @@
 {{- /*
-  Unnumbered margin note (inline). Use inside a paragraph:
+  Unnumbered margin note (inline; \marginnote, \marginpar). Use inside a
+  paragraph:
 
     Links are underlined. {{< marginnote >}}Blue text is *crass*.{{< /marginnote >}}
+    A one-line form: {{< marginnote "A margin note." />}}
 
-  The inner text is inline Markdown. A one-line form also works:
-  {{< marginnote "A margin note." />}} or {{< marginnote text="…" />}}.
+  The inner text is inline Markdown and may contain other inline shortcodes.
 
-  Output (Tufte CSS):
-    <label for="mn-ID" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-ID" class="margin-toggle"/><span class="marginnote">TEXT</span>
+  Named params (never mixed with positional ones):
+    text    the note text (instead of the inner text)
+    offset  \marginnote[offset]: vertical shift, e.g. "1bl" (baselines), "-1rem"
+    cite    citation keys: their full references follow the text
+
+  Output (Tufte CSS + SPEC-LATEX §3.3):
+    <label for="mn-ID" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-ID" class="margin-toggle"/><span class="marginnote"[ style="--tufte-offset:…"]>TEXT[<span class="citation-block">…</span>]</span>
+
+  (No sn-end marker: a margin note has no mark in the text, so a sidenote
+  right after it is not a "multiple mark".)
 */ -}}
+{{- $p := .Page -}}
 {{- $text := strings.TrimSpace .Inner -}}
-{{- if not $text -}}
-  {{- if .IsNamedParams -}}
-    {{- $text = .Get "text" | default "" -}}
-  {{- else -}}
-    {{- $text = .Get 0 | default "" -}}
+{{- $offset := "" -}}{{- $cite := "" -}}
+{{- if .IsNamedParams -}}
+  {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
+  {{- $offset = printf "%v" (.Get "offset" | default "") -}}
+  {{- $cite = printf "%v" (.Get "cite" | default "") -}}
+{{- else if not $text -}}
+  {{- $text = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- if and (not $text) (not $cite) -}}
+  {{- warnidf "tufte-empty" "marginnote shortcode: empty margin note in %s" .Position -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with $text -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- /* A sidenote or margin note nested in it cannot float. */ -}}
+  {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $.Name) "where" $.Position) -}}
+  {{- /* A span cannot hold paragraphs: turn paragraph breaks into <br>. */ -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+{{- end -}}
+{{- /* Citations: those of nested cite shortcodes and of cite=, in one
+       block after the text (tufte/cite-gather.html). */ -}}
+{{- $keys := slice -}}
+{{- range split $cite "," }}{{ with strings.TrimSpace . }}{{ $keys = $keys | append (lower .) }}{{ end }}{{ end -}}
+{{- with partial "tufte/cite-gather.html" (dict "page" $p "html" $html "keys" $keys) -}}
+  {{- $html = printf "%s%s" .html .block -}}
+{{- end -}}
+{{- $style := "" -}}
+{{- with $offset -}}
+  {{- with partial "tufte/offset.html" (dict "value" . "page" $.Page "where" (printf "(%s shortcode, line %d)" $.Name $.Position.LineNumber)) -}}
+    {{- $style = printf ` style="%s"` (htmlEscape (string .)) -}}
   {{- end -}}
 {{- end -}}
-{{- if not $text -}}
-  {{- warnf "marginnote shortcode: empty margin note in %s" .Position -}}
-{{- end -}}
-{{- /* Inline Markdown; the HTML of nested shortcodes is kept as is. */ -}}
-{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "text" $text "where" (printf "%s shortcode in %v" .Name .Position)) -}}
-{{- /* A span cannot hold paragraphs: turn paragraph breaks into <br>. */ -}}
-{{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
-{{- $id := partial "func/note-id.html" .Page -}}
-<label for="mn-{{ $id }}" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-{{ $id }}" class="margin-toggle"/><span class="marginnote">{{ $html | safeHTML }}</span>
-{{- /* no trailing newline */ -}}
+{{- $id := partial "func/note-id.html" $p -}}
+{{- $out := printf `<label for="mn-%s" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-%s" class="margin-toggle"/><span class="marginnote"%s>%s</span>` $id $id $style $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

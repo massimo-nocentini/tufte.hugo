@@ -60,15 +60,30 @@ jobs:
           F=public/posts/footnotes-as-sidenotes/index.html
           need "$F"
           grep -q 'class="sidenote"' "$F" || fail "footnotes not converted to sidenotes in $F"
-          if grep -q 'class="footnotes"' "$F"; then fail "endnote list left in $F"; fi
+          if grep -q '<div class="footnotes"' "$F"; then fail "Goldmark endnote div left in $F"; fi
 
           M=public/posts/math-and-code/index.html
           need "$M"
           grep -q 'class="katex' "$M" || fail "no KaTeX output in $M"
           grep -q 'katex.min.css' "$M" || fail "KaTeX stylesheet not loaded in $M"
           if grep -q 'class="math-error"' "$M"; then fail "invalid TeX (math-error) in $M"; fi
-          # KaTeX renders \tag as <span class="tag">; post-meta tag links use class "post-tag".
-          grep -q '<span class="tag">' "$M" || fail "no equation \\tag in $M"
+          # KaTeX renders \tag as <span class="tag"> (KaTeX 0.16, Hugo < 0.166) or
+          # <span class="katex-tag"> (KaTeX 0.18, Hugo >= 0.166); post-meta tag
+          # links use class "post-tag".
+          grep -qE '<span class="(katex-)?tag">' "$M" || fail "no equation \\tag in $M"
+          # The stylesheet must be the KaTeX release Hugo embeds (class names
+          # changed in 0.18): katex-base in the HTML needs katex@0.18+ CSS.
+          if grep -q 'class="katex-base"' "$M"; then
+            grep -qE 'katex@0\.(1[89]|[2-9][0-9])\.[0-9]+/dist/katex\.min\.css' "$M" || fail "KaTeX 0.18 HTML with an older katex.min.css in $M"
+          else
+            grep -q 'katex@0\.16\.[0-9]*/dist/katex\.min\.css' "$M" || fail "KaTeX 0.16 HTML without katex@0.16 CSS in $M"
+          fi
+
+          # Embeds nested in a block shortcode keep their HTML (tufte/nest.html).
+          T=public/posts/figures-and-tables/index.html
+          need "$T"
+          tr -d '\n' < "$T" | grep -qE '<div class="fullwidth">[[:space:]]*<figure class="iframe-wrapper"' || fail "iframe inside fullwidth lost in $T"
+          if grep -q 'raw HTML omitted' "$T"; then fail "raw HTML omitted in $T"; fi
 
           # Note ids must be unique per page, also on list pages with several summaries.
           for f in "$P" "$F" public/index.html public/posts/index.html; do
@@ -84,3 +99,285 @@ jobs:
           HUGO_PARAMS_SECTIONS: none
           HUGO_PARAMS_FOOTNOTES: endnotes
         run: hugo --gc --minify --panicOnWarning --destination public-variant
+
+      # SPEC-LATEX §11: sidenotes and real footnotes on the same page.
+      # footnotes-as-sidenotes mixes [^x], [^fn-x], {{< footnote >}} and
+      # {{< sidenote >}} (footnote list at the end of the page);
+      # footnotes-and-sidenotes does the same with footnoteplacement: section.
+      - name: Check footnotes and sidenotes together
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          need() { [ -f "$1" ] || fail "missing $1"; }
+          # Every in-page footnote link has its target, in both directions.
+          links() {
+            local f=$1 h
+            for h in $(grep -o 'href="#fn\(ref\)\?-[^"]*"' "$f" | sed 's/^href="#//; s/"$//' | sort -u); do
+              grep -q " id=\"$h\"" "$f" || fail "dangling footnote link #$h in $f"
+            done
+          }
+          nodups() {
+            local dups
+            dups=$(grep -o ' id="[^"]*"' "$1" | sort | uniq -d || true)
+            [ -z "$dups" ] || fail "duplicate ids in $1: $dups"
+          }
+          common() {
+            local f=$1
+            need "$f"
+            grep -q 'class="margin-toggle sidenote-number"' "$f" || fail "no sidenote in $f"
+            grep -q '<sup class="footnote-ref" id="fnref-' "$f" || fail "no footnote reference in $f"
+            grep -q 'class="footnotes-list"' "$f" || fail "no footnote list in $f"
+            grep -q '<li id="fn-[^"]*" class="footnote-item"' "$f" || fail "no footnote item in $f"
+            grep -q 'class="footnote-backref"' "$f" || fail "no footnote backlink in $f"
+            # The page has numbered sidenotes, so footnotestyle "auto" uses letters.
+            grep -q 'role="doc-noteref">a</a></sup>' "$f" || fail "first footnote is not marked \"a\" in $f"
+            if grep -q '<div class="footnotes"' "$f"; then fail "Goldmark footnote div left in $f"; fi
+            if grep -q 'href="#fn:' "$f"; then fail "Goldmark footnote link left in $f"; fi
+            if grep -q 'class="tufte-fn"' "$f"; then fail "unresolved footnote marker in $f"; fi
+            links "$f"
+            nodups "$f"
+          }
+
+          P=public/posts/footnotes-as-sidenotes/index.html
+          common "$P"
+          [ "$(grep -o 'class="footnotes-list"' "$P" | wc -l)" -eq 1 ] || fail "footnoteplacement page: expected one footnote list in $P"
+          # <section class="footnotes footnotes-STYLE" …> (STYLE: arabic, alpha, roman, symbol)
+          grep -qE '<section class="footnotes( [^"]*)?" role="doc-endnotes"' "$P" || fail "no section.footnotes in $P"
+
+          S=public/posts/footnotes-and-sidenotes/index.html
+          common "$S"
+          [ "$(grep -o 'class="footnotes-list"' "$S" | wc -l)" -ge 2 ] || fail "footnoteplacement section: expected a footnote list per section in $S"
+          grep -q '<div class="footnotes footnotes-section' "$S" || fail "footnoteplacement section: no div.footnotes.footnotes-section in $S"
+
+          # Summaries on list pages: no footnote link without its target.
+          for f in public/index.html public/posts/index.html; do
+            need "$f"; links "$f"; nodups "$f"
+          done
+
+      - name: Check footnotes and sidenotes (sections = none, footnotes = endnotes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          # This build is minified: attribute quotes may be dropped.
+          for f in public-variant/posts/footnotes-as-sidenotes/index.html public-variant/posts/footnotes-and-sidenotes/index.html; do
+            [ -f "$f" ] || fail "missing $f"
+            # endnotes mode: [^x] are real footnotes, the shortcodes keep their kind.
+            grep -q 'class="margin-toggle sidenote-number' "$f" || fail "sidenote shortcode lost in $f"
+            grep -qE 'class="?footnotes-list' "$f" || fail "no footnote list in $f"
+            if grep -qE 'href="?#fn:' "$f"; then fail "Goldmark footnote link left in $f"; fi
+            for h in $(grep -oE 'href="?#fn(ref)?-[^" >]*' "$f" | sed -E 's/^href="?#//' | sort -u); do
+              grep -qE " id=\"?$h(\"|[ >])" "$f" || fail "dangling footnote link #$h in $f"
+            done
+            dups=$(grep -oE ' id="?[^" >]*' "$f" | sed 's/"//' | sort | uniq -d || true)
+            [ -z "$dups" ] || fail "duplicate ids in $f: $dups"
+          done
+
+      # tufte-latex parity (SPEC-LATEX §10): the acceptance matrix, run on the
+      # default build. The script is written once and reused by the variant
+      # builds below ("markers" mode: only unresolved markers and duplicate ids,
+      # since a variant legitimately changes numbering and layout).
+      - name: Write the tufte-latex acceptance script
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/tufte-latex-check.sh" <<'TUFTE_LATEX_CHECK'
+          #!/usr/bin/env bash
+          # tufte-latex acceptance matrix (SPEC-LATEX §10), run inside the public dir.
+          set -uo pipefail
+          cd "${1:-public}"
+          mode=${2:-full}   # full: the default build; markers: only markers and ids (variant builds)
+          errs=0
+          fail() { echo "::error::$*"; errs=$((errs+1)); }
+          need() { [ -f "$1" ] || { fail "missing $1"; return 1; }; }
+
+          # 1. No unresolved markers anywhere.
+          for pat in 'TUFTENEST' 'raw HTML omitted' 'class="sn-end"' 'class="cap-end"' 'class="tufte-float"' 'class="tufte-block' 'TUFTEBLOCK' 'TUFTEFIGURE' 'TUFTEXREF' '&lt;a class=&#34;xref' 'class="xref xref-missing"' '<span class="tufte-num"[^>]*></span>' 'class="tufte-placeholder"' 'class="bib-entry bib-missing"'; do
+            hits=$(grep -rlE --include='*.html' "$pat" . || true)
+            [ -z "$hits" ] || fail "unresolved marker /$pat/ in: $(echo $hits)"
+          done
+
+          # 2. Unique ids in every HTML page (including the book's print.html).
+          while IFS= read -r f; do
+            dups=$(grep -oE ' id="[^"]*"' "$f" | sort | uniq -d || true)
+            [ -z "$dups" ] || fail "duplicate ids in $f: $(echo $dups)"
+          done < <(find . -name '*.html' -not -path './tags/*' -not -path './categories/*')
+
+          if [ "$mode" = markers ]; then
+            [ "$errs" -eq 0 ] && echo "tufte-latex markers: all checks passed" && exit 0
+            echo "$errs check(s) failed"; exit 1
+          fi
+
+          # 3. Tufte CSS showcase stays unnumbered (R12): no labels, no xrefs there.
+          T=posts/tufte-css/index.html
+          need "$T" && { grep -q 'class="caption-label"' "$T" && fail "$T: figures numbered in the Tufte CSS port"; }
+
+          # 4. Handout: figures 1, 2, 3 and table 1; automatic bibliography; LaTeX title block.
+          H=posts/sample-handout/index.html
+          if need "$H"; then
+            nums=$(grep -oE 'data-kind="(figure|table)"[^>]*>[0-9]+<' "$H" | sed -E 's/data-kind="([a-z]+)".*>([0-9]+)</\1\2/' | tr '\n' ' ')
+            [ "$nums" = "figure1 figure2 figure3 table1 " ] || fail "$H: float numbers are '$nums'"
+            grep -q '<h2 id="tufte-references">' "$H" || fail "$H: no automatic bibliography"
+            grep -q 'class="sidenote citation"' "$H" || fail "$H: no citation sidenote"
+            grep -q 'tufte-handout' "$H" || fail "$H: body class tufte-handout missing"
+            grep -q 'title-block latex' "$H" || fail "$H: no LaTeX title block"
+          fi
+
+          # 5. Book: landing, print view, continuous numbering, cross-chapter xrefs, index.
+          BK=books/sample-book
+          for f in index.html print.html tufte-design/index.html tufte-book/index.html introduction/index.html troubleshooting/index.html general-index/index.html bibliography/index.html figures/index.html tables/index.html; do need "$BK/$f"; done
+          grep -q 'class="book-toc"' "$BK/index.html" || fail "$BK: no table of contents on the landing page"
+          grep -q 'class="title-page"' "$BK/index.html" || fail "$BK: no title page"
+          grep -q 'tufte-book' "$BK/tufte-book/index.html" || fail "$BK: body class tufte-book missing"
+          # sidenote counter-reset grows monotonically along the chapters
+          prev=-1
+          for c in tufte-design tufte-book customizing compatibility troubleshooting; do
+            n=$(grep -oE 'counter-reset: ?sidenote-counter [0-9]+' "$BK/$c/index.html" | grep -oE '[0-9]+$' || echo 0)
+            [ "$n" -ge "$prev" ] || fail "$BK/$c: sidenote counter-reset $n < $prev"
+            prev=$n
+          done
+          # tables continue across chapters: tufte-book's first numbered table follows tufte-design's last
+          last1=$(grep -oE 'data-kind="table"[^>]*>[0-9]+<' "$BK/tufte-design/index.html" | grep -oE '>[0-9]+<' | tr -d '<>' | tail -1)
+          first2=$(grep -oE 'data-kind="table"[^>]*>[0-9]+<' "$BK/tufte-book/index.html" | grep -oE '>[0-9]+<' | tr -d '<>' | head -1)
+          [ -n "$last1" ] && [ -n "$first2" ] && [ "$first2" -eq $((last1+1)) ] || fail "$BK: tables do not continue across chapters ($last1 → $first2)"
+          # cross-chapter references, forward (introduction → tufte-book) and backward (troubleshooting → tufte-book)
+          grep -q 'class="xref" href="/books/sample-book/tufte-book/' "$BK/introduction/index.html" || fail "$BK: no forward cross-chapter xref"
+          grep -q 'class="xref" href="/books/sample-book/tufte-book/#fig-marginfig"' "$BK/troubleshooting/index.html" || fail "$BK: no backward cross-chapter xref"
+          # footnotemark inside {{< table >}} and its lone footnotetext
+          grep -qE '<label for="sn-[0-9a-f]+-ft-frontispiece"' "$BK/tufte-design/index.html" || fail "$BK: footnotemark missing"
+          grep -q 'class="footnotetext-anchor"' "$BK/tufte-design/index.html" || fail "$BK: footnotetext missing"
+          grep -q '<p><p class="footnotetext-anchor"' "$BK/tufte-design/index.html" && fail "$BK: footnotetext wrapped in <p>"
+          # lists, bibliography, index
+          grep -q 'class="tufte-lof"' "$BK/figures/index.html" || fail "$BK: empty list of figures"
+          grep -q 'class="tufte-lof"' "$BK/tables/index.html" || fail "$BK: empty list of tables"
+          grep -q 'class="bibliography-list"' "$BK/bibliography/index.html" || fail "$BK: no bibliography list"
+          grep -q 'fonts, <em>see</em> typefaces' "$BK/general-index/index.html" || fail "$BK: index lacks 'fonts, see typefaces'"
+
+          # 6. camelCase options take effect: numberChapters in the parts demo.
+          PD=books/parts-demo
+          if [ -d "$PD" ]; then
+            grep -rqE 'class="chapter-number"' "$PD" || fail "$PD: numberChapters = true did not number the chapters"
+            grep -rq 'class="part-number"' "$PD" || fail "$PD: no part numbers"
+            # a .bib page resource of the book bundle (bibliography: refs.bib), read by the BibTeX reader
+            grep -q 'id="ref-knuth1984"' "$PD/bibliography/index.html" || fail "$PD: refs.bib entries missing from the bibliography"
+            # book root `frontispiece`: an unnumbered figure before the title page
+            grep -q '<section class="frontispiece"><figure class="tufte-figure">' "$PD/index.html" || fail "$PD: no frontispiece on the landing page"
+          fi
+
+          # 7. Cheat-sheet page: nested shortcodes in a sidenote, every placeholder resolved.
+          L=posts/latex-to-hugo/index.html
+          if need "$L"; then
+            grep -oE '<span class="sidenote"[^>]*>.*' "$L" | grep -q 'class="smallcaps"' || fail "$L: smallcaps inside a sidenote not rendered"
+            grep -q 'href="#sn-demo">Note' "$L" || fail "$L: labelled sidenote not referenced"
+            grep -q 'class="tufte-index' "$L" || fail "$L: no index"
+            grep -q '<sup class="footnote-ref" id="fnref-' "$L" || fail "$L: no real footnote (footnote shortcode, [^fn-x])"
+            grep -q 'data-kind="listing"><li>' "$L" || fail "$L: no list of listings"
+          fi
+          # a summary with a forward xref resolves on the list page
+          grep -qE 'class="xref"[^>]*>The cheat sheet<' posts/index.html || fail "posts/index.html: forward xref in the latex-to-hugo summary not resolved"
+
+          [ "$errs" -eq 0 ] && echo "tufte-latex acceptance: all checks passed" || { echo "$errs check(s) failed"; exit 1; }
+          TUFTE_LATEX_CHECK
+          chmod +x "$RUNNER_TEMP/tufte-latex-check.sh"
+
+      - name: Check tufte-latex parity (handout, book, cheat sheet)
+        shell: bash
+        run: '"$RUNNER_TEMP/tufte-latex-check.sh" public full'
+
+      # The LaTeX preset everywhere (justified off, hyphenation, indentation,
+      # old-style figures, numbered floats, plainnat, running heads). Not
+      # minified, so that the marker checks can match quoted attributes.
+      - name: Build (tufte.style = latex)
+        env:
+          HUGO_PARAMS_TUFTE_STYLE: latex
+        run: hugo --gc --panicOnWarning --destination public-latex
+
+      - name: Check tufte-latex markers (tufte.style = latex)
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/tufte-latex-check.sh" public-latex markers
+          grep -q 'tufte-style-latex' public-latex/posts/tufte-css/index.html || { echo "::error::style preset not applied"; exit 1; }
+
+      # KaTeX in the browser: the TeX stays in the HTML and the page loads
+      # katex.min.js and auto-render of the same release as the stylesheet.
+      - name: Build (math.engine = client)
+        env:
+          HUGO_PARAMS_MATH_ENGINE: client
+        run: hugo --gc --panicOnWarning --destination public-client
+
+      - name: Check KaTeX in the browser (math.engine = client)
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          "$RUNNER_TEMP/tufte-latex-check.sh" public-client markers
+          M=public-client/posts/math-and-code/index.html
+          [ -f "$M" ] || fail "missing $M"
+          grep -q 'class="math math-inline"' "$M" || fail "no client-side math in $M"
+          css=$(grep -oE 'katex@[0-9.]+/dist/katex\.min\.css' "$M" | head -1 | cut -d/ -f1)
+          js=$(grep -oE 'katex@[0-9.]+/dist/katex\.min\.js' "$M" | head -1 | cut -d/ -f1)
+          [ -n "$css" ] && [ "$css" = "$js" ] || fail "KaTeX stylesheet ($css) and script ($js) differ in $M"
+          # Book landings have no pager: no /page/N/ copies of print.html.
+          if find public-client -path '*/page/*' -name print.html | grep -q .; then fail "paginated copies of print.html"; fi
+
+      - name: Build (A4 paper, nobib, numbered sections)
+        env:
+          HUGO_PARAMS_TUFTE_PRINT_PAPER: a4
+          HUGO_PARAMS_TUFTE_BIBLIOGRAPHY_MARGIN: "false"
+          HUGO_PARAMS_TUFTE_HEADINGS_NUMBER: "2"
+        run: hugo --gc --panicOnWarning --destination public-a4
+
+      - name: Check tufte-latex markers (A4 paper, nobib, numbered sections)
+        shell: bash
+        run: '"$RUNNER_TEMP/tufte-latex-check.sh" public-a4 markers'
+
+      # Scale regression: a generated 150-chapter book (html + print), each
+      # chapter with sidenotes, cross-chapter xrefs, labelled figures, cites
+      # and index entries. The theme memoizes its cross-page results in
+      # .Store; when they sat only in partialCached's bounded cache, such a
+      # book took minutes instead of seconds.
+      - name: Build a 150-chapter book within the time limit
+        shell: bash
+        run: |
+          set -euo pipefail
+          B="$RUNNER_TEMP/bigbook"
+          mkdir -p "$B/content/books/big" "$B/data"
+          cp data/bibliography.yaml "$B/data/"
+          cat > "$B/hugo.toml" <<EOF
+          baseURL = "https://example.org/"
+          title = "Big book"
+          theme = "tufte.hugo"
+          themesDir = "$GITHUB_WORKSPACE"
+          [markup.goldmark.parser]
+            wrapStandAloneImageWithinParagraph = false
+            [markup.goldmark.parser.attribute]
+              block = true
+          [markup.goldmark.extensions.passthrough]
+            enable = true
+            [markup.goldmark.extensions.passthrough.delimiters]
+              inline = [['\$', '\$']]
+              block = [['\$\$', '\$\$']]
+          EOF
+          printf -- '---\ntitle: Big\nbook: true\noutputs: [html, print]\n---\n' > "$B/content/books/big/_index.md"
+          for i in $(seq 1 150); do
+            p=$(( i > 1 ? i - 1 : 1 ))
+            f="$B/content/books/big/ch$(printf %03d "$i").md"
+            printf -- '---\ntitle: Chapter %d\nweight: %d\n---\n' "$i" "$i" > "$f"
+            for s in 0 1 2 3; do
+              printf '## Section %d {#sec:c%d-s%d}\n\n' "$s" "$i" "$s" >> "$f"
+              for n in 0 1 2; do
+                printf 'Text{{< sidenote >}}note %d.%d with $x_%d${{< /sidenote >}} {{< index "term%d!sub%d" >}} see {{< xref "fig:c%d-f%d" "full" >}} {{< cite "tufte2006" >}}.\n\n' "$s" "$n" "$n" "$n" "$s" "$p" "$s" >> "$f"
+              done
+              printf '{{< figure src="/x.png" caption="Figure %d-%d" label="fig:c%d-f%d" >}}\n\n' "$i" "$s" "$i" "$s" >> "$f"
+            done
+          done
+          printf -- '---\ntitle: Figures\nmatter: back\nweight: 1\n---\n{{< listoffigures heading="" >}}\n' > "$B/content/books/big/zz-figs.md"
+          printf -- '---\ntitle: Bibliography\nmatter: back\nweight: 2\n---\n{{< bibliography heading="" >}}\n' > "$B/content/books/big/zz-bib.md"
+          printf -- '---\ntitle: Index\nmatter: back\nweight: 3\n---\n{{< printindex >}}\n' > "$B/content/books/big/zz-index.md"
+          start=$(date +%s)
+          timeout 240 hugo --source "$B" --destination "$B/public" --panicOnWarning
+          echo "built in $(( $(date +%s) - start ))s"
+          # Chapter 150 refers to the first figure of chapter 149: 148 × 4 + 1.
+          grep -q '>Figure&nbsp;593</a>' "$B/public/books/big/ch150/index.html" || { echo "::error::cross-chapter xref not resolved"; exit 1; }
+          grep -q -- '-fig-c150-f3"' "$B/public/books/big/print.html" || { echo "::error::print document incomplete"; exit 1; }

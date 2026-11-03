@@ -1,16 +1,11 @@
 {{- /*
   Table of contents of a single page, when the "toc" param (front matter,
-  else site params) is true and the page has headings. Hugo wraps the list
-  in <nav id="TableOfContents">; that wrapper is dropped so the list sits
-  directly in nav.toc. Heading levels follow markup.tableOfContents.
+  else site params) is true and the page has headings. The markup and the
+  stripping of margin material are in tufte/page-toc.html (also used by
+  the `tableofcontents` shortcode outside a book). Book contents are
+  tufte/book/toc.html.
   Takes: the page.
 */ -}}
 {{- if .Param "toc" -}}
-  {{- $toc := .TableOfContents -}}
-  {{- if findRE `<li>` $toc 1 }}
-<nav class="toc" aria-label="{{ T "tableOfContents" }}">
-  <p class="sans">{{ T "tableOfContents" }}</p>
-  {{ replaceRE `</?nav[^>]*>` "" $toc | strings.TrimSpace | safeHTML }}
-</nav>
-  {{- end -}}
+{{ partial "tufte/page-toc.html" . }}
 {{- end -}}

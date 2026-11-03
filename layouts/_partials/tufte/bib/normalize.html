@@ -1,0 +1,272 @@
+{{- /*
+  Normalises one raw bibliography entry (SPEC-LATEX §5.2).
+
+  Takes: dict "entry" (a native map or a CSL item, as returned by db.html)
+              "key"   (the lowercased cite key)
+  Returns: a dict with plain-text string fields (not HTML-escaped; braces
+  removed outside math), where math ($…$, \(…\)) and \url{…} /
+  \nolinkurl{…} are kept as written and a literal dollar is \$
+  (tufte/bib/tex-split.html; format.html renders them):
+    key type authors editors title container publisher place year month
+    volume issue number pages edition series institution school
+    organization howpublished note isbn doi url chapter sortkey
+  where `authors`/`editors` are slices of dict {given family literal} and
+  `month` is a string "1".."12" (or the original text when unrecognised).
+
+  Names: a string is split on " and " (BibTeX); "Last, First" is split at
+  the comma, otherwise the last word is the family name; a fully braced
+  name ({Barnes and Noble}) is literal. Lists may hold strings or maps
+  {family, given} / {literal} (CSL; particles are kept with the family).
+  CSL types map to BibTeX ones (§5.1).
+*/ -}}
+{{- $e := .entry | default dict -}}
+{{- $key := .key | default "" -}}
+{{- $isCSL := or (isset $e "id") (isset $e "issued") (isset $e "container-title") (isset $e "container_title") -}}
+
+{{- /* field getter: first non-empty value among the given names */ -}}
+{{- $F := newScratch -}}
+{{- $fields := dict
+  "title" (slice "title")
+  "container" (slice "journal" "journaltitle" "booktitle" "container-title" "container_title")
+  "publisher" (slice "publisher")
+  "place" (slice "address" "place" "location" "publisher-place" "publisher_place")
+  "volume" (slice "volume")
+  "issue" (slice "number" "issue")
+  "number" (slice "number" "issue")
+  "pages" (slice "pages" "page")
+  "edition" (slice "edition")
+  "series" (slice "series" "collection-title")
+  "institution" (slice "institution")
+  "school" (slice "school")
+  "organization" (slice "organization")
+  "howpublished" (slice "howpublished")
+  "note" (slice "note" "addendum")
+  "isbn" (slice "isbn" "ISBN")
+  "doi" (slice "doi" "DOI")
+  "url" (slice "url" "URL")
+  "chapter" (slice "chapter")
+-}}
+{{- range $name, $alts := $fields -}}
+  {{- $val := "" -}}
+  {{- range $alts -}}
+    {{- if not $val -}}
+      {{- with index $e . -}}
+        {{- if reflect.IsSlice . -}}
+          {{- $val = delimit . ", " -}}
+        {{- else if not (reflect.IsMap .) -}}
+          {{- $val = printf "%v" . -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* light LaTeX clean-up for hand-written data (.bib files are
+         converted fully by bibtex.html) */ -}}
+  {{- if in (slice "url" "doi" "isbn") $name -}}
+    {{- if strings.Contains $val "\\" -}}
+      {{- $val = replaceRE `\\(?:url|nolinkurl|doi)\s*\{([^{}]*)\}` "$1" $val -}}
+      {{- $val = replaceRE `\\([%$_#&])` "$1" $val -}}
+    {{- end -}}
+    {{- $val = trim (replaceRE `[{}]` "" $val) " \t\n" -}}
+  {{- else -}}
+    {{- /* outside math and \url{…} only (tufte/bib/tex-split.html); a
+           literal \$ stays escaped for format.html */ -}}
+    {{- $segs := slice (dict "k" "t" "s" $val) -}}
+    {{- if findRE `\$|\\\(|\\(?:url|nolinkurl)\b` $val 1 }}{{ $segs = partial "tufte/bib/tex-split.html" $val }}{{ end -}}
+    {{- $joined := "" -}}
+    {{- range $segs -}}
+      {{- $t := .s -}}
+      {{- if eq .k "t" -}}
+        {{- if strings.Contains $t "\\" -}}
+          {{- $t = replaceRE `\\href\s*\{[^{}]*\}\s*\{([^{}]*)\}` "$1" $t -}}
+          {{- $t = replaceRE `\\(?:texttt|textit|textbf|textsc|textsf|textrm|emph|mbox|doi)\s*\{([^{}]*)\}` "$1" $t -}}
+          {{- $t = replace (replace (replace $t "\\LaTeX" "LaTeX") "\\TeX" "TeX") "\\&" "&" -}}
+          {{- $t = replaceRE `\\([%_#])` "$1" $t -}}
+          {{- $t = replace $t "\\ " " " -}}
+        {{- end -}}
+        {{- $t = replaceRE `[{}]` "" $t -}}
+      {{- end -}}
+      {{- $joined = printf "%s%s" $joined $t -}}
+    {{- end -}}
+    {{- $val = trim (replaceRE `\s+` " " $joined) " " -}}
+  {{- end -}}
+  {{- $F.Set $name $val -}}
+{{- end -}}
+
+{{- /* CSL: institution/school of reports and theses live in publisher */ -}}
+{{- $type := lower (printf "%v" (index $e "type" | default "misc")) -}}
+{{- if $isCSL -}}
+  {{- $map := dict
+    "book" "book" "article-journal" "article" "article" "article" "article-magazine" "article"
+    "article-newspaper" "article" "chapter" "incollection" "paper-conference" "inproceedings"
+    "thesis" "phdthesis" "report" "techreport" "webpage" "online" "post-weblog" "online"
+    "manuscript" "unpublished" -}}
+  {{- $type = index $map $type | default "misc" -}}
+  {{- if and (eq $type "phdthesis") (not ($F.Get "school")) }}{{ $F.Set "school" ($F.Get "publisher") }}{{ $F.Set "publisher" "" }}{{ end -}}
+  {{- if and (eq $type "techreport") (not ($F.Get "institution")) }}{{ $F.Set "institution" ($F.Get "publisher") }}{{ $F.Set "publisher" "" }}{{ end -}}
+  {{- with index $e "genre" -}}
+    {{- if and (eq $type "phdthesis") (findRE `(?i)master` (printf "%v" .) 1) }}{{ $type = "mastersthesis" }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- $type = replace $type "conference" "inproceedings" -}}
+{{- if eq $type "www" }}{{ $type = "online" }}{{ end -}}
+{{- if eq $type "electronic" }}{{ $type = "online" }}{{ end -}}
+{{- if eq $type "inbook" }}{{ $type = "incollection" }}{{ end -}}
+
+{{- /* names */ -}}
+{{- $N := newScratch -}}
+{{- range $role := slice "author" "editor" -}}
+  {{- $N.Set $role slice -}}
+  {{- $raw := index $e $role -}}
+  {{- $list := slice -}}
+  {{- if reflect.IsSlice $raw -}}
+    {{- $list = $raw -}}
+  {{- else if $raw -}}
+    {{- $s := printf "%v" $raw -}}
+    {{- /* protect spaces inside braces so " and " there does not split */ -}}
+    {{- range findRE `\{[^{}]*\}` $s -}}
+      {{- $s = replace $s . (replace . " " "\x1e") -}}
+    {{- end -}}
+    {{- range split (replaceRE `\s+and\s+` "\x1f" (trim $s " ")) "\x1f" -}}
+      {{- $list = $list | append . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $list -}}
+    {{- $n := dict "given" "" "family" "" "literal" "" -}}
+    {{- if reflect.IsMap . -}}
+      {{- $fam := printf "%v" (or (index . "family") (index . "last") "") -}}
+      {{- with or (index . "non-dropping-particle") (index . "non_dropping_particle") }}{{ $fam = printf "%v %s" . $fam }}{{ end -}}
+      {{- $giv := printf "%v" (or (index . "given") (index . "first") "") -}}
+      {{- with or (index . "dropping-particle") (index . "dropping_particle") }}{{ $giv = printf "%s %v" $giv . }}{{ end -}}
+      {{- with index . "suffix" }}{{ $fam = printf "%s, %v" $fam . }}{{ end -}}
+      {{- $lit := printf "%v" (or (index . "literal") (index . "name") "") -}}
+      {{- $n = dict "given" (trim $giv " ") "family" (trim $fam " ") "literal" (trim $lit " ") -}}
+    {{- else -}}
+      {{- $s := trim (printf "%v" .) " \t\n" -}}
+      {{- if findRE `^\{[^{}]*\}$` $s 1 -}}
+        {{- $n = dict "given" "" "family" "" "literal" $s -}}
+      {{- else if strings.Contains $s "," -}}
+        {{- $parts := split $s "," -}}
+        {{- $fam := trim (index $parts 0) " " -}}
+        {{- $giv := trim (index $parts (sub (len $parts) 1)) " " -}}
+        {{- if gt (len $parts) 2 }}{{ $fam = printf "%s, %s" $fam (trim (index $parts 1) " ") }}{{ end -}}
+        {{- $n = dict "given" $giv "family" $fam "literal" "" -}}
+      {{- else -}}
+        {{- $words := split (replaceRE `\s+` " " $s) " " -}}
+        {{- $fam := index $words (sub (len $words) 1) -}}
+        {{- $giv := delimit (first (sub (len $words) 1) $words) " " -}}
+        {{- $n = dict "given" $giv "family" $fam "literal" "" -}}
+      {{- end -}}
+    {{- end -}}
+    {{- /* restore protected spaces, drop braces */ -}}
+    {{- $clean := dict
+      "given" (trim (replaceRE `[{}]` "" (replace $n.given "\x1e" " ")) " ")
+      "family" (trim (replaceRE `[{}]` "" (replace $n.family "\x1e" " ")) " ")
+      "literal" (trim (replaceRE `[{}]` "" (replace $n.literal "\x1e" " ")) " ") -}}
+    {{- if or $clean.given $clean.family $clean.literal -}}
+      {{- $N.Add $role (slice $clean) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* date */ -}}
+{{- $year := "" -}}
+{{- $month := "" -}}
+{{- with index $e "year" }}{{ $year = printf "%v" . }}{{ end -}}
+{{- with index $e "month" }}{{ $month = printf "%v" . }}{{ end -}}
+{{- $date := or (index $e "issued") (index $e "date") -}}
+{{- if and $date (not $year) -}}
+  {{- $d := $date -}}
+  {{- if reflect.IsSlice $d }}{{ $d = index $d 0 }}{{ end -}}
+  {{- if reflect.IsMap $d -}}
+    {{- with or (index $d "date-parts") (index $d "date_parts") -}}
+      {{- $dp := index . 0 -}}
+      {{- if reflect.IsSlice $dp -}}
+        {{- /* Parts may be numbers or strings, zero-padded ("08"): never
+               `int` a string (Hugo reads a leading 0 as octal, so "08"
+               fails). Digits lose their leading zeros; anything else is
+               kept as written (a month name is resolved below). */ -}}
+        {{- range $i, $part := first 2 $dp -}}
+          {{- $s := "" -}}
+          {{- if ne $part nil }}{{ $s = trim (printf "%v" $part) " " }}{{ end -}}
+          {{- with findRESubmatch `^(-?)0*([0-9]+)$` $s 1 }}{{ $s = printf "%s%s" (index (index . 0) 1) (index (index . 0) 2) }}{{ end -}}
+          {{- if eq $i 0 }}{{ $year = $s }}{{ else }}{{ $month = $s }}{{ end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- else -}}
+      {{- with index $d "year" }}{{ $year = printf "%v" . }}{{ end -}}
+      {{- with index $d "month" }}{{ $month = printf "%v" . }}{{ end -}}
+      {{- if not $year -}}
+        {{- with or (index $d "raw") (index $d "literal") }}{{ $d = printf "%v" . }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if and (not $year) (eq (printf "%T" $d) "string") -}}
+    {{- with findRESubmatch `^\s*(-?\d{1,4})(?:-(\d{1,2}))?` $d 1 -}}
+      {{- $year = index (index . 0) 1 -}}
+      {{- with index (index . 0) 2 }}{{ $month = printf "%d" (int (strings.TrimLeft "0" . | default "0")) }}{{ end -}}
+    {{- else -}}
+      {{- $year = $d -}}
+    {{- end -}}
+  {{- else if and (not $year) (not (reflect.IsMap $d)) (not (reflect.IsSlice $d)) -}}
+    {{- $year = printf "%v" $d -}}
+    {{- with findRESubmatch `^(\d{4})-(\d{1,2})` $year 1 -}}
+      {{- $month = printf "%d" (int (strings.TrimLeft "0" (index (index . 0) 2) | default "0")) -}}
+      {{- $year = index (index . 0) 1 -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $year = trim (replaceRE `[{}]` "" $year) " " -}}
+{{- $month = trim (replaceRE `[{}.]` "" $month) " " -}}
+{{- if $month -}}
+  {{- if findRE `^[0-9]+$` $month 1 -}}
+    {{- $m := int (strings.TrimLeft "0" $month | default "0") -}}
+    {{- $month = cond (and (ge $m 1) (le $m 12)) (printf "%d" $m) "" -}}
+  {{- else -}}
+    {{- $months := dict "jan" 1 "feb" 2 "mar" 3 "apr" 4 "may" 5 "jun" 6 "jul" 7 "aug" 8 "sep" 9 "oct" 10 "nov" 11 "dec" 12 -}}
+    {{- with index $months (lower (substr $month 0 3)) }}{{ $month = printf "%d" . }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* pages: hyphens between page numbers → en dash */ -}}
+{{- $pages := replaceRE `([0-9A-Za-z])\s*[-‐‑–]{1,3}\s*([0-9A-Za-z])` "$1–$2" ($F.Get "pages") -}}
+{{- $doi := replaceRE `^(?i)(?:https?://(?:dx\.)?doi\.org/|doi:\s*)` "" ($F.Get "doi") -}}
+
+{{- $authors := $N.Get "author" -}}
+{{- $editors := $N.Get "editor" -}}
+{{- $first := "" -}}
+{{- $fams := slice -}}
+{{- range (cond (gt (len $authors) 0) $authors $editors) -}}
+  {{- $fams = $fams | append (or .family .literal) -}}
+{{- end -}}
+{{- $first = delimit $fams " " -}}
+{{- $title := $F.Get "title" -}}
+{{- $sortkey := lower (printf "%s|%s|%s" (or $first $title) $year $title) -}}
+
+{{- return (dict
+  "key" $key
+  "type" $type
+  "authors" $authors
+  "editors" $editors
+  "title" $title
+  "container" ($F.Get "container")
+  "publisher" ($F.Get "publisher")
+  "place" ($F.Get "place")
+  "year" $year
+  "month" $month
+  "volume" ($F.Get "volume")
+  "issue" ($F.Get "issue")
+  "number" ($F.Get "number")
+  "pages" $pages
+  "edition" ($F.Get "edition")
+  "series" ($F.Get "series")
+  "institution" ($F.Get "institution")
+  "school" ($F.Get "school")
+  "organization" ($F.Get "organization")
+  "howpublished" ($F.Get "howpublished")
+  "note" ($F.Get "note")
+  "isbn" ($F.Get "isbn")
+  "doi" $doi
+  "url" ($F.Get "url")
+  "chapter" ($F.Get "chapter")
+  "sortkey" $sortkey
+) -}}

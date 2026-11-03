@@ -1,15 +1,19 @@
 {{ define "main" }}
+{{- /* A regular page is a book chapter when it sits inside a section whose
+       _index.md sets `book: true` (tufte-book), else a handout
+       (tufte-handout): title block (tufte.titleBlock), abstract, optional
+       page TOC, the content, previous/next links and comments. */ -}}
+{{- with partialCached "tufte/book/root.html" . (or .RelPermalink .Path) }}
+{{ partial "tufte/book/chapter.html" (dict "page" $ "root" .) }}
+{{- else }}
 <article>
-  <h1>{{ .Title }}</h1>
-  {{- with .Params.subtitle }}
-  <p class="subtitle">{{ . }}</p>
-  {{- end }}
-  {{ partial "post-meta.html" . }}
+  {{ partial "tufte/title-block.html" . }}
   {{ partial "toc.html" . }}
   {{ partial "before_content.html" . }}
-  {{ partial "func/content.html" . }}
+  {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
   {{ partial "after_content.html" . }}
   {{ partial "post-nav.html" . }}
   {{ partial "comments.html" . }}
 </article>
+{{- end }}
 {{ end }}

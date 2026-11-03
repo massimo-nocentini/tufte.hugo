@@ -64,6 +64,15 @@ mainSections = ["posts"]
   [params.comments]
     enable = false
 
+  # tufte-latex parity: the site keeps the default preset ("css"), so the
+  # Tufte CSS showcase renders exactly as Tufte CSS does. The handout and the
+  # book switch to the LaTeX look in their own front matter
+  # (`tufte: {style: latex}`). Every key is listed in the theme's README.
+  # [params.tufte]
+  #   style = "css"
+  #   [params.tufte.print]
+  #     paper = "a4"
+
 # Hugo does not merge [markup] from a theme by default (a site could opt in
 # with `_merge = "deep"`), and the theme defines no menus: these settings
 # live in the site configuration.
@@ -113,20 +122,31 @@ mainSections = ["posts"]
   pageRef = "/posts"
   weight = 2
 
+# The two ports of the Tufte-LaTeX samples (a handout and a book).
+[[menu.main]]
+  name = "Handout"
+  pageRef = "/posts/sample-handout"
+  weight = 3
+
+[[menu.main]]
+  name = "Book"
+  pageRef = "/books/sample-book"
+  weight = 4
+
 [[menu.main]]
   name = "Tags"
   pageRef = "/tags"
-  weight = 3
+  weight = 5
 
 [[menu.main]]
   name = "Archives"
   pageRef = "/archives"
-  weight = 4
+  weight = 6
 
 [[menu.main]]
   name = "About"
   pageRef = "/about"
-  weight = 5
+  weight = 7
 
 [outputs]
   home = ["HTML", "RSS"]

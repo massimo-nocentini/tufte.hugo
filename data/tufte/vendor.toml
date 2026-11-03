@@ -1,32 +1,58 @@
-# Third-party assets used by tufte.hugo (read by layouts/_partials/tufte/vendor.html).
+# Third-party assets used by tufte.hugo (read by layouts/_partials/tufte/katex.html
+# and emitted by layouts/_partials/tufte/vendor.html).
 #
-# url        CDN link, pinned to an exact version
-# integrity  its SRI hash (sha384); bump url, version and integrity together
-# version    the version in the url (params.math.katexVersion is compared to it)
-# dir        where the file is published with params.selfHosted = true
+# KaTeX: one [[katex]] entry per supported KaTeX release, NEWEST FIRST.
+#
+#   version  the KaTeX version in the URLs (params.math.katexVersion is
+#            compared to it)
+#   hugo     the first Hugo version whose transform.ToMath (build-time KaTeX)
+#            embeds this release. The theme picks the first entry whose
+#            `hugo` is <= the running Hugo, so that the stylesheet matches
+#            the HTML Hugo generates: KaTeX 0.18 renamed the classes of its
+#            output (base → katex-base, strut → katex-strut, tag → katex-tag,
+#            sizing → katex-sizing), and an older stylesheet leaves that
+#            output unstyled. The client engine loads the JS of the same
+#            entry, so stylesheet and script always agree.
+#              Hugo 0.132.0 – 0.165.x  KaTeX 0.16.x (0.16.21 from 0.144)
+#              Hugo 0.166.0 and later  KaTeX 0.18.4
+#   css, js, autorender
+#            url        CDN link, pinned to the exact version
+#            integrity  its SRI hash (sha384); bump url and hash together
+#   dir      where the files are published with params.selfHosted = true
 #
 # With params.selfHosted = true the theme downloads each file at build time
 # (resources.GetRemote), checks it against the hash and serves it from the
 # site. The KaTeX stylesheet loads its fonts from "fonts/" next to itself, so
-# a self-hosted site must copy KaTeX's dist/fonts/ to static/katex/fonts/.
+# a self-hosted site must copy KaTeX's dist/fonts/ (of the same version) to
+# static/katex/fonts/.
 #
 # Hashes computed with:
 #   curl -sL URL | openssl dgst -sha384 -binary | openssl base64 -A
 
-[katex-css]
-url = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
-integrity = "sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+"
-version = "0.16.11"
+[[katex]]
+version = "0.18.4"
+hugo = "0.166.0"
 dir = "katex"
+  [katex.css]
+  url = "https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.css"
+  integrity = "sha384-u1zONI5gPXUx0UKI62c75/zww972y0v2rSK5ZYlVdS6xEuWDeZWUI66v6t1gvlXJ"
+  [katex.js]
+  url = "https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.js"
+  integrity = "sha384-ykMNcWQhhTUb0YV9SPpPUFURHZ+tWmubkakGBP+OgNK/UXdO2gtzglWx0Rj9hnO3"
+  [katex.autorender]
+  url = "https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/contrib/auto-render.min.js"
+  integrity = "sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz"
 
-[katex-js]
-url = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
-integrity = "sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"
-version = "0.16.11"
+[[katex]]
+version = "0.16.21"
+hugo = "0.0.0"
 dir = "katex"
-
-[katex-auto-render]
-url = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
-integrity = "sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk"
-version = "0.16.11"
-dir = "katex"
+  [katex.css]
+  url = "https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css"
+  integrity = "sha384-zh0CIslj+VczCZtlzBcjt5ppRcsAmDnRem7ESsYwWwg3m/OaJ2l4x7YBZl9Kxxib"
+  [katex.js]
+  url = "https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"
+  integrity = "sha384-Rma6DA2IPUwhNxmrB/7S3Tno0YY7sFu9WSYMCuulLhIqYSGZ2gKCJWIqhBWqMQfh"
+  [katex.autorender]
+  url = "https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
+  integrity = "sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh"

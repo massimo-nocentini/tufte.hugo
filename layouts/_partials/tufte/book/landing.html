@@ -1,0 +1,46 @@
+{{- /*
+  The landing page of a book (the section _index.md with `book: true`),
+  i.e. its front pages in tufte-book order:
+
+    1. half title (`halftitle: true`, print only)
+    2. opening epigraphs (`epigraphs`)
+    3. frontispiece (`frontispiece`, the verso facing the title page)
+    4. full title page (tufte.book.titlepage, default true)
+    5. copyright page (`copyrightPage`)
+    6. contents (tufte.book.toc, default true; depth tufte.book.tocDepth)
+    7. dedication (`dedication`)
+    8. the _index.md content
+
+  Used by list.html (HTML) and list.print.html (the whole-book print
+  document).
+
+  Takes: the book root page.
+  Returns: template.HTML.
+*/ -}}
+{{- $p := . -}}
+{{- $key := (or $p.RelPermalink $p.Path) -}}
+{{- $out := "" -}}
+{{- if partial "tufte/truthy.html" $p.Params.halftitle -}}
+  {{- $t := partial "tufte/plain-title.html" (dict "page" $p "title" $p.Title) -}}
+  {{- $out = printf `%s<section class="half-title print-only"><p>%s</p></section>` $out (htmlEscape $t) -}}
+{{- end -}}
+{{- $out = printf "%s%s" $out (partial "tufte/book/epigraphs.html" $p | string) -}}
+{{- $out = printf "%s%s" $out (partial "tufte/book/frontispiece.html" $p | string) -}}
+{{- if partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.titlepage") $key "book.titlepage") -}}
+  {{- $out = printf "%s%s" $out (partial "tufte/book/titlepage.html" $p | string) -}}
+  {{- /* The abstract (front matter), after the title page. */ -}}
+  {{- $out = printf "%s%s" $out (partial "tufte/abstract.html" $p | string) -}}
+{{- else -}}
+  {{- /* No title page: the handout title block names the book. */ -}}
+  {{- $out = printf "%s%s" $out (partial "tufte/title-block.html" $p | string) -}}
+{{- end -}}
+{{- $out = printf "%s%s" $out (partial "tufte/book/copyright.html" $p | string) -}}
+{{- if partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.toc") $key "book.toc") -}}
+  {{- $out = printf "%s%s" $out (partialCached "tufte/book/toc.html" (dict "root" $p) $key "landing" | string) -}}
+{{- end -}}
+{{- $out = printf "%s%s" $out (partial "tufte/book/dedication.html" $p | string) -}}
+{{- $out = printf "%s%s" $out (partial "before_content.html" $p | string) -}}
+{{- $out = printf "%s%s" $out (partialCached "func/content.html" $p (or $p.RelPermalink $p.Path) false | string) -}}
+{{- $out = printf "%s%s" $out (partial "after_content.html" $p | string) -}}
+{{- $out = printf "<article class=\"book-landing\">\n%s\n</article>" $out -}}
+{{- return ($out | safeHTML) -}}

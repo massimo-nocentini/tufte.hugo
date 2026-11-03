@@ -1,0 +1,119 @@
+{{- /*
+  Notes written inside link text (area B helper, called by
+  tufte/postprocess.html after the footnote references are emitted).
+
+    [see this[^1]](https://x)        [text {{< sidenote >}}…{{< /sidenote >}}](https://x)
+
+  render-link.html prints the link text as Goldmark and the shortcodes made
+  it, so a sidenote, margin note, cite or footnote mark would sit inside the
+  <a>: interactive content (label, checkbox) inside a link, the whole note
+  part of the hyperlink, and a link inside the note (a nested <a>) closes
+  the outer link and the note with it in the browser's parser. As
+  tufte-latex sets \href{url}{text\footnote{…}}, the mark and its note are
+  moved to just after the link's </a>:
+
+  - note triplets <label class="margin-toggle…"></label><input …/><span
+    class="sidenote|marginnote…">…</span>[<i class="sn-end" hidden></i>]
+    (sidenotes, margin notes, citation sidenotes, inline margin figures,
+    footnotes turned sidenotes), and a lone footnotemark <label>;
+  - real footnote references <sup class="footnote-ref">…</sup>;
+  - nobib citations [<a class="citation-ref" …>n</a>, …] (they link to
+    the bibliography);
+  - whitespace just before the first moved mark goes with it.
+  Any other <a> still nested in the link (an xref, a link in link text)
+  is unlinked: it becomes a <span> with its class, so the page has no <a>
+  inside an <a>.
+
+  Takes: the HTML string. Returns: the HTML string (unchanged when no link
+  holds a note or a nested link).
+*/ -}}
+{{- $h := string . -}}
+{{- /* Fast check: an <a> followed, before any </a>, by a label, a
+       footnote reference or another <a>. */ -}}
+{{- if findRE `<a(?:\s[^>]*)?>(?:[^<]|<[^/]|</[^a]|</a[^\s>])*?<(?:label\s|sup class="footnote-ref"|a[\s>])` $h 1 -}}
+  {{- $sep := "TUFTEASPLIT" -}}
+  {{- $segs := split (replaceRE `(<a(?:\s[^>]*)?>|</a\s*>)` (printf "%s$1" $sep) $h) $sep -}}
+  {{- $out := index $segs 0 -}}
+  {{- $depth := 0 -}}
+  {{- $cur := "" -}}
+  {{- $markRE := `(?s)<label for="[^"]*" class="margin-toggle[^"]*"[^>]*>[^<]*</label>(?:<input type="checkbox" id="[^"]*" class="margin-toggle"/>)?|<sup class="footnote-ref"[^>]*>.*?</sup>|\[<a class="citation-ref"[^>]*><span class="cite-num"[^>]*>[^<]*</span></a>(?:, <a class="citation-ref"[^>]*><span class="cite-num"[^>]*>[^<]*</span></a>)*(?:, [^\]<]*)?\]` -}}
+  {{- range $s := after 1 $segs -}}
+    {{- if strings.HasPrefix $s "</a" -}}
+      {{- if eq $depth 0 -}}
+        {{- $out = printf "%s%s" $out $s -}}
+      {{- else -}}
+        {{- $depth = sub $depth 1 -}}
+        {{- if gt $depth 0 -}}
+          {{- $cur = printf "%s%s" $cur $s -}}
+        {{- else -}}
+          {{- /* One outermost link, balanced: $cur is "<a …>INNER", $close
+                 its end tag, $rest the text after it. */ -}}
+          {{- $close := replaceRE `^(</a\s*>)(?s:.*)$` "$1" $s -}}
+          {{- $rest := strings.TrimPrefix $close $s -}}
+          {{- $open := replaceRE `^(<a(?:\s[^>]*)?>)(?s:.*)$` "$1" $cur -}}
+          {{- $inner := strings.TrimPrefix $open $cur -}}
+          {{- $moved := "" -}}
+          {{- if findRE `<(?:label\s|sup class="footnote-ref"|a[\s>])` $inner 1 -}}
+            {{- range findRE $markRE $inner -}}
+              {{- with findRE $markRE $inner 1 -}}
+                {{- $m := index . 0 -}}
+                {{- $before := index (split $inner $m) 0 -}}
+                {{- $after := strings.TrimPrefix (printf "%s%s" $before $m) $inner -}}
+                {{- $piece := $m -}}
+                {{- /* The note's own element (span, balanced), then its
+                       sn-end marker. */ -}}
+                {{- if and (strings.HasSuffix $m "/>") (strings.HasPrefix $after "<span") -}}
+                  {{- $acc := "" -}}
+                  {{- $n := 0 -}}
+                  {{- $done := false -}}
+                  {{- range $chunk := split $after "</span>" -}}
+                    {{- if not $done -}}
+                      {{- $n = add $n (len (findRE `<span[\s>]` $chunk)) -}}
+                      {{- $n = sub $n 1 -}}
+                      {{- $acc = printf "%s%s</span>" $acc $chunk -}}
+                      {{- if le $n 0 }}{{ $done = true }}{{ end -}}
+                    {{- end -}}
+                  {{- end -}}
+                  {{- if and $done (strings.HasPrefix $after $acc) -}}
+                    {{- $piece = printf "%s%s" $piece $acc -}}
+                    {{- $after = strings.TrimPrefix $acc $after -}}
+                  {{- end -}}
+                  {{- with `<i class="sn-end" hidden></i>` -}}
+                    {{- if strings.HasPrefix $after . -}}
+                      {{- $piece = printf "%s%s" $piece . -}}
+                      {{- $after = strings.TrimPrefix . $after -}}
+                    {{- end -}}
+                  {{- end -}}
+                {{- end -}}
+                {{- /* The space before the first mark leaves the link with it. */ -}}
+                {{- if not $moved -}}
+                  {{- with replaceRE `^(?s:.*?)(\s*)$` "$1" $before -}}
+                    {{- $before = strings.TrimSuffix . $before -}}
+                    {{- $piece = printf "%s%s" . $piece -}}
+                  {{- end -}}
+                {{- end -}}
+                {{- $moved = printf "%s%s" $moved $piece -}}
+                {{- $inner = printf "%s%s" $before $after -}}
+              {{- end -}}
+            {{- end -}}
+            {{- /* Links still nested (xref, link in link text) lose
+                   their link. */ -}}
+            {{- if findRE `<a[\s>]` $inner 1 -}}
+              {{- $inner = replaceRE `<a\s(?:[^>]*\s)?class="([^"]*)"[^>]*>` `<span class="$1">` $inner -}}
+              {{- $inner = replaceRE `<a(?:\s[^>]*)?>` "<span>" $inner -}}
+              {{- $inner = replaceRE `</a\s*>` "</span>" $inner -}}
+            {{- end -}}
+          {{- end -}}
+          {{- $out = printf "%s%s%s%s%s%s" $out $open $inner $close $moved $rest -}}
+          {{- $cur = "" -}}
+        {{- end -}}
+      {{- end -}}
+    {{- else -}}
+      {{- $depth = add $depth 1 -}}
+      {{- $cur = printf "%s%s" $cur $s -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* An unclosed link (malformed HTML): left as it was. */ -}}
+  {{- $h = printf "%s%s" $out $cur -}}
+{{- end -}}
+{{- return $h -}}

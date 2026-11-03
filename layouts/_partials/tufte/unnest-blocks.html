@@ -1,0 +1,100 @@
+{{- /*
+  Moves block content out of the paragraph it was written in (SPEC-LATEX
+  R5, tufte/postprocess.html). A block shortcode must stand alone; written
+  inside a paragraph (`Text {{< bibliography >}}`, `Front. {{< figure … >}}`)
+  its HTML lands inside the <p>, which is invalid: the browser closes the
+  paragraph before the block and turns the paragraph's </p> into an empty
+  paragraph, and a placeholder replaced by a generated <h2> splits the
+  section in the middle of the paragraph.
+
+  For each <p> holding a block element (a placeholder, figure, margin
+  block, nested paragraph, list, table…) the paragraph is closed before
+  the block (dropped if only white space precedes it), the block is kept
+  whole (its end found by balancing its tags), and the text after it, if
+  any, opens a new paragraph that the original </p> closes. A margin
+  toggle (label + checkbox) right before the block moves with it, so the
+  toggle still precedes its margin block. When the text before the block
+  has an unclosed inline element (the block sits inside a span, e.g. a
+  note), the paragraph is left as it is.
+
+  Takes a dict:
+    html  the HTML (string)
+  Returns: dict
+    html    the HTML (string)
+    blocks  slice of the opening tags of the moved blocks (for a warning)
+*/ -}}
+{{- $rest := string .html -}}
+{{- $done := "" -}}
+{{- $moved := slice -}}
+{{- $void := slice "area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr" -}}
+{{- $blockRE := `address|article|aside|blockquote|details|dialog|div|dl|fieldset|figcaption|figure|footer|form|h[1-6]|header|hgroup|hr|main|menu|nav|ol|p|pre|section|table|ul` -}}
+{{- /* A <p …> followed, before any </p> or other <p…>, by a block tag. */ -}}
+{{- $findRE := printf `(?s)<p(?:\s[^>]*)?>(?:[^<]|<[^/p]|</[^p]|</p[^>]|<p[^\s>])*?<(?:%s)[\s>/]` $blockRE -}}
+{{- $nameRE := `(?s)^</?([a-zA-Z][a-zA-Z0-9-]*).*$` -}}
+{{- if findRE $findRE $rest 1 -}}
+  {{- range seq 200 -}}
+    {{- $m := index (findRE $findRE $rest 1) 0 | default "" -}}
+    {{- if not $m }}{{ break }}{{ end -}}
+    {{- $pre := index (split $rest $m) 0 -}}
+    {{- $pOpen := replaceRE `(?s)^(<p(?:\s[^>]*)?>).*$` "$1" $m -}}
+    {{- $inl := replaceRE `(?s)<[a-zA-Z0-9]+[\s>/]$` "" (strings.TrimPrefix $pOpen $m) -}}
+    {{- /* A margin toggle right before the block goes with it. */ -}}
+    {{- $toggle := "" -}}
+    {{- with findRE `(?s)<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label><input [^>]*class="margin-toggle"[^>]*/?>\s*$` $inl 1 -}}
+      {{- $toggle = index . 0 -}}
+      {{- $inl = strings.TrimSuffix $toggle $inl -}}
+    {{- end -}}
+    {{- $from := strings.TrimPrefix (printf "%s%s%s%s" $pre $pOpen $inl $toggle) $rest -}}
+    {{- /* Is the text before the block balanced (not inside a span)? */ -}}
+    {{- $open := 0 -}}
+    {{- range findRE `<[^>]*>` $inl -}}
+      {{- $n := replaceRE $nameRE "$1" . | lower -}}
+      {{- if strings.HasPrefix . "</" -}}
+        {{- $open = sub $open 1 -}}
+      {{- else if not (or (strings.HasSuffix . "/>") (in $void $n)) -}}
+        {{- $open = add $open 1 -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if ne $open 0 -}}
+      {{- /* Leave this paragraph alone: keep it up to the block's tag. */ -}}
+      {{- $keep := printf "%s%s%s%s" $pre $pOpen $inl $toggle -}}
+      {{- $done = printf "%s%s" $done $keep -}}
+      {{- $rest = strings.TrimPrefix $keep $rest -}}
+      {{- continue -}}
+    {{- end -}}
+    {{- /* The block, up to its balanced end tag. */ -}}
+    {{- $block := "" -}}
+    {{- $depth := 0 -}}
+    {{- range $t := findRE `<[^>]*>|[^<]+|<` $from -}}
+      {{- $block = printf "%s%s" $block $t -}}
+      {{- if and (strings.HasPrefix $t "<") (gt (len $t) 2) -}}
+        {{- $n := replaceRE $nameRE "$1" $t | lower -}}
+        {{- if strings.HasPrefix $t "</" -}}
+          {{- $depth = sub $depth 1 -}}
+        {{- else if not (or (strings.HasSuffix $t "/>") (in $void $n) (strings.HasPrefix $t "<!")) -}}
+          {{- $depth = add $depth 1 -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if le $depth 0 }}{{ break }}{{ end -}}
+    {{- end -}}
+    {{- $after := strings.TrimPrefix $block $from -}}
+    {{- $head := "" -}}
+    {{- with strings.TrimSpace $inl -}}
+      {{- $head = printf "%s%s</p>\n" $pOpen (strings.TrimRight " \t\n" $inl) -}}
+    {{- end -}}
+    {{- $tail := strings.TrimLeft " \t\n" $after -}}
+    {{- /* A block alone in its paragraph (<p>BLOCK</p>) is unwrapped
+           silently; any text around it is an authoring slip, reported. */ -}}
+    {{- if or $head (not (strings.HasPrefix $tail "</p>")) -}}
+      {{- $moved = $moved | append (replaceRE `(?s)^(<[^>]*>).*$` "$1" $block) -}}
+    {{- end -}}
+    {{- if strings.HasPrefix $tail "</p>" -}}
+      {{- $tail = strings.TrimPrefix "</p>" $tail -}}
+    {{- else -}}
+      {{- $tail = printf "<p>%s" $tail -}}
+    {{- end -}}
+    {{- $done = printf "%s%s%s%s%s\n" $done $pre $head $toggle $block -}}
+    {{- $rest = $tail -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "html" (printf "%s%s" $done $rest) "blocks" $moved) -}}

@@ -4,7 +4,8 @@
  * chrome (header, nav, footer), list pages, post meta, pagination, archive,
  * taxonomy lists, table of contents, post navigation, heading anchors,
  * display math, GitHub-style alerts, Chroma code blocks, tables, iframes,
- * 404, dark mode, the 760px responsive layout and print.
+ * 404, dark mode, the 760px responsive layout and print colours (the print
+ * geometry is in tufte-latex.css).
  *
  * Loaded after tufte.css in the same bundle, so it only refines; it never
  * changes the Tufte typography of article bodies. Widths follow Tufte's
@@ -304,9 +305,13 @@ p.post-meta,
 /* ------------------------------------------------------------------ */
 
 /* Each summary sits inside its own <section> (post-summary.html), so
-   tufte's section > p / ul / ol rules already give it the text column. */
+   tufte's section > p / ul / ol rules already give it the text column.
+   Every summary restarts the sidenote counter, so its notes carry the
+   numbers they have on the page itself (post-summary.html sets a non-zero
+   start inline for book offsets and title-block \thanks notes). */
 div.post-summary {
     margin: 0 0 3.5rem 0;
+    counter-reset: sidenote-counter;
 }
 
 h2.post-summary-title,
@@ -972,9 +977,11 @@ pre {
 /* Endnotes (footnotes = "endnotes")                                   */
 /* ------------------------------------------------------------------ */
 /* Goldmark's div.footnotes > hr + ol sits inside the last section, so
-   tufte's section > ol width does not reach it: keep it in the text column. */
+   tufte's section > ol width does not reach it: keep it in the text column.
+   The section-placed §11 lists (div.footnotes.footnotes-section) take the
+   footnote look of tufte-latex.css (ol.footnotes-list) instead. */
 
-div.footnotes > ol {
+div.footnotes:not(.footnotes-section) > ol {
     width: 50%;
     -webkit-padding-start: 5%;
     padding-inline-start: 5%;
@@ -982,7 +989,7 @@ div.footnotes > ol {
     line-height: 1.6;
 }
 
-div.footnotes li p {
+div.footnotes:not(.footnotes-section) li p {
     width: auto;
     margin: 0.3rem 0;
     font-size: inherit;
@@ -1392,14 +1399,13 @@ figure.video video {
 }
 
 /* ------------------------------------------------------------------ */
-/* Print: a Tufte handout, with notes in the margin                    */
+/* Print: colours and chrome                                           */
 /* ------------------------------------------------------------------ */
+/* The paper geometry (@page size and margins, font size, the text and
+   margin columns, notes and captions in the margin) lives in
+   tufte-latex.css and tufte/head-style.html, from tufte-common.def. */
 
 @media print {
-    @page {
-        margin: 2cm 1.5cm;
-    }
-
     :root,
     :root[data-theme="dark"],
     :root:not([data-theme="light"]) {
@@ -1417,10 +1423,6 @@ figure.video video {
         --tufte-alert-important: #6b4a8f;
         --tufte-alert-warning: #8a5a00;
         --tufte-alert-caution: #a12a2a;
-    }
-
-    html {
-        font-size: 11px;
     }
 
     body {
@@ -1453,42 +1455,8 @@ figure.video video {
     }
 
     .site-header {
-        max-width: 90%;
+        max-width: 100%;
         padding-top: 0;
-    }
-
-    /* Restore the wide layout even when the page is narrower than 760px
-       (an A4 or Letter page is about 700px). Each selector matches or
-       outranks its counterpart in the 760px block above. */
-    hr,
-    section > p,
-    section > footer,
-    section > table,
-    section > details,
-    p.post-meta,
-    .post-meta,
-    section > .math-display,
-    article > .math-display,
-    blockquote:not(.alert) > .math-display,
-    blockquote.alert,
-    section > div.table-wrapper,
-    article > div.table-wrapper,
-    blockquote:not(.alert) > div.table-wrapper,
-    nav.toc,
-    .toc,
-    ul.archive-list,
-    ol.archive-list,
-    ul.taxonomy-list,
-    ol.taxonomy-list,
-    .not-found p {
-        width: 55%;
-    }
-
-    section > dl,
-    section > ol,
-    section > ul,
-    div.footnotes > ol {
-        width: 50%;
     }
 
     /* Paper cannot scroll: let wide equations and tables show in full. */
@@ -1503,76 +1471,14 @@ figure.video video {
         white-space: normal;
     }
 
-    blockquote {
-        margin-left: 40px;
-        margin-right: 40px;
-    }
-
-    blockquote p,
-    blockquote footer {
-        width: 55%;
-    }
-
-    blockquote.alert {
-        margin-left: 0;
-        margin-right: 0;
-    }
-
-    blockquote.alert p,
-    blockquote.alert footer {
-        width: auto;
-    }
-
-    figure {
-        max-width: 55%;
-    }
-
-    figure.fullwidth,
-    div.fullwidth,
-    div.fullwidth:has(> div.highlight),
-    div.highlight.fullwidth,
-    pre.fullwidth {
-        max-width: 90%;
-    }
-
-    div.table-wrapper.fullwidth,
-    div.table-wrapper:has(> table.fullwidth) {
-        width: 90%;
-        max-width: 90%;
-    }
-
-    /* Undo the 760px block's min-width: 100%: tables keep their own width. */
-    div.table-wrapper > table {
-        min-width: 50%;
-    }
-
-    figcaption {
-        max-width: 40%;
-    }
-
-    figure.fullwidth figcaption {
-        margin-right: 24%;
-    }
-
-    img {
-        width: auto;
-        max-width: 100%;
-    }
-
     div.highlight > pre,
     div.highlight > div {
         overflow: visible;
         white-space: pre-wrap;
     }
 
-    section > div.highlight > pre,
-    section > div.highlight > div,
-    article > div.highlight > pre,
-    article > div.highlight > div,
-    blockquote:not(.alert) > div.highlight > pre,
-    blockquote:not(.alert) > div.highlight > div {
-        width: 52.5%;
-        margin-left: 2.5%;
+    pre > code {
+        white-space: pre-wrap;
     }
 
     /* noClasses mode paints light text on a dark inline background, and
@@ -1582,54 +1488,9 @@ figure.video video {
         background: transparent !important;
     }
 
-    pre > code {
-        width: 52.5%;
-        white-space: pre-wrap;
-    }
-
-    pre.fullwidth > code {
-        width: auto;
-        margin-left: 0;
-    }
-
-    div.highlight pre > code {
-        width: auto;
-    }
-
-    .sidenote,
-    .marginnote {
-        display: block;
-        float: right;
-        clear: right;
-        left: auto;
-        margin: 0.3rem -60% 0 0;
-        width: 50%;
-    }
-
-    blockquote .sidenote,
-    blockquote .marginnote {
-        margin-right: -82%;
-        min-width: 59%;
-    }
-
-    blockquote.alert .sidenote,
-    blockquote.alert .marginnote {
-        margin-right: -60%;
-        min-width: 0;
-        width: 50%;
-    }
-
     a:link,
     a:visited {
         text-decoration: none;
-    }
-
-    section > p a[href^="http"]::after {
-        content: " \2039" attr(href) "\203A";
-        font-family: var(--tufte-sans);
-        font-size: 0.8em;
-        word-break: break-all;
-        color: var(--tufte-muted);
     }
 
     h1,

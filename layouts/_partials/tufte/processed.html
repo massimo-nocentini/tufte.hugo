@@ -1,0 +1,28 @@
+{{- /*
+  Phase 2 of a page's content before sectioning: tufte/postprocess.html of
+  its phase-1 HTML (func/content-raw.html), computed once per page and
+  mode. func/content.html (the sections) and tufte/abstract.html (the
+  front-matter abstract it cuts off) both read it, and so does the
+  whole-book print document for every chapter: postprocess does not depend
+  on "print" (add it to the keys below if it ever does).
+
+  Memoized in the page's Store, as content-raw is (not in hugo server, see
+  tufte/opts.html): partialCached's bounded cache would evict it on large
+  books, and the print document would process every chapter again.
+
+  Takes: a dict with page, summary (bool) and optional print (bool).
+  Returns: the HTML string.
+*/ -}}
+{{- $p := .page -}}
+{{- $summary := eq .summary true -}}
+{{- $memoKey := printf "tufteMemoPost|%v" $summary -}}
+{{- $res := "" -}}
+{{- with cond hugo.IsServer nil ($p.Store.Get $memoKey) -}}
+  {{- $res = .v -}}
+{{- else -}}
+  {{- $key := or $p.RelPermalink $p.Path -}}
+  {{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" $summary) $key $summary -}}
+  {{- $res = partialCached "tufte/postprocess.html" (dict "page" $p "html" $raw "summary" $summary "print" (eq .print true)) $key $summary | string -}}
+  {{- if not hugo.IsServer }}{{ $p.Store.Set $memoKey (dict "v" $res) }}{{ end -}}
+{{- end -}}
+{{- return $res -}}

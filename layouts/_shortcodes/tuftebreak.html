@@ -1,0 +1,7 @@
+{{- /*
+  Extra vertical space between paragraphs (block; \tuftebreak, \tufteskip).
+  Put it on its own line: {{< tuftebreak >}}
+
+  Output: <div class="tufte-break" role="separator"></div>
+*/ -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" `<div class="tufte-break" role="separator"></div>`) | safeHTML -}}

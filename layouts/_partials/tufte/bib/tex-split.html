@@ -1,0 +1,44 @@
+{{- /*
+  Splits a bibliography field value into text, math and URL segments, so
+  that the TeX-to-text clean-up (bibtex.html, normalize.html) touches only
+  the text and format.html can typeset the math and link the URLs.
+
+  Takes: a string.
+  Returns: a slice of dicts { k, s, v }:
+    k "t"  text; s = the text (a literal dollar stays escaped as \$)
+    k "m"  math; s = the source with its delimiters, v = the TeX inside
+    k "u"  \url{X}; s = the source, v = X
+    k "n"  \nolinkurl{X}; s = the source, v = X
+  Joining every s gives the input back.
+
+  Math is $…$ (no space right after the opening or before the closing
+  dollar, as pandoc reads it, so "costs $5 and $10" stays text), $$…$$
+  (set inline: an entry is a run of text) and \(…\). An escaped dollar \$
+  is never a delimiter.
+  Callers test first, to skip the regex work on plain values:
+    findRE `\$|\\\(|\\(?:url|nolinkurl)\b` $value 1
+*/ -}}
+{{- $re := `(?s)^(.*?)(\$\$(.+?)\$\$|\$([^\s$](?:[^$]*?[^\s$])?)\$|\\\((.+?)\\\)|\\(url|nolinkurl)\s*\{([^{}]*)\})` -}}
+{{- $rest := replace (printf "%v" .) `\$` "\x1a" -}}
+{{- $segs := slice -}}
+{{- range seq 1000 -}}
+  {{- if not $rest }}{{ break }}{{ end -}}
+  {{- $m := findRESubmatch $re $rest 1 -}}
+  {{- if not $m -}}
+    {{- $segs = $segs | append (dict "k" "t" "s" (replace $rest "\x1a" `\$`)) -}}
+    {{- $rest = "" -}}
+    {{- break -}}
+  {{- end -}}
+  {{- $g := index $m 0 -}}
+  {{- with index $g 1 }}{{ $segs = $segs | append (dict "k" "t" "s" (replace . "\x1a" `\$`)) }}{{ end -}}
+  {{- $src := replace (index $g 2) "\x1a" `\$` -}}
+  {{- with index $g 6 -}}
+    {{- $segs = $segs | append (dict "k" (cond (eq . "url") "u" "n") "s" $src "v" (replace (index $g 7) "\x1a" `\$`)) -}}
+  {{- else -}}
+    {{- $tex := or (index $g 3) (index $g 4) (index $g 5) -}}
+    {{- $segs = $segs | append (dict "k" "m" "s" $src "v" (replace $tex "\x1a" `\$`)) -}}
+  {{- end -}}
+  {{- $rest = strings.TrimPrefix (index $g 0) $rest -}}
+{{- end -}}
+{{- with $rest }}{{ $segs = $segs | append (dict "k" "t" "s" (replace . "\x1a" `\$`)) }}{{ end -}}
+{{- return $segs -}}

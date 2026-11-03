@@ -1,0 +1,269 @@
+{{- /*
+  Formats one bibliography entry like plainnat as used by tufte-latex
+  (SPEC-LATEX §5.3), e.g.
+
+    Edward R. Tufte. <cite>Beautiful Evidence</cite>. Graphics Press, LLC,
+    first edition, May 2006. ISBN 0-9613921-7-7
+
+  Takes: dict
+    "entry"    a normalised entry (normalize.html) or nil (unknown key)
+    "key"      the cite key (defaults to entry.key)
+    "postnote" optional text (e.g. "p. 42") added after the entry, before
+               the final period; a string is escaped, template.HTML is not
+    "page"     optional: the page the entry is shown on; math in the
+               fields ($…$, \(…\), kept by bibtex.html and normalize.html)
+               is typeset with its math engine and sets its hasMath.
+               Without it the math source is printed as written.
+    "margin"   bool: true for entries in the margin (sidenotes, bibentry).
+               Like \bibentry in tufte-latex, margin entries have no final
+               period, and "doi:" is set in small capitals. "ISBN" is in
+               ordinary capitals everywhere, as in the reference PDFs.
+    "wrap"     bool, default true: wrap in <span class="bib-entry"
+               data-cite="key">; false returns only the inner HTML (used by
+               the bibliography list, whose <li> carries the class).
+  Returns: HTML. An unknown key gives
+    <span class="bib-entry bib-missing" data-cite="key">[key?]</span>
+  (the caller warns, since it knows the page).
+
+  Blocks (each ends with "." unless it already ends with . ? or !):
+    names. title[, volume V of Series]. container + publication. extras.
+  For articles, theses, reports and misc the container and the publication
+  data form one block ("Journal, 12(3):45–67, May 2006."); for incollection
+  and inproceedings they are two ("In E, editors, Book, pages 1–9.
+  Publisher, Place, 2006.").
+*/ -}}
+{{- define "_partials/inline/tufte-bib-text.html" -}}
+  {{- /* One field value as HTML: text escaped (\$ → $), math typeset
+         with the page's engine (tufte/math-render.html, which also sets
+         the page's hasMath), \url{X} linked, \nolinkurl{X} as text. */ -}}
+  {{- $s := printf "%v" .s -}}
+  {{- $html := "" -}}
+  {{- if not (findRE `\$|\\\(|\\(?:url|nolinkurl)\b` $s 1) -}}
+    {{- $html = htmlEscape $s -}}
+  {{- else -}}
+    {{- $page := .page -}}
+    {{- $key := .key -}}
+    {{- range partial "tufte/bib/tex-split.html" $s -}}
+      {{- if eq .k "t" -}}
+        {{- $html = printf "%s%s" $html (htmlEscape (replace .s `\$` "$")) -}}
+      {{- else if eq .k "u" -}}
+        {{- $html = printf `%s<a href="%s">%s</a>` $html (htmlEscape .v) (htmlEscape .v) -}}
+      {{- else if eq .k "n" -}}
+        {{- $html = printf "%s%s" $html (htmlEscape .v) -}}
+      {{- else if $page -}}
+        {{- $at := "" -}}
+        {{- with $page.File }}{{ $at = .Path }}{{ else }}{{ $at = $page.RelPermalink }}{{ end -}}
+        {{- $html = printf "%s%s" $html (partial "tufte/math-render.html" (dict "page" $page "inner" .v "block" false "position" (printf "%s, bibliography entry %q" $at $key))) -}}
+      {{- else -}}
+        {{- $html = printf "%s%s" $html (htmlEscape .s) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- return $html -}}
+{{- end -}}
+
+{{- $e := .entry -}}
+{{- $page := .page | default false -}}
+{{- $key := .key | default "" -}}
+{{- if and (not $key) $e }}{{ $key = $e.key }}{{ end -}}
+{{- $margin := .margin | default false -}}
+{{- $wrap := true -}}
+{{- if isset . "wrap" }}{{ $wrap = .wrap }}{{ end -}}
+{{- $post := "" -}}
+{{- with .postnote -}}
+  {{- if eq (printf "%T" .) "template.HTML" }}{{ $post = printf "%s" . }}{{ else }}{{ $post = htmlEscape (printf "%v" .) }}{{ end -}}
+{{- end -}}
+
+{{- $out := "" -}}
+{{- if not $e -}}
+  {{- $out = printf "[%s?]" (htmlEscape $key) -}}
+  {{- if $wrap }}{{ $out = printf `<span class="bib-entry bib-missing" data-cite="%s">%s</span>` (htmlEscape $key) $out }}{{ end -}}
+{{- else -}}
+
+{{- $and := T "and" | default "and" -}}
+{{- $type := $e.type -}}
+
+{{- /* "A", "A and B", "A, B, and C" */ -}}
+{{- $joinNames := dict -}}
+{{- $S := newScratch -}}
+{{- range $role := slice "authors" "editors" -}}
+  {{- $names := slice -}}
+  {{- range index $e $role -}}
+    {{- $names = $names | append (htmlEscape (or .literal (trim (printf "%s %s" .given .family) " "))) -}}
+  {{- end -}}
+  {{- $s := "" -}}
+  {{- if eq (len $names) 1 -}}
+    {{- $s = index $names 0 -}}
+  {{- else if eq (len $names) 2 -}}
+    {{- $s = printf "%s %s %s" (index $names 0) $and (index $names 1) -}}
+  {{- else if gt (len $names) 2 -}}
+    {{- $s = delimit $names ", " (printf ", %s " $and) -}}
+  {{- end -}}
+  {{- $S.Set $role $s -}}
+  {{- $S.Set (printf "%sN" $role) (len $names) -}}
+{{- end -}}
+{{- $editorWord := cond (gt ($S.Get "editorsN") 1) (T "editors" | default "editors") (T "editor" | default "editor") -}}
+
+{{- $blocks := slice -}}
+
+{{- /* 1. names */ -}}
+{{- if $S.Get "authors" -}}
+  {{- $blocks = $blocks | append ($S.Get "authors") -}}
+{{- else if $S.Get "editors" -}}
+  {{- $blocks = $blocks | append (printf "%s, %s" ($S.Get "editors") $editorWord) -}}
+{{- end -}}
+
+{{- /* 2. title */ -}}
+{{- /* Italic only where tufte.bst uses format.btitle (book, manual,
+       theses, proceedings). misc, online, unpublished, booklet and the
+       part-of-a-whole types use format.title, which is upright. */ -}}
+{{- $citeTypes := slice "book" "phdthesis" "mastersthesis" "manual" "proceedings" -}}
+{{- $isCiteTitle := in $citeTypes $type -}}
+{{- with $e.title -}}
+  {{- $t := partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key) -}}
+  {{- if $isCiteTitle }}{{ $t = printf "<cite>%s</cite>" $t }}{{ end -}}
+  {{- if and $e.volume (in (slice "book" "proceedings" "incollection" "inproceedings") $type) -}}
+    {{- $t = printf "%s, %s %s" $t (T "volume" | default "volume") (htmlEscape $e.volume) -}}
+    {{- with $e.series }}{{ $t = printf "%s %s <cite>%s</cite>" $t (T "of" | default "of") (partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key)) }}{{ end -}}
+  {{- end -}}
+  {{- $blocks = $blocks | append $t -}}
+{{- end -}}
+
+{{- /* 3. container */ -}}
+{{- $cont := slice -}}
+{{- $howURL := "" -}}
+{{- if eq $type "article" -}}
+  {{- with $e.container }}{{ $cont = $cont | append (printf "<cite>%s</cite>" (partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key))) }}{{ end -}}
+  {{- $vol := htmlEscape $e.volume -}}
+  {{- with $e.issue }}{{ $vol = printf "%s(%s)" $vol (htmlEscape .) }}{{ end -}}
+  {{- if and $vol $e.pages -}}
+    {{- $cont = $cont | append (printf "%s:%s" $vol (htmlEscape $e.pages)) -}}
+  {{- else if $vol -}}
+    {{- $cont = $cont | append $vol -}}
+  {{- else if $e.pages -}}
+    {{- $cont = $cont | append (printf "%s %s" (T "pages" | default "pages") (htmlEscape $e.pages)) -}}
+  {{- end -}}
+{{- else if in (slice "incollection" "inproceedings") $type -}}
+  {{- $in := T "in" | default "In" -}}
+  {{- $parts := slice -}}
+  {{- if and ($S.Get "authors") ($S.Get "editors") -}}
+    {{- $parts = $parts | append (printf "%s, %s" ($S.Get "editors") $editorWord) -}}
+  {{- end -}}
+  {{- with $e.container }}{{ $parts = $parts | append (printf "<cite>%s</cite>" (partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key))) }}{{ end -}}
+  {{- with $e.chapter }}{{ $parts = $parts | append (printf "%s %s" (T "chapter" | default "chapter") (htmlEscape .)) }}{{ end -}}
+  {{- with $e.pages }}{{ $parts = $parts | append (printf "%s %s" (T "pages" | default "pages") (htmlEscape .)) }}{{ end -}}
+  {{- if $parts -}}
+    {{- $cont = $cont | append (printf "%s %s" $in (delimit $parts ", ")) -}}
+  {{- end -}}
+{{- else if in (slice "phdthesis" "mastersthesis") $type -}}
+  {{- $w := cond (eq $type "phdthesis") (T "phdThesis" | default "PhD thesis") (T "mastersThesis" | default "Master's thesis") -}}
+  {{- $cont = $cont | append (htmlEscape $w) -}}
+  {{- with or $e.school $e.institution }}{{ $cont = $cont | append (partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key)) }}{{ end -}}
+{{- else if eq $type "techreport" -}}
+  {{- $w := htmlEscape (T "techReport" | default "Technical Report") -}}
+  {{- with $e.number }}{{ $w = printf "%s %s" $w (htmlEscape .) }}{{ end -}}
+  {{- $cont = $cont | append $w -}}
+  {{- with or $e.institution $e.organization }}{{ $cont = $cont | append (partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key)) }}{{ end -}}
+{{- else -}}
+  {{- with $e.container }}{{ $cont = $cont | append (printf "<cite>%s</cite>" (partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key))) }}{{ end -}}
+  {{- with $e.howpublished -}}
+    {{- $h := . -}}
+    {{- with findRESubmatch `^\s*(?:URL\s+)?(?:\\url\s*\{)?((?:https?|ftp)://[^\s{}]+)\}?\s*$` $h 1 -}}
+      {{- $howURL = index (index . 0) 1 -}}
+      {{- $cont = $cont | append (printf `<a href="%s">%s</a>` (htmlEscape $howURL) (htmlEscape $howURL)) -}}
+    {{- else -}}
+      {{- $cont = $cont | append (partial "inline/tufte-bib-text.html" (dict "s" $h "page" $page "key" $key)) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* 4. publication: publisher, place, edition, month year */ -}}
+{{- $pub := slice -}}
+{{- $publisher := $e.publisher -}}
+{{- if and (not $publisher) (in (slice "manual" "inproceedings" "proceedings" "misc" "online" "book") $type) }}{{ $publisher = $e.organization }}{{ end -}}
+{{- with $publisher }}{{ $pub = $pub | append (partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key)) }}{{ end -}}
+{{- with $e.place }}{{ $pub = $pub | append (partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key)) }}{{ end -}}
+{{- with $e.edition -}}
+  {{- $ed := . -}}
+  {{- if findRE `^[0-9]+$` $ed 1 -}}
+    {{- $lang := (partial "func/lang.html" site.Language).name -}}
+    {{- if hasPrefix (lower $lang) "en" -}}
+      {{- $n := int $ed -}}
+      {{- $suf := "th" -}}
+      {{- if not (in (slice 11 12 13) (mod $n 100)) -}}
+        {{- $suf = index (dict "1" "st" "2" "nd" "3" "rd") (printf "%d" (mod $n 10)) | default "th" -}}
+      {{- end -}}
+      {{- $ed = printf "%d%s" $n $suf -}}
+    {{- end -}}
+  {{- else if findRE `^[A-Za-z]+$` $ed 1 -}}
+    {{- $ed = lower $ed -}}
+  {{- end -}}
+  {{- $w := T "edition" (dict "Edition" $ed) | default "edition" -}}
+  {{- if not (strings.Contains $w $ed) }}{{ $w = printf "%s %s" $ed $w }}{{ end -}}
+  {{- $pub = $pub | append (htmlEscape $w) -}}
+{{- end -}}
+{{- $date := "" -}}
+{{- with $e.month -}}
+  {{- if findRE `^[0-9]+$` . 1 -}}
+    {{- $date = time.Format "January" (printf "2000-%02d-01" (int .)) -}}
+  {{- else -}}
+    {{- $date = . -}}
+  {{- end -}}
+{{- end -}}
+{{- with $e.year }}{{ $date = trim (printf "%s %s" $date .) " " }}{{ end -}}
+{{- with $date }}{{ $pub = $pub | append (htmlEscape .) }}{{ end -}}
+
+{{- if in (slice "incollection" "inproceedings") $type -}}
+  {{- with $cont }}{{ $blocks = $blocks | append (delimit . ", ") }}{{ end -}}
+  {{- with $pub }}{{ $blocks = $blocks | append (delimit . ", ") }}{{ end -}}
+{{- else -}}
+  {{- $all := $cont -}}
+  {{- range $pub }}{{ $all = $all | append . }}{{ end -}}
+  {{- with $all }}{{ $blocks = $blocks | append (delimit . ", ") }}{{ end -}}
+{{- end -}}
+
+{{- /* 5. extras */ -}}
+{{- with $e.isbn -}}
+  {{- $blocks = $blocks | append (printf "ISBN %s" (htmlEscape .)) -}}
+{{- end -}}
+{{- with $e.doi -}}
+  {{- $w := cond $margin `<span class="smallcaps">doi:</span>` "doi:" -}}
+  {{- $href := printf "https://doi.org/%s" . -}}
+  {{- $blocks = $blocks | append (printf `%s <a href="%s">%s</a>` $w (htmlEscape $href) (htmlEscape .)) -}}
+{{- end -}}
+{{- with $e.url -}}
+  {{- if ne . $howURL -}}
+    {{- if findRE `^(?i)(?:https?|ftp)://` . 1 -}}
+      {{- $blocks = $blocks | append (printf `URL <a href="%s">%s</a>` (htmlEscape .) (htmlEscape .)) -}}
+    {{- else -}}
+      {{- $blocks = $blocks | append (printf "URL %s" (htmlEscape .)) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- with $e.note -}}
+  {{- $blocks = $blocks | append (partial "inline/tufte-bib-text.html" (dict "s" . "page" $page "key" $key)) -}}
+{{- end -}}
+
+{{- /* postnote on the last block, then punctuation */ -}}
+{{- if and $post $blocks -}}
+  {{- $last := sub (len $blocks) 1 -}}
+  {{- $nb := slice -}}
+  {{- range $i, $b := $blocks -}}
+    {{- if eq $i $last }}{{ $b = printf "%s, %s" $b $post }}{{ end -}}
+    {{- $nb = $nb | append $b -}}
+  {{- end -}}
+  {{- $blocks = $nb -}}
+{{- end -}}
+{{- range $i, $b := $blocks -}}
+  {{- $isLast := eq $i (sub (len $blocks) 1) -}}
+  {{- $text := $b | plainify | htmlUnescape | strings.TrimRight " " -}}
+  {{- if and (not (and $isLast $margin)) (not (findRE `[.?!]$` $text 1)) -}}
+    {{- $b = printf "%s." $b -}}
+  {{- end -}}
+  {{- $out = cond (eq $i 0) $b (printf "%s %s" $out $b) -}}
+{{- end -}}
+{{- if $wrap -}}
+  {{- $out = printf `<span class="bib-entry" data-cite="%s">%s</span>` (htmlEscape $key) $out -}}
+{{- end -}}
+{{- end -}}{{- /* if $e */ -}}
+{{- return ($out | safeHTML) -}}

@@ -4,7 +4,24 @@
   a relative destination that names a page (e.g. "../other-post.md" or
   "/about") or a page/global resource is replaced by its relative
   permalink, keeping any query and fragment. Fragment-only links ("#x"),
-  absolute URLs and unresolved paths are left as written.
+  absolute URLs and unresolved paths are left as written (in a summary on
+  a list page, tufte/postprocess.html points "#x" to the page: PAGE#x).
+
+  Notes in the link text ([text[^1]](url), a sidenote, marginnote or cite
+  shortcode) are moved after the </a> by tufte/postprocess.html
+  (tufte/unnest-links.html), and links nested in it are unlinked.
+
+  A linked stand-alone image, [![alt](src "Caption")](url), reaches the
+  image hook with .IsBlock = true and becomes a figure, which may not sit
+  inside an <a> (nor inside the <p> Goldmark keeps around the link). The
+  link then goes inside the figure, around the <img> only, and the figure
+  is wrapped in inert block markers:
+    <i class="tufte-block" hidden></i><figure …>…<a href="URL"><img …/></a>…</figure><i class="tufte-block-end" hidden></i>
+  func/content-raw.html drops the paragraph around a block that is alone
+  in it (the figure stands on its own, like an unlinked block image), and
+  turns a block that shares its paragraph with text into a linked plain
+  image followed by its caption (func/inline-figures.html, which also
+  handles blocks in notes).
 */ -}}
 {{- $href := .Destination -}}
 {{- $u := "" -}}
@@ -39,6 +56,34 @@
 {{- else -}}
   {{- $safe = false -}}
 {{- end -}}
+{{- $text := string .Text -}}
+{{- $img := "" -}}
+{{- if or (strings.Contains $text "<figure") (strings.Contains $text `<p class="margin-figure-anchor`) -}}
+  {{- with findRE `<img [^>]*/>` $text 1 }}{{ $img = index . 0 }}{{ end -}}
+{{- end -}}
+{{- if $img -}}
+  {{- /* As html/template would: only http, https and mailto schemes. */ -}}
+  {{- $h := printf "%v" $href -}}
+  {{- if not $safe -}}
+    {{- with findRESubmatch `^\s*([a-zA-Z][a-zA-Z0-9+.-]*):` $h 1 -}}
+      {{- if not (in (slice "http" "https" "mailto") (lower (index . 0 1))) }}{{ $h = "#ZgotmplZ" }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $a := printf `<a href="%s"%s>%s</a>` (htmlEscape $h) (cond (ne (printf "%v" (.Title | default "")) "") (printf ` title="%s"` (htmlEscape (printf "%v" .Title))) "") $img -}}
+  {{- printf `<i class="tufte-block" hidden></i>%s<i class="tufte-block-end" hidden></i>` (replace $text $img $a 1) | safeHTML -}}
+{{- else -}}
+{{- /* A link whose text is its own address (an autolink <https://…>, a
+       linkified bare URL, [https://x](https://x/)) gets class "url", like
+       \url: print then does not repeat the address after it. Compared
+       without scheme, "www." and trailing slash, case-insensitively. */ -}}
+{{- $isURL := false -}}
+{{- $scheme := `(?i)^(?:[a-z][a-z0-9+.-]*://|mailto:)?(?:www\.)?` -}}
+{{- $pt := htmlUnescape (strings.TrimSpace (string .PlainText)) | replaceRE $scheme "" | strings.TrimRight "/" | lower -}}
+{{- $dt := strings.TrimSpace (string .Destination) | replaceRE $scheme "" | strings.TrimRight "/" | lower -}}
+{{- if and $pt (eq $pt $dt) -}}
+  {{- $isURL = true -}}
+{{- end -}}
 {{- /* Dangerous schemes (javascript:, …) are left to html/template, which neutralises them. */ -}}
-<a href="{{ if $safe }}{{ $href | safeURL }}{{ else }}{{ $href }}{{ end }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text }}</a>
+<a href="{{ if $safe }}{{ $href | safeURL }}{{ else }}{{ $href }}{{ end }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $isURL }} class="url"{{ end }}>{{ .Text }}</a>
+{{- end -}}
 {{- /* no trailing newline */ -}}

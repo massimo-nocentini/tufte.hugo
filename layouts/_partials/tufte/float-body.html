@@ -1,0 +1,73 @@
+{{- /*
+  Body floats (area B helper): the table, fullwidthtable, margintable and
+  listing shortcodes. Renders the shortcode's inner Markdown as blocks and
+  hands it to tufte/figure.html as Body, with the caption in the margin.
+
+  Takes a dict:
+    ctx    the shortcode context
+    inner  its .Inner (the shortcode must read .Inner itself, or Hugo
+           rejects the closing tag)
+    type   "main" | "fullwidth" | "margin" (default: the type param, else main)
+    kind   "table" | "listing"
+    class  extra class of the float (listing style: ruled, boxed, plain)
+
+  Shortcode params (named): caption, label, short, numbered, captionpos,
+  offset, cite, class, type (table only). Without caption, the first
+  paragraph of the inner text is the caption (a \caption inside the
+  environment) and is removed from the body.
+*/ -}}
+{{- $c := .ctx -}}
+{{- $p := $c.Page -}}
+{{- $kind := .kind | default "table" -}}
+{{- $get := dict -}}
+{{- if $c.IsNamedParams }}{{ $get = $c.Params }}{{ else if $c.Params }}{{ warnidf "tufte-bad-option" "%s shortcode: use named parameters, e.g. caption=\"…\" label=\"tab:x\" (%s)" $c.Name $c.Position }}{{ end -}}
+{{- $type := .type | default (index $get "type") | default "main" | lower -}}
+{{- $where := printf "%s shortcode in %v" $c.Name $c.Position -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" (strings.TrimSpace (string .inner)) "display" "block" "where" $where) | string -}}
+{{- /* Goldmark footnotes inside the inner text make a nested list. */ -}}
+{{- if strings.Contains $html `class="footnotes"` -}}
+  {{- warnidf "tufte-raw-html" "tufte.hugo: Markdown footnotes inside the %s shortcode are dropped; use {{< footnotemark \"name\" >}} in the cell and {{< footnotetext \"name\" >}}…{{< /footnotetext >}} after the shortcode (%s)" $c.Name $c.Position -}}
+  {{- $html = replaceRE `(?s)<div class="footnotes"[^>]*>.*?</ol>\s*</div>` "" $html -}}
+  {{- $html = replaceRE `<sup id="fnref[^"]*"><a [^>]*>[^<]*</a></sup>` "" $html -}}
+{{- end -}}
+{{- $caption := printf "%v" (index $get "caption" | default "") -}}
+{{- $capHTML := "" -}}
+{{- if not $caption -}}
+  {{- with findRESubmatch `(?s)^\s*<p>(.*?)</p>` $html 1 -}}
+    {{- $capHTML = index . 0 1 -}}
+    {{- $html = replace $html (index . 0 0) "" 1 -}}
+  {{- end -}}
+{{- end -}}
+{{- $html = strings.TrimSpace $html -}}
+{{- /* A margin float (margintable) already sits in the margin: a sidenote
+       or margin note in its cells cannot float there either, so it is
+       shown inline (tufte/note-in-note.html, as for marginblock and the
+       captions); a cite becomes a citation block, gathered after the
+       caption by tufte/figure.html. */ -}}
+{{- if eq $type "margin" -}}
+  {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $c.Name) "where" $c.Position) -}}
+{{- end -}}
+{{- if eq $type "fullwidth" -}}
+  {{- if findRE `<table[^>]*\sclass="` $html 1 -}}
+    {{- $html = replaceRE `^((?s:.*?))<table([^>]*)\sclass="` `$1<table$2 class="fullwidth ` $html -}}
+  {{- else -}}
+    {{- $html = replace $html "<table" `<table class="fullwidth"` 1 -}}
+  {{- end -}}
+  {{- $html = replace $html `<div class="table-wrapper">` `<div class="table-wrapper fullwidth">` 1 -}}
+{{- end -}}
+{{- $class := delimit (slice (.class | default "") (printf "%v" (index $get "class" | default ""))) " " | strings.TrimSpace -}}
+{{- return (partial "tufte/figure.html" (dict
+  "Page" $p
+  "Body" $html
+  "Kind" $kind
+  "Type" $type
+  "Caption" $caption
+  "CaptionHTML" $capHTML
+  "Class" $class
+  "Label" (index $get "label" | default "")
+  "Short" (index $get "short" | default "")
+  "Numbered" (index $get "numbered")
+  "CaptionPos" (index $get "captionpos" | default "")
+  "Offset" (index $get "offset" | default "")
+  "Cite" (index $get "cite" | default "")
+)) -}}

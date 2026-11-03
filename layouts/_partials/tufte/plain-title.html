@@ -1,0 +1,15 @@
+{{- /*
+  A title as plain text (\title[plain]), for <title>, the OpenGraph,
+  Twitter, schema and RSS metadata, aria labels, the post and book
+  navigation and the running heads: the list-mode output of
+  tufte/title-html.html (Markdown rendered, links unwrapped, math left as
+  written) with the tags removed, so no backticks or asterisks are left
+  while $…$ stays as the author wrote it.
+
+  Takes: a dict with
+    page   the page whose RenderString is used
+    title  optional: the text (default: the page's LinkTitle)
+  Returns: the plain string (not HTML-escaped).
+*/ -}}
+{{- $html := partial "tufte/title-html.html" (dict "page" .page "title" .title) -}}
+{{- return (string $html | plainify | htmlUnescape | strings.TrimSpace) -}}

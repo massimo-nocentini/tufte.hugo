@@ -1,0 +1,42 @@
+{{- /*
+  Index entry (inline; \index), invisible in the text:
+
+    Typefaces{{< index "typefaces" >}} …
+    {{< index "typefaces!sizes" >}}                  sub-entry (at most 3 levels, "!";
+                                                      deeper ones are warned and folded into the third)
+    {{< index "tex@\TeX" >}}                         sort key @ display text
+    {{< index "fonts|see{typefaces}" >}}             cross-reference
+    {{< index "class options|seealso{options}" >}}
+    {{< index "floats|(" >}} … {{< index "floats|)" >}}   page range
+    {{< index term="fonts" see="typefaces" >}}       named form (term, see, seealso)
+
+  The display text of each level is inline Markdown (`code`, *italic*).
+  {{< printindex >}} prints the index of the book or page.
+
+  Output: <span class="index-anchor" id="idx-ID" data-index="RAW"></span>
+*/ -}}
+{{- $raw := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $raw = printf "%v" (.Get "term" | default (.Get "entry") | default "") | strings.TrimSpace -}}
+  {{- with .Get "see" -}}
+    {{- $raw = printf "%s|see{%v}" $raw . -}}
+  {{- else -}}
+    {{- with $.Get "seealso" -}}
+      {{- $raw = printf "%s|seealso{%v}" $raw . -}}
+    {{- end -}}
+  {{- end -}}
+{{- else -}}
+  {{- $raw = printf "%v" (.Get 0 | default "") | strings.TrimSpace -}}
+{{- end -}}
+{{- if or (not $raw) (strings.HasPrefix $raw "|") -}}
+  {{- errorf "index shortcode: an entry is required, e.g. {{< index \"typefaces!sizes\" >}} (%s)" .Position -}}
+{{- end -}}
+{{- /* makeindex allows three levels (a!b!c); the index folds deeper ones
+       into the third (tufte/index/parse.html). */ -}}
+{{- $main := index (split $raw "|") 0 -}}
+{{- if gt (len (split $main "!")) 3 -}}
+  {{- warnidf "tufte-bad-option" "index shortcode: %q has more than 3 levels (a!b!c is the deepest, as in makeindex); the levels after the third are shown as part of it (%s)" $main .Position -}}
+{{- end -}}
+{{- $id := partial "func/note-id.html" .Page -}}
+{{- $out := printf `<span class="index-anchor" id="idx-%s" data-index="%s"></span>` $id (htmlEscape $raw) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

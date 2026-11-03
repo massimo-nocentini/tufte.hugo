@@ -1,0 +1,239 @@
+{{- /*
+  Resolves number tokens and cross-references in a piece of HTML
+  (SPEC-LATEX §3.0.1; steps 3 and 4 of tufte/postprocess.html). Also used
+  on generated HTML that copies phase-1 captions (lists of figures…) and,
+  recursively, on a caption that becomes an xref "name": a \ref inside a
+  \caption prints its number in the LoF and in \nameref.
+
+  Takes a dict:
+    page     the page the HTML belongs to (keys resolve against its labels,
+             then its book's)
+    html     the HTML
+    summary  optional bool: summary mode (no warnings, page links)
+    quiet    optional bool: no warnings (the page itself already warned);
+             an undefined key prints "??"
+    depth    optional int: recursion depth for captions inside names
+  Returns: string (the HTML).
+
+  3. <span class="tufte-num" …></span> get their display number (missing
+     key: left empty, CSS shows "?").
+  4. <a class="xref" data-ref data-fmt …>REF</a> become plain links with
+     the formatted text (auto num full name page eq). A marker copied,
+     HTML-escaped, into an attribute (a figure's alt text derived from its
+     caption, tufte/figure.html) becomes the plain text, escaped.
+*/ -}}
+{{- $p := .page -}}
+{{- $summary := eq .summary true -}}
+{{- $quiet := or $summary (eq .quiet true) -}}
+{{- $depth := int (.depth | default 0) -}}
+{{- $html := string .html -}}
+{{- $at := $p.RelPermalink -}}
+{{- with $p.File }}{{ $at = .Path }}{{ end -}}
+{{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $inBook := false -}}
+{{- with $root }}{{ $inBook = true }}{{ end -}}
+{{- $L := partialCached "tufte/labels.html" $p (or $p.RelPermalink $p.Path) -}}
+
+{{- /* 3. Number tokens. */ -}}
+{{- if strings.Contains $html `class="tufte-num"` -}}
+  {{- /* A key numbered more than once (a duplicate label: LaTeX numbers
+         every float and equation, only \ref takes the first): its tokens
+         are filled by position, the n-th one in document order with the
+         n-th display (labels.html duptokens). */ -}}
+  {{- $dup := $L.duptokens | default dict -}}
+  {{- if $dup -}}
+    {{- $seen := newScratch -}}
+    {{- $put := slice -}}
+    {{- range $tok := findRE `<span class="tufte-num"[^>]*></span>` $html -}}
+      {{- if and (strings.Contains $tok `data-key="`) (strings.Contains $tok `data-kind="`) -}}
+        {{- $tk := printf "%s|%s" (replaceRE `(?s)^.*data-kind="([^"]*)".*$` "$1" $tok) (partial "tufte/key.html" (replaceRE `(?s)^.*data-key="([^"]*)".*$` "$1" $tok)) -}}
+        {{- with index $dup $tk -}}
+          {{- $seen.Add $tk 1 -}}
+          {{- $n := int ($seen.Get $tk) -}}
+          {{- $d := index . (sub (cond (le $n (len .)) $n (len .)) 1) -}}
+          {{- /* The first remaining copy of this exact string is this one
+                 (the earlier ones are placeholders already). */ -}}
+          {{- $html = replace $html $tok (printf "TUFTENUMTOK%dEND" (len $put)) 1 -}}
+          {{- $put = $put | append (cond (ne $d "") (replace $tok "></span>" (printf ">%s</span>" $d)) $tok) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- range $i, $t := $put }}{{ $html = replace $html (printf "TUFTENUMTOK%dEND" $i) $t }}{{ end -}}
+  {{- end -}}
+  {{- range $tok := findRE `<span class="tufte-num"[^>]*></span>` $html | uniq -}}
+    {{- if strings.Contains $tok `data-key="` -}}
+      {{- $k := partial "tufte/key.html" (replaceRE `(?s)^.*data-key="([^"]*)".*$` "$1" $tok) -}}
+      {{- /* The token's own number (by kind and key: right even when its
+             key lost to another label, e.g. a heading named like a figure). */ -}}
+      {{- $d := "" -}}
+      {{- $kind := "" -}}
+      {{- if strings.Contains $tok `data-kind="` }}{{ $kind = replaceRE `(?s)^.*data-kind="([^"]*)".*$` "$1" $tok }}{{ end -}}
+      {{- if isset $dup (printf "%s|%s" $kind $k) }}{{ continue }}{{ end -}}
+      {{- with $L.tokens -}}
+        {{- $d = index . (printf "%s|%s" $kind $k) | default "" -}}
+      {{- else -}}
+        {{- with index $L.entries $k }}{{ $d = .display }}{{ end -}}
+      {{- end -}}
+      {{- with $d -}}
+        {{- $html = replace $html $tok (replace $tok "></span>" (printf ">%s</span>" .)) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* 4. Cross-references. */ -}}
+{{- if or (strings.Contains $html `<a class="xref"`) (strings.Contains $html `&lt;a class=&#34;xref&#34;`) -}}
+  {{- $bookL := dict -}}
+  {{- with $root }}{{ $bookL = partialCached "tufte/book/labels.html" . (or .RelPermalink .Path) }}{{ end -}}
+  {{- $words := dict
+    "figure" (T "figure" | default "Figure")
+    "table" (T "table" | default "Table")
+    "listing" (T "listing" | default "Listing")
+    "eq" (T "equation" | default "Equation")
+    "heading" (T "section" | default "Section")
+    "label" (T "section" | default "Section")
+    "chapter" (T "chapter" | default "Chapter")
+    "appendix" (T "appendix" | default "Appendix")
+    "part" (T "part" | default "Part")
+    "sidenote" (T "note" | default "Note")
+    "footnote" (T "footnote" | default "Footnote")
+  -}}
+  {{- $marks := findRE `<a class="xref"[^>]*>[^<]*</a>` $html -}}
+  {{- range findRE `&lt;a class=&#34;xref&#34;.*?&lt;/a&gt;` $html }}{{ $marks = $marks | append (htmlUnescape .) }}{{ end -}}
+  {{- range $m := $marks | uniq -}}
+    {{- $ref := "" -}}
+    {{- if strings.Contains $m `data-ref="` }}{{ $ref = replaceRE `(?s)^.*data-ref="([^"]*)".*$` "$1" $m | htmlUnescape | strings.TrimSpace }}{{ end -}}
+    {{- $fmt := "auto" -}}
+    {{- if strings.Contains $m `data-fmt="` }}{{ $fmt = replaceRE `(?s)^.*data-fmt="([^"]*)".*$` "$1" $m | lower | default "auto" }}{{ end -}}
+    {{- $path := "" -}}
+    {{- $k := $ref -}}
+    {{- if strings.Contains $ref "#" -}}
+      {{- $path = replaceRE `(?s)^([^#]*)#.*$` "$1" $ref | strings.TrimSpace -}}
+      {{- $k = replaceRE `(?s)^[^#]*#(.*)$` "$1" $ref -}}
+    {{- end -}}
+    {{- $k = partial "tufte/key.html" $k -}}
+    {{- $e := false -}}
+    {{- if $path -}}
+      {{- with $p.GetPage $path -}}
+        {{- if $k -}}
+          {{- with index (partialCached "tufte/labels.html" . (or .RelPermalink .Path)).entries $k }}{{ $e = . }}{{ end -}}
+        {{- else -}}
+          {{- /* "path#" or "path": a link to the page itself. */ -}}
+          {{- $lt := partial "tufte/plain-title.html" (dict "page" .) | htmlEscape -}}
+          {{- $e = dict "key" "" "kind" "page" "display" "" "name" $lt "short" "" "caption" "" "anchor" "" "where" $lt "level" 0 "page" . -}}
+        {{- end -}}
+      {{- end -}}
+    {{- else if $k -}}
+      {{- with index $L.entries $k -}}
+        {{- $e = . -}}
+      {{- else -}}
+        {{- with index $bookL $k }}{{ $e = . }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $out := "" -}}
+    {{- if $e -}}
+      {{- $tp := $e.page -}}
+      {{- $samePage := eq $tp $p -}}
+      {{- /* name: a float's short caption, else its first 80 plain chars.
+             References inside the caption are resolved first (against the
+             caption's page), else they would read as their raw keys. */ -}}
+      {{- $name := $e.name -}}
+      {{- if and (in (slice "figure" "table" "listing" "eq") $e.kind) (not $e.short) -}}
+        {{- $c := $e.caption | default $e.name -}}
+        {{- if and (lt $depth 2) (or (strings.Contains $c `<a class="xref"`) (strings.Contains $c `class="tufte-num"`)) -}}
+          {{- $c = partial "tufte/resolve-refs.html" (dict "page" $tp "html" $c "summary" $summary "quiet" true "depth" (add $depth 1)) -}}
+        {{- end -}}
+        {{- /* Too deep (a caption naming itself): no raw keys. */ -}}
+        {{- $c = replaceRE `<a class="xref" data-ref[^>]*>[^<]*</a>` "??" $c -}}
+        {{- $c = replaceRE `(?s)<math.*?</math>` "" $c -}}
+        {{- $c = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/>` "" $c -}}
+        {{- /* Margin material (sidenotes, margin notes, citation blocks,
+               real-footnote markers span.tufte-fn) with its nested spans, as lists/render.html strips it: a
+               non-greedy match would stop at the first inner </span> and
+               leave the end of a citation (e.g. its ISBN). Note spans are
+               renamed <tufnote>, then innermost elements are resolved
+               repeatedly (finished spans become <xspan>, finished notes
+               are removed). */ -}}
+        {{- if findRE `<span class="(?:sidenote|marginnote|citation-block|tufte-fn)` $c 1 -}}
+          {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<s[^p]|</[^s]|</s[^p])*` -}}
+          {{- $c = replaceRE `<span class="(sidenote|marginnote|citation-block|tufte-fn)` `<tufnote class="$1` $c -}}
+          {{- range seq 40 -}}
+            {{- if not (or (strings.Contains $c "<span") (strings.Contains $c "<tufnote")) }}{{ break }}{{ end -}}
+            {{- $c = replaceRE (printf `<tufnote[^>]*>%s</span>(?:<i class="[sf]n-end" hidden></i>)?` $C) "" $c -}}
+            {{- $c = replaceRE (printf `<span([^>]*)>(%s)</span>` $C) "<xspan$1>$2</xspan>" $c -}}
+          {{- end -}}
+          {{- $c = replace (replace $c "<xspan" "<span") "</xspan>" "</span>" -}}
+        {{- end -}}
+        {{- $c = $c | plainify | htmlUnescape | strings.TrimSpace -}}
+        {{- $c = replaceRE `\s+` " " $c -}}
+        {{- if gt (strings.RuneCount $c) 80 -}}
+          {{- $c = printf "%s…" (strings.TrimSpace (substr $c 0 80)) -}}
+        {{- end -}}
+        {{- $name = htmlEscape $c -}}
+      {{- end -}}
+      {{- $d := $e.display -}}
+      {{- $text := "" -}}
+      {{- if eq $fmt "num" -}}
+        {{- $text = $d | default "??" -}}
+      {{- else if eq $fmt "full" -}}
+        {{- if $d -}}
+          {{- $text = printf "%s&nbsp;%s" (htmlEscape (index $words $e.kind | default "")) $d -}}
+        {{- else -}}
+          {{- $text = $name -}}
+        {{- end -}}
+      {{- else if eq $fmt "name" -}}
+        {{- $text = $name -}}
+      {{- else if eq $fmt "page" -}}
+        {{- if and $inBook (not $samePage) -}}
+          {{- $text = partial "tufte/plain-title.html" (dict "page" $tp) | htmlEscape -}}
+        {{- else -}}
+          {{- $text = $e.where -}}
+        {{- end -}}
+      {{- else if eq $fmt "eq" -}}
+        {{- $text = printf "(%s)" ($d | default "??") -}}
+      {{- else -}}
+        {{- if and (ne $fmt "auto") (not $quiet) -}}
+          {{- warnidf "tufte-bad-option" "tufte.hugo: xref format must be auto, num, full, name, page or eq, not %q (ref %q) in %s" $fmt $ref $at -}}
+        {{- end -}}
+        {{- $text = $d | default $name -}}
+      {{- end -}}
+      {{- /* A heading or run-in title (name, where) holds the xrefs written
+             in it as TUFTEXREF tokens (tufte/labels.html "xrefs"): resolve
+             them against the target's page, as plain text (the result goes
+             inside this link). Too deep (a title naming itself): "??". */ -}}
+      {{- if strings.Contains $text "TUFTEXREF" -}}
+        {{- $xm := (partialCached "tufte/labels.html" $tp (or $tp.RelPermalink $tp.Path)).xrefs | default dict -}}
+        {{- range $tok := findRE `TUFTEXREF[0-9a-f]{16}END` $text | uniq -}}
+          {{- $r := "??" -}}
+          {{- with index $xm (substr $tok 9 16) -}}
+            {{- if lt $depth 2 -}}
+              {{- $r = partial "tufte/resolve-refs.html" (dict "page" $tp "html" . "summary" $summary "quiet" true "depth" (add $depth 1)) | plainify | htmlUnescape | strings.TrimSpace | htmlEscape -}}
+            {{- end -}}
+          {{- end -}}
+          {{- $text = replace $text $tok $r -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $text = $text | default (htmlEscape $ref) -}}
+      {{- $href := "" -}}
+      {{- if and $samePage (not $summary) -}}
+        {{- $href = printf "#%s" $e.anchor -}}
+        {{- if not $e.anchor }}{{ $href = $tp.RelPermalink }}{{ end -}}
+      {{- else -}}
+        {{- $href = $tp.RelPermalink -}}
+        {{- with $e.anchor }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
+      {{- end -}}
+      {{- $out = printf `<a class="xref" href="%s">%s</a>` (htmlEscape $href) $text -}}
+    {{- else if $summary -}}
+      {{- /* As on the page ("??"), but no link and no warning. */ -}}
+      {{- $out = `<span class="xref xref-missing">??</span>` -}}
+    {{- else -}}
+      {{- if not $quiet -}}
+        {{- warnidf "tufte-undefined-ref" "tufte.hugo: undefined reference %q in %s" $ref $at -}}
+      {{- end -}}
+      {{- $out = `<a class="xref xref-missing" href="#">??</a>` -}}
+    {{- end -}}
+    {{- $html = replace $html $m $out -}}
+    {{- $html = replace $html (htmlEscape $m) ($out | plainify | htmlUnescape | htmlEscape) -}}
+  {{- end -}}
+{{- end -}}
+{{- return $html -}}

@@ -1,0 +1,47 @@
+{{- /*
+  The sections of one chapter for the book contents (tocdepth 1):
+
+    <ol class="toc-sections"><li><a href="REL#id">Section</a></li>…</ol>
+
+  Walks the .Fragments.Headings tree of the chapter and keeps the nodes
+  with Level 2 and a non-empty ID (h2 = \section), at any depth of the tree
+  (the tree starts at h1 when the content has one). Margin material and
+  Hugo's shortcode placeholders are removed from the heading texts (R27),
+  and the ids are cleaned like render-heading.html's (tufte/heading-id.html).
+  A heading with math gets its typeset formula (tufte/toc-text.html).
+
+  Takes: a dict with
+    page      the chapter page
+    headings  a tableofcontents.Headings slice (the walk recurses on it)
+    inner     internal: true in the recursive calls (no <ol> wrapper)
+  Returns: template.HTML ("" when there are no sections).
+*/ -}}
+{{- $p := .page -}}
+{{- $items := "" -}}
+{{- range .headings -}}
+  {{- if and (eq .Level 2) .ID -}}
+    {{- $t := string .Title -}}
+    {{- $t = replaceRE `<label[^>]*>[^<]*</label><input[^>]*/?>` "" $t -}}
+    {{- $t = replaceRE `(?s)<span class="(?:sidenote|marginnote)[^"]*"[^>]*>.*?</span><i class="sn-end" hidden></i>` "" $t -}}
+    {{- $t = replaceRE `<span class="(?:sidenote|marginnote)[^"]*"[^>]*>[^<]*</span>` "" $t -}}
+    {{- $t = replaceRE `<span class="(?:index-anchor|tufte-anchor|tufte-num)[^>]*></span>` "" $t -}}
+    {{- $t = replaceRE `<i class="(?:sn-end|cap-end)" hidden></i>` "" $t -}}
+    {{- $t = replaceRE `</?a\b[^>]*>` "" $t -}}
+    {{- /* Hugo's shortcode placeholders (headings holding a shortcode): the
+           id is cleaned as render-heading.html cleans it. */ -}}
+    {{- $t = replaceRE `\s*HAHAHUGOSHORTCODE[0-9A-Za-z]*?HBHB` "" $t -}}
+    {{- $id := partial "tufte/heading-id.html" .ID -}}
+    {{- /* Math in the heading: the typeset formula (tufte/toc-text.html). */ -}}
+    {{- $t = partial "tufte/toc-text.html" (dict "page" $p "id" $id "text" (strings.TrimSpace $t)) -}}
+    {{- $items = printf `%s<li><a href="%s#%s">%s</a></li>` $items $p.RelPermalink $id $t -}}
+  {{- else if lt .Level 2 -}}
+    {{- with .Headings -}}
+      {{- $items = printf "%s%s" $items (partial "tufte/book/toc-headings.html" (dict "page" $p "headings" . "inner" true) | string) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $out := $items -}}
+{{- if and (not .inner) $items -}}
+  {{- $out = printf `<ol class="toc-sections">%s</ol>` $items -}}
+{{- end -}}
+{{- return ($out | safeHTML) -}}

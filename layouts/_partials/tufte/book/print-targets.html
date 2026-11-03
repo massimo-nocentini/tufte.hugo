@@ -1,0 +1,24 @@
+{{- /*
+  Whole-book print document: the map from the path of each chapter and
+  part page of the book (RelPermalink without its trailing slash) to its
+  anchor id in the document: "tufte-c<Index>" for chapters, "tufte-p<K>"
+  for parts (K from 1, in the order of tufte/book/print-parts.html). The
+  tufte- namespace keeps them apart from the landing's own ids. Built once per
+  book and shared by every tufte/book/print-links.html call.
+
+  Takes: the book root.
+  Returns: a map path → id.
+  Callers: partialCached "tufte/book/print-targets.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- $root := . -}}
+{{- $s := newScratch -}}
+{{- $s.Set "t" dict -}}
+{{- range partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
+  {{- $id := printf "tufte-c%v" .Index -}}
+  {{- with .Page.RelPermalink }}{{ $s.SetInMap "t" (strings.TrimSuffix "/" .) $id }}{{ end -}}
+{{- end -}}
+{{- range $i, $part := partialCached "tufte/book/print-parts.html" $root (or $root.RelPermalink $root.Path) -}}
+  {{- $id := printf "tufte-p%d" (add $i 1) -}}
+  {{- with $part.RelPermalink }}{{ $s.SetInMap "t" (strings.TrimSuffix "/" .) $id }}{{ end -}}
+{{- end -}}
+{{- return ($s.Get "t") -}}

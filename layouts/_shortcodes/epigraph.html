@@ -19,60 +19,49 @@
        {author="Richard P. Feynman"}
        {{< /epigraph >}}
 
-  Params (form 1, all optional): author, cite (work title, in <cite>),
+  style="open" gives the book's opening-epigraph look (\openepigraph:
+  sans-serif capitals, class open-epigraph).
+
+  Params (form 1, all optional): author, cite (work title, in <cite>;
+  alias work, as in a book root's `epigraphs:` list),
   url (blockquote cite attribute; links the footer), footer (full footer,
-  inline Markdown), class (extra classes for the div). In form 2 only
-  class applies; author/cite/url/footer are ignored with a warning.
+  inline Markdown), class (extra classes for the div), style. In form 2
+  only class and style apply; author/cite/url/footer are ignored with a
+  warning.
 
   Output (Tufte CSS):
     <div class="epigraph"><blockquote><p>…</p><footer>Author, <cite>Work</cite></footer></blockquote></div>
 */ -}}
 {{- $p := .Page -}}
 {{- $text := strings.TrimSpace .Inner -}}
-{{- /* Block Markdown; the HTML of nested shortcodes is kept as is. */ -}}
-{{- $html := partial "tufte/render-inner.html" (dict "page" $p "text" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) -}}
-{{- $author := "" -}}{{- $cite := "" -}}{{- $url := "" -}}{{- $footerRaw := "" -}}{{- $class := "" -}}
+{{- /* Block Markdown; nested shortcodes are kept (nest tokens). */ -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
+{{- $author := "" -}}{{- $cite := "" -}}{{- $url := "" -}}{{- $footerRaw := "" -}}{{- $class := "" -}}{{- $style := "" -}}
 {{- if .IsNamedParams -}}
   {{- $author = .Get "author" | default "" -}}
-  {{- $cite = .Get "cite" | default "" -}}
+  {{- $cite = .Get "cite" | default (.Get "work") | default "" -}}
   {{- $url = .Get "url" | default "" -}}
   {{- $footerRaw = .Get "footer" | default "" -}}
-  {{- $class = .Get "class" | default "" -}}
+  {{- $class = printf "%v" (.Get "class" | default "") | strings.TrimSpace -}}
+  {{- $style = lower (printf "%v" (.Get "style" | default "")) -}}
 {{- end -}}
 {{- /* Form 2 when the content already is (a list of) block quotes. */ -}}
-{{- $multi := or (strings.HasPrefix $text ">") (strings.HasPrefix (string $html) "<blockquote") -}}
+{{- $multi := or (strings.HasPrefix $text ">") (strings.HasPrefix $html "<blockquote") -}}
 {{- if and $multi (or $author $cite $url $footerRaw) -}}
-  {{- warnf "epigraph shortcode: the content is block quotes, so the author, cite, url and footer params are ignored; put {author=\"…\" cite=\"…\"} or {footer=\"…\"} on the line after each quote, or drop the leading > (%s)" .Position -}}
+  {{- warnidf "tufte-bad-option" "epigraph shortcode: the content is block quotes, so the author, cite, url and footer params are ignored; put {author=\"…\" cite=\"…\"} or {footer=\"…\"} on the line after each quote, or drop the leading > (%s)" .Position -}}
 {{- end -}}
-<div class="epigraph{{ with $class }} {{ . }}{{ end }}">
-{{- if $multi }}
-{{ $html | safeHTML }}
+{{- $divClass := "epigraph" -}}
+{{- if eq $style "open" -}}
+  {{- $divClass = "epigraph open-epigraph" -}}
+{{- else if $style -}}
+  {{- warnidf "tufte-bad-option" "epigraph shortcode: style must be \"open\" or empty, not %q (%s)" $style .Position -}}
+{{- end -}}
+{{- with $class }}{{ $divClass = printf "%s %s" $divClass . }}{{ end -}}
+{{- $out := "" -}}
+{{- if $multi -}}
+  {{- $out = printf "<div class=\"%s\">\n%s\n</div>" (htmlEscape $divClass) $html -}}
 {{- else -}}
-  {{- $footer := "" -}}
-  {{- with $footerRaw -}}
-    {{- $footer = $p.RenderString . | string -}}
-  {{- else -}}
-    {{- with $author -}}
-      {{- $footer = $p.RenderString . | string -}}
-    {{- end -}}
-    {{- with $cite -}}
-      {{- $c := printf "<cite>%s</cite>" ($p.RenderString .) -}}
-      {{- if $footer -}}
-        {{- $footer = printf "%s, %s" $footer $c -}}
-      {{- else -}}
-        {{- $footer = $c -}}
-      {{- end -}}
-    {{- end -}}
-  {{- end -}}
-  {{- /* Footer link: the anchor is built by html/template so that the URL is
-       filtered (javascript:, vbscript:, … become #ZgotmplZ), as in the link hook. */ -}}
-  {{- $link := and $footer $url (not (strings.Contains $footer "<a ")) }}
-<blockquote{{ with $url }} cite="{{ . }}"{{ end }}>
-{{ $html | safeHTML }}
-{{- with $footer }}
-<footer>{{ if $link }}<a href="{{ $url }}">{{ . | safeHTML }}</a>{{ else }}{{ . | safeHTML }}{{ end }}</footer>
-{{- end }}
-</blockquote>
-{{- end }}
-</div>
-{{- /* no trailing newline */ -}}
+  {{- $bq := partial "tufte/quote.html" (dict "page" $p "html" $html "author" $author "cite" $cite "url" $url "footer" $footerRaw "class" "") -}}
+  {{- $out = printf "<div class=\"%s\">%s</div>" (htmlEscape $divClass) $bq -}}
+{{- end -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

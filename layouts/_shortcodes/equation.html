@@ -1,0 +1,48 @@
+{{- /*
+  Numbered display equation (block; \begin{equation} … \label{…}). Put it on
+  its own lines; the inner text is TeX (not Markdown):
+
+    {{< equation label="eq:euler" >}}
+    e^{i\pi} + 1 = 0
+    {{< /equation >}}
+
+    … by {{< eqref "eq:euler" >}} …          → (1)
+
+  A positional form takes the label: {{< equation "eq:euler" >}}…{{< /equation >}}.
+  Without a label the equation is displayed unnumbered. The same works in
+  Markdown with $$ … \label{eq:euler} $$. KaTeX's own \begin{equation}
+  numbering restarts at 1 in every formula: use label for page-wide numbers.
+  An equation gets one number: a second \label (one per row of an aligned
+  block) is ignored and reported (tufte-bad-option). A \tag{X} in the TeX
+  is the number, as in amsmath: KaTeX prints it, eqref gives "(X)" and the
+  counter does not step (tufte/math-render.html, "tagged").
+
+  Output: <span class="math-display numbered" id="KEY">KATEX<span class="eq-number">(<span class="tufte-num" data-kind="eq" data-key="KEY" data-labeled="1"></span>)</span></span>
+  (with params.math.engine = "client", KATEX is <span class="math math-display">\[TeX\]</span>)
+*/ -}}
+{{- $label := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $label = printf "%v" (.Get "label" | default "") -}}
+{{- else -}}
+  {{- $label = printf "%v" (.Get 0 | default "") -}}
+{{- end -}}
+{{- $tex := strings.TrimSpace .Inner -}}
+{{- with findRESubmatch `\\label\{([^}]+)\}` $tex -}}
+  {{- if not (strings.TrimSpace $label) }}{{ $label = index . 0 1 }}{{ end -}}
+  {{- $tex = replaceRE `\\label\{[^}]+\}` "" $tex -}}
+  {{- /* One number per equation: any other \label has no number to name. */ -}}
+  {{- $extra := slice -}}
+  {{- range . -}}
+    {{- $k := index . 1 -}}
+    {{- if and (ne (partial "tufte/key.html" $k) (partial "tufte/key.html" $label)) (not (in $extra $k)) }}{{ $extra = $extra | append $k }}{{ end -}}
+  {{- end -}}
+  {{- with $extra -}}
+    {{- warnidf "tufte-bad-option" "equation shortcode: an equation gets one number, labelled %q; \\label{%s} is ignored and references to it are undefined: write one equation per numbered row (%s)" $label (delimit . "}, \\label{") $.Position -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $tex -}}
+  {{- warnidf "tufte-empty" "equation shortcode: empty equation (%s)" .Position -}}
+{{- end -}}
+{{- $label = partial "tufte/label-key.html" (dict "key" $label "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+{{- $out := partial "tufte/math-render.html" (dict "page" .Page "inner" $tex "block" true "label" $label "position" (printf "%v" .Position)) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

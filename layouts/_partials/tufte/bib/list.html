@@ -1,0 +1,135 @@
+{{- /*
+  The bibliography list (SPEC-LATEX §5.4): \bibliography{…} with natbib.
+
+  Takes: dict
+    "page"     the page that shows the list
+    "all"      optional bool: every database entry (\nocite{*}), for this
+               list only (other lists of the page keep the cited keys)
+    "seq"      optional int: 1-based rank of this list on the page (default
+               1). Lists after the first get "-SEQ" appended to their ids
+               (tufte-references-2, ref-KEY-2) so ids stay unique; citation
+               links (#ref-KEY) point to the first list. The heading id
+               skips ids the page content already uses (tufte/gen-id.html).
+    "heading"  optional string: the h2 text; when present and empty, no h2
+               is emitted (the page or chapter title already says it).
+               When absent: option bibliography.heading, else i18n
+               "bibliography" in a book, "references" on a handout.
+  Returns: HTML
+    <h2 id="tufte-references">HEADING</h2>
+    <ol class="bibliography-list"><li id="ref-KEY" class="bib-entry">…</li></ol>
+  Order: option bibliography.style "tufte" = order of first citation in the
+  scope (numbers.html); "plainnat" = author, year, title. With option
+  bibliography.margin = false (class option nobib) entries are numbered
+  "[n]" and ordered by n, whatever the style, so they match the in-text
+  [n] marks.
+  Keys come from numbers.html (citations, nocite, "*"); with "all" every
+  remaining database key is appended in alphabetical order.
+*/ -}}
+{{- $p := .page -}}
+{{- $suffix := "" -}}
+{{- with .seq }}{{ if gt (int .) 1 }}{{ $suffix = printf "-%d" (int .) }}{{ end }}{{ end -}}
+{{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $where := "" -}}
+{{- with $p.File }}{{ $where = .Path }}{{ else }}{{ $where = $p.RelPermalink }}{{ end -}}
+
+{{- $style := lower (printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.style" "default" "tufte") (or $p.RelPermalink $p.Path) "bibliography.style" | default "tufte")) -}}
+{{- $marginOpt := partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.margin" "default" true) (or $p.RelPermalink $p.Path) "bibliography.margin" -}}
+{{- $nobib := in (slice "false" "no" "0" "off") (lower (printf "%v" $marginOpt)) -}}
+{{- if not (in (slice "tufte" "plainnat") $style) -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: %s: unknown bibliography.style %q (use \"tufte\" or \"plainnat\")" $where $style -}}
+  {{- $style = "tufte" -}}
+{{- end -}}
+
+{{- /* heading */ -}}
+{{- $heading := "" -}}
+{{- $given := false -}}
+{{- if isset . "heading" -}}
+  {{- with .heading }}{{ $heading = printf "%v" . }}{{ $given = true }}{{ else }}{{ if eq (printf "%T" .heading) "string" }}{{ $given = true }}{{ end }}{{ end -}}
+{{- end -}}
+{{- if not $given -}}
+  {{- $heading = printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.heading" "default" "") (or $p.RelPermalink $p.Path) "bibliography.heading" | default "") -}}
+  {{- if not $heading -}}
+    {{- if $root -}}
+      {{- $heading = T "bibliography" | default "Bibliography" -}}
+    {{- else -}}
+      {{- $heading = T "references" | default "References" -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* keys in numbering order */ -}}
+{{- $nums := partialCached "tufte/bib/numbers.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $items := slice -}}
+{{- range $k, $n := $nums }}{{ $items = $items | append (dict "key" $k "n" $n) }}{{ end -}}
+{{- $items = sort $items "n" -}}
+{{- $db := partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- if .all -}}
+  {{- $c := len $items -}}
+  {{- range $k, $_ := $db -}}
+    {{- if not (isset $nums $k) -}}
+      {{- $c = add $c 1 -}}
+      {{- $items = $items | append (dict "key" $k "n" $c) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* other databases of the scope (references of the landing, parts and
+       chapters), in reading order */ -}}
+{{- $scope := partial "tufte/scope.html" $p -}}
+
+{{- $entries := slice -}}
+{{- range $items -}}
+  {{- $k := .key -}}
+  {{- $raw := index $db $k -}}
+  {{- $from := $p -}}
+  {{- if not $raw -}}
+    {{- range $scope -}}
+      {{- if not $raw -}}
+        {{- with index (partialCached "tufte/bib/db.html" . (or .RelPermalink .Path)) $k }}{{ $raw = . }}{{ end -}}
+        {{- if $raw }}{{ $from = . }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $e := false -}}
+  {{- $sortkey := printf "~%s" $k -}}
+  {{- if $raw -}}
+    {{- $e = partialCached "tufte/bib/normalize.html" (dict "entry" $raw "key" $k) (or $from.RelPermalink $from.Path) $k -}}
+    {{- $sortkey = $e.sortkey -}}
+  {{- else -}}
+    {{- /* A key cited in the text was already reported by the citation
+           (tufte/bib/entries.html marks it bib-missing): warn here only for
+           keys that reach the list another way (nocite, front matter). */ -}}
+    {{- $cited := false -}}
+    {{- $mark := printf `bib-missing" data-cite="%s"` (htmlEscape $k) -}}
+    {{- range $scope -}}
+      {{- if not $cited -}}
+        {{- $cited = strings.Contains (printf "%s" (partialCached "func/content-raw.html" (dict "page" . "summary" false) (or .RelPermalink .Path) false)) $mark -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if not $cited -}}
+      {{- warnidf "tufte-unknown-cite" "tufte.hugo: %s: unknown citation key %q in the bibliography (not in the database)" $where $k -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $entries = $entries | append (dict "key" $k "n" .n "entry" $e "sortkey" $sortkey) -}}
+{{- end -}}
+{{- if and (eq $style "plainnat") (not $nobib) -}}
+  {{- $entries = sort $entries "sortkey" -}}
+{{- end -}}
+
+{{- $out := "" -}}
+{{- with $heading -}}
+  {{- $hid := partial "tufte/gen-id.html" (dict "page" $p "base" "tufte-references" "seq" ($.seq | default 1)) -}}
+  {{- $out = printf `<h2 id="%s">%s</h2>` $hid (htmlEscape .) -}}
+{{- end -}}
+{{- if $entries -}}
+  {{- $lis := slice -}}
+  {{- range $entries -}}
+    {{- $inner := partial "tufte/bib/format.html" (dict "entry" .entry "key" .key "margin" false "wrap" false "page" $p) -}}
+    {{- $num := "" -}}
+    {{- if $nobib }}{{ $num = printf `<span class="bib-num">[%d]</span> ` .n }}{{ end -}}
+    {{- $cls := cond (not .entry) "bib-entry bib-missing" "bib-entry" -}}
+    {{- $lis = $lis | append (printf `<li id="ref-%s%s" class="%s">%s%s</li>` (htmlEscape .key) $suffix $cls $num $inner) -}}
+  {{- end -}}
+  {{- $out = printf `%s<ol class="bibliography-list%s">%s</ol>` $out (cond $nobib " bibliography-numbered" "") (delimit $lis "") -}}
+{{- end -}}
+{{- return ($out | safeHTML) -}}

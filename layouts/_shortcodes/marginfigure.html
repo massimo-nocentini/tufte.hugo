@@ -1,6 +1,6 @@
 {{- /*
-  Margin figure: the image and its caption go in the margin as a margin
-  note. Two ways to place it:
+  Margin figure (\begin{marginfigure}): the image and its caption go in the
+  margin as a margin note. Two ways to place it:
 
   1. At the start of a paragraph, ON THE SAME LINE as its text, with
      inline="true" (no wrapping <p>; the note becomes part of that
@@ -15,7 +15,10 @@
   or inside a sentence: the paragraph would contain a nested <p>, which
   browsers break apart, and the text would lose the paragraph styles.
 
-  Params: as for the figure shortcode, without type, plus inline.
+  Params: as for the figure shortcode (src, alt, caption, title, attr,
+  attrlink, link, width, height, class, label, short, numbered, offset,
+  cite), without type, plus inline. captionpos="bottom" has no effect on
+  a margin float (warning tufte-bad-option).
 
   Rendering is done by the partial tufte/figure.html.
 */ -}}
@@ -26,7 +29,7 @@
 {{- if not $src -}}
   {{- errorf "marginfigure shortcode: the src parameter is required (%s)" .Position -}}
 {{- end -}}
-{{- partial "tufte/figure.html" (dict
+{{- $out := partial "tufte/figure.html" (dict
   "Page" .Page
   "Src" $src
   "Alt" (.Get "alt" | default "")
@@ -35,9 +38,16 @@
   "Attr" (.Get "attr" | default "")
   "AttrLink" (.Get "attrlink" | default "")
   "Link" (.Get "link" | default "")
-  "Type" ("margin")
+  "Type" "margin"
   "Width" (.Get "width" | default "")
   "Height" (.Get "height" | default "")
   "Class" (.Get "class" | default "")
-  "Inline" (in (slice "true" "1" "yes") (printf "%v" (.Get "inline")))
+  "Inline" (partial "tufte/truthy.html" (.Get "inline"))
+  "Label" (.Get "label" | default "")
+  "Short" (.Get "short" | default "")
+  "Numbered" (.Get "numbered")
+  "CaptionPos" (.Get "captionpos" | default "")
+  "Offset" (.Get "offset" | default "")
+  "Cite" (.Get "cite" | default "")
 ) -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

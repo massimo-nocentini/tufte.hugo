@@ -1,0 +1,20 @@
+{{- /*
+  Sort key of a book weight (SPEC-LATEX R13), for the string keys of
+  tufte/book/chapters.html, parts.html, sequence.html and toc.html: a
+  fixed-width string that sorts like the number, negative weights
+  included (Hugo orders weights -10, -5, 1; a zero-padded "%09d" would put
+  "-00000010" after "-00000005"). Weight 0 means unweighted and sorts
+  last.
+
+  Takes: a weight (int, or anything int accepts).
+  Returns: a 10-digit string: weight + 1000000000 (weights clamped to
+  -999999999 … 8999999998), or "9999999999" for weight 0.
+*/ -}}
+{{- $w := int (. | default 0) -}}
+{{- $key := "9999999999" -}}
+{{- if ne $w 0 -}}
+  {{- if lt $w -999999999 }}{{ $w = -999999999 }}{{ end -}}
+  {{- if gt $w 8999999998 }}{{ $w = 8999999998 }}{{ end -}}
+  {{- $key = printf "%010d" (add $w 1000000000) -}}
+{{- end -}}
+{{- return $key -}}

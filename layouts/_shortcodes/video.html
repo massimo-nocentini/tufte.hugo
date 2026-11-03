@@ -62,7 +62,7 @@
 
 {{- $type := lower (printf "%v" (.Get "type" | default "main")) -}}
 {{- if not (in (slice "main" "fullwidth") $type) -}}
-  {{- warnf "video shortcode: unknown type %q, using \"main\" (%s)" $type .Position -}}
+  {{- warnidf "tufte-bad-option" "video shortcode: unknown type %q, using \"main\" (%s)" $type .Position -}}
   {{- $type = "main" -}}
 {{- end -}}
 
@@ -92,25 +92,39 @@
 {{- if and (eq $type "main") $caption -}}
   {{- $id = partial "func/note-id.html" $p -}}
 {{- end -}}
-<figure class="{{ $figClass }}">
+{{- /* Built as a string (attributes escaped as html/template would, script
+       URLs refused) so that it goes through tufte/nest.html: nested in a
+       theme shortcode (fullwidth, marginblock…) its HTML is kept, also
+       with markup.goldmark.renderer.unsafe = false. */ -}}
+{{- $safe := dict -}}
+{{- range $key := slice "src" "poster" -}}
+  {{- $u := printf "%v" (index $urls $key | default "") -}}
+  {{- if and (findRE `^[a-zA-Z][a-zA-Z0-9+.-]*:` $u 1) (not (findRE `(?i)^https?:` $u 1)) }}{{ $u = "#ZgotmplZ" }}{{ end -}}
+  {{- $safe = merge $safe (dict $key $u) -}}
+{{- end -}}
+{{- $out := printf `<figure class="%s">` (htmlEscape $figClass) -}}
 {{- if $id -}}
-<label for="mn-{{ $id }}" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-{{ $id }}" class="margin-toggle"/><span class="marginnote">{{ $caption | safeHTML }}</span>
+  {{- $out = printf `%s<label for="mn-%s" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-%s" class="margin-toggle"/><span class="marginnote">%s</span>` $out $id $id $caption -}}
 {{- end -}}
-<video preload="metadata"
-  {{- if $controls }} controls{{ end }}
-  {{- if $autoplay }} autoplay{{ end }}
-  {{- if $loop }} loop{{ end }}
-  {{- if $muted }} muted{{ end }}
-  {{- if $inline }} playsinline{{ end }}
-  {{- with index $urls "poster" }} poster="{{ . }}"{{ end }}
-  {{- with $width }} width="{{ . }}"{{ end }}
-  {{- with $height }} height="{{ . }}"{{ end }}
-  {{- with $label }} aria-label="{{ . }}"{{ end }}>
-<source src="{{ $src }}"{{ with $mime }} type="{{ . }}"{{ end }}>
-<a href="{{ $src }}">{{ $src | path.Base }}</a>
-</video>
+{{- $attrs := "" -}}
+{{- if $controls }}{{ $attrs = printf "%s controls" $attrs }}{{ end -}}
+{{- if $autoplay }}{{ $attrs = printf "%s autoplay" $attrs }}{{ end -}}
+{{- if $loop }}{{ $attrs = printf "%s loop" $attrs }}{{ end -}}
+{{- if $muted }}{{ $attrs = printf "%s muted" $attrs }}{{ end -}}
+{{- if $inline }}{{ $attrs = printf "%s playsinline" $attrs }}{{ end -}}
+{{- with index $safe "poster" }}{{ $attrs = printf `%s poster="%s"` $attrs (htmlEscape .) }}{{ end -}}
+{{- with $width }}{{ $attrs = printf `%s width="%s"` $attrs (htmlEscape .) }}{{ end -}}
+{{- with $height }}{{ $attrs = printf `%s height="%s"` $attrs (htmlEscape .) }}{{ end -}}
+{{- with $label }}{{ $attrs = printf `%s aria-label="%s"` $attrs (htmlEscape .) }}{{ end -}}
+{{- $s := htmlEscape (index $safe "src") -}}
+{{- $typeAttr := "" -}}
+{{- with $mime }}{{ $typeAttr = printf ` type="%s"` (htmlEscape .) }}{{ end -}}
+{{- /* The fallback link (browsers without <video>) has the class
+       video-fallback: it is not text of the page (tufte/description.html
+       leaves it out of the meta description). */ -}}
+{{- $out = printf "%s<video preload=\"metadata\"%s>\n<source src=\"%s\"%s>\n<a class=\"video-fallback\" href=\"%s\">%s</a>\n</video>" $out $attrs $s $typeAttr $s (htmlEscape (path.Base (index $urls "src"))) -}}
 {{- if and (eq $type "fullwidth") $caption -}}
-<figcaption>{{ $caption | safeHTML }}</figcaption>
+  {{- $out = printf `%s<figcaption>%s</figcaption>` $out $caption -}}
 {{- end -}}
-</figure>
-{{- /* no trailing newline */ -}}
+{{- $out = printf `%s</figure>` $out -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

@@ -1,0 +1,45 @@
+{{- /*
+  Block content in the margin (block): paragraphs, lists, a small table or
+  display math, with the same ⊕ toggle as a margin note on small screens.
+  Put it on its own lines, at the top level of the content:
+
+    {{< marginblock offset="1bl" label="mb:legend" >}}
+    **Legend**
+
+    - red: imports
+    - blue: exports
+    {{< /marginblock >}}
+
+  Named params: offset (vertical shift: 1bl, -2rem…), label (key for xref).
+  The geometry is right only at section level (not inside other blocks).
+
+  Output (SPEC-LATEX §3.3):
+    [<span class="tufte-anchor" id="KEY"></span>]<label for="mn-ID" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-ID" class="margin-toggle"/><div class="marginnote margin-block"[ style]>BLOCKS</div>
+*/ -}}
+{{- $p := .Page -}}
+{{- $offset := "" -}}{{- $label := "" -}}
+{{- if .IsNamedParams -}}
+  {{- $offset = printf "%v" (.Get "offset" | default "") -}}
+  {{- $label = printf "%v" (.Get "label" | default "") -}}
+{{- end -}}
+{{- $html := "" -}}
+{{- with strings.TrimSpace .Inner -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "block" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- /* A sidenote or margin note nested in it cannot float. */ -}}
+  {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $.Name) "where" $.Position) -}}
+  {{- /* Nested cites: one citation block after the blocks. */ -}}
+  {{- with partial "tufte/cite-gather.html" (dict "page" $p "html" $html) }}{{ $html = printf "%s%s" .html .block }}{{ end -}}
+{{- end -}}
+{{- $style := "" -}}
+{{- with $offset -}}
+  {{- with partial "tufte/offset.html" (dict "value" . "page" $.Page "where" (printf "(%s shortcode, line %d)" $.Name $.Position.LineNumber)) -}}
+    {{- $style = printf ` style="%s"` (htmlEscape (string .)) -}}
+  {{- end -}}
+{{- end -}}
+{{- $anchor := "" -}}
+{{- with partial "tufte/label-key.html" (dict "key" $label "where" (printf "%s shortcode in %v" .Name .Position)) -}}
+  {{- $anchor = printf `<span class="tufte-anchor" id="%s"></span>` (htmlEscape .) -}}
+{{- end -}}
+{{- $id := partial "func/note-id.html" $p -}}
+{{- $out := printf `%s<label for="mn-%s" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-%s" class="margin-toggle"/><div class="marginnote margin-block"%s>%s</div>` $anchor $id $id $style $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

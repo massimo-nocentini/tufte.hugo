@@ -1,0 +1,168 @@
+{{- /*
+  One <style> element with the page-dependent part of the tufte-latex
+  layer, emitted in <head> after the theme stylesheet (css.html):
+
+  1. :root custom properties for the marginalia, from the class options
+     sidenote=, marginnote=, caption=, citation=, marginals= and the
+     \set…font commands (tufte.sidenote.align, tufte.sidenote.font, …):
+       --tufte-X-align    justify | left | right
+       --tufte-margin-hyphens:auto   when any of them is justified
+       --tufte-X-family, --tufte-X-style, --tufte-X-size, --tufte-X-color
+     for X in sidenote, marginnote, caption, citation. The size words
+     are root-relative: small = 0.9 and smaller = 0.8 of the default
+     note size (1.1rem → 0.99rem / 0.88rem; with sfsidenotes 1rem →
+     0.9rem / 0.8rem).
+  2. Print geometry from tufte-common.def (tufte.print.paper):
+     @page size and margins, and the --pt / --pm / --print-page-h
+     variables used by the @media print rules of tufte-latex.css.
+  3. Running heads (tufte.print.runningheads): @page margin boxes, as the
+     fancyhdr heads of tufte-handout and tufte-book.
+
+  Every value written with safeCSS comes from a whitelist. Titles in the
+  running heads are written by html/template inside quoted CSS strings, so
+  they are escaped for that context (never safeCSS on user text).
+
+  Takes: the page.
+*/ -}}
+{{- $p := . -}}
+{{- $key := (or $p.RelPermalink $p.Path) -}}
+{{- $where := $p.RelPermalink -}}
+{{- with $p.File }}{{ $where = .Path }}{{ end -}}
+{{- $opt := dict -}}
+{{- range $k := slice "justified" "sfsidenotes" "marginals" "print.paper" "print.runningheads" "sidenote.align" "sidenote.font" "marginnote.align" "marginnote.font" "caption.align" "caption.font" "citation.align" "citation.font" -}}
+  {{- $opt = merge $opt (dict $k (partialCached "tufte/opt.html" (dict "page" $p "key" $k) $key $k)) -}}
+{{- end -}}
+{{- $justified := partial "tufte/truthy.html" (index $opt "justified") -}}
+{{- /* The default marginalia size (tufte-latex.css: 1.1rem, 1rem with
+       sfsidenotes). The size words scale it and are written in rem, not
+       em: a custom property holding an em length is resolved against the
+       font size of each element that uses it (a note's <p>, a heading
+       holding a \thanks note, the note around a citation block), so the
+       same word would give a different size in every place. In rem it is
+       one size wherever the note sits, as \small is in LaTeX. */ -}}
+{{- $baseSize := cond (partial "tufte/truthy.html" (index $opt "sfsidenotes")) 1.0 1.1 -}}
+{{- $sizeWords := dict
+  "small" (printf "%.4grem" (mul $baseSize 0.9))
+  "smaller" (printf "%.4grem" (mul $baseSize 0.8))
+-}}
+
+{{- /* 1. Marginalia variables. */ -}}
+{{- $alignMap := dict "justified" "justify" "justify" "justify" "raggedright" "left" "raggedleft" "right" "raggedouter" "left" -}}
+{{- $families := dict
+  "sans" `"Gill Sans","Gill Sans MT",Calibri,sans-serif`
+  "serif" `et-book,Palatino,"Palatino Linotype",Georgia,serif`
+  "mono" `Consolas,"Liberation Mono",Menlo,Courier,monospace`
+-}}
+{{- $vars := slice -}}
+{{- $hyphens := false -}}
+{{- $marginals := lower (printf "%v" (or (index $opt "marginals") "auto")) -}}
+{{- range $x := slice "sidenote" "marginnote" "caption" "citation" -}}
+  {{- $a := lower (printf "%v" (or (index $opt (printf "%s.align" $x)) "")) -}}
+  {{- if not $a }}{{ $a = $marginals }}{{ end -}}
+  {{- $css := "" -}}
+  {{- if eq $a "auto" -}}
+    {{- $css = cond $justified "justify" "left" -}}
+  {{- else if isset $alignMap $a -}}
+    {{- $css = index $alignMap $a -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: unknown alignment %q for tufte.%s.align / tufte.marginals (justified, raggedright, raggedleft, raggedouter or auto) in %s" $a $x $where -}}
+    {{- $css = cond $justified "justify" "left" -}}
+  {{- end -}}
+  {{- if eq $css "justify" }}{{ $hyphens = true }}{{ end -}}
+  {{- $vars = $vars | append (printf "--tufte-%s-align:%s" $x $css) -}}
+  {{- /* Font words, e.g. "italic sans small #555". */ -}}
+  {{- $font := printf "%v" (or (index $opt (printf "%s.font" $x)) "") -}}
+  {{- $family := "" }}{{ $style := "" }}{{ $size := "" }}{{ $color := "" -}}
+  {{- range $w := split (replaceRE `\s+` " " (strings.TrimSpace $font)) " " -}}
+    {{- $lw := lower $w -}}
+    {{- if not $w -}}
+    {{- else if eq $lw "italic" }}{{ $style = "italic" -}}
+    {{- else if eq $lw "upright" }}{{ $style = "normal" -}}
+    {{- else if isset $families $lw }}{{ $family = index $families $lw -}}
+    {{- else if isset $sizeWords $lw }}{{ $size = index $sizeWords $lw -}}
+    {{- else if eq $lw "normal" }}{{ $size = "" }}{{ $style = "normal" }}{{ $family = "" -}}
+    {{- else if findRE `^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$` $w 1 }}{{ $color = $w -}}
+    {{- else -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: unknown word %q in tufte.%s.font (italic, upright, sans, serif, mono, small, smaller, normal or a #hex colour) in %s" $w $x $where -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $family }}{{ $vars = $vars | append (printf "--tufte-%s-family:%s" $x .) }}{{ end -}}
+  {{- with $style }}{{ $vars = $vars | append (printf "--tufte-%s-style:%s" $x .) }}{{ end -}}
+  {{- with $size }}{{ $vars = $vars | append (printf "--tufte-%s-size:%s" $x .) }}{{ end -}}
+  {{- with $color }}{{ $vars = $vars | append (printf "--tufte-%s-color:%s" $x .) }}{{ end -}}
+{{- end -}}
+{{- if $hyphens }}{{ $vars = $vars | append "--tufte-margin-hyphens:auto" }}{{ end -}}
+{{- $root := printf ":root{%s}" (delimit $vars ";") -}}
+
+{{- /* 2. Paper geometry (tufte-common.def, §7.1 of the spec). */ -}}
+{{- $papers := dict
+  "letter" (dict "size" "letter" "margin" "1.58in 0.86in 0.9in 1in" "pt" "65" "pm" "30" "h" "8.52in")
+  "a4" (dict "size" "A4" "margin" "42.2mm 20.6mm 13.4mm 24.8mm" "pt" "65" "pm" "30" "h" "241.4mm")
+  "b5" (dict "size" "176mm 250mm" "margin" "28.7mm 14.69mm 34.1mm 14.66mm" "pt" "70" "pm" "25" "h" "187.2mm")
+-}}
+{{- $paper := lower (printf "%v" (or (index $opt "print.paper") "letter")) -}}
+{{- $paper = replaceRE `paper$` "" $paper -}}
+{{- if not (isset $papers $paper) -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.print.paper must be letter, a4 or b5, not %q (%s)" $paper $where -}}
+  {{- $paper = "letter" -}}
+{{- end -}}
+{{- $g := index $papers $paper -}}
+{{- $print := printf "@media print{:root{--pt:%s;--pm:%s;--print-page-h:%s}}@page{size:%s;margin:%s}" $g.pt $g.pm $g.h $g.size $g.margin -}}
+
+{{- /* 3. Running heads: what kind of page this is. */ -}}
+{{- $heads := partial "tufte/truthy.html" (index $opt "print.runningheads") -}}
+{{- $bookRoot := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $mode := "" -}}
+{{- $book := "" }}{{ $chapter := "" }}{{ $title := "" -}}
+{{- if $heads -}}
+  {{- if $bookRoot -}}
+    {{- $book = partial "tufte/plain-title.html" (dict "page" $bookRoot) -}}
+    {{- if eq $bookRoot $p -}}
+      {{- /* The landing page: only the print document gets running heads. */ -}}
+      {{- if and ($p.OutputFormats.Get "print") ($p.AlternativeOutputFormats.Get "html") }}{{ $mode = "printbook" }}{{ end -}}
+    {{- else if $p.IsPage -}}
+      {{- $mode = "chapter" -}}
+      {{- $chapter = partial "tufte/plain-title.html" (dict "page" $p) -}}
+    {{- end -}}
+  {{- else if $p.IsPage -}}
+    {{- /* tufte-handout is oneside: \fancyhead[RE,RO]{\plaintitle\quad
+           \thepage} (tufte-common.def), the plain title and the page
+           number, no author (the author is only on twoside verso pages). */ -}}
+    {{- $mode = "handout" -}}
+    {{- $title = partial "tufte/plain-title.html" (dict "page" $p) -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Margin-box font of the running heads: tufte-book sets them with
+       \smallcaps, letterspaced by \smallcapsspacing (\textls[50] =
+       0.05em); class option nols (tufte.letterspacing = false) drops the
+       letterspacing. Custom properties do not reach @page margin boxes,
+       so the value is written here. */ -}}
+{{- $ls := "0.05em" -}}
+{{- if not (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "letterspacing") $key "letterspacing")) }}{{ $ls = "normal" }}{{ end -}}
+{{- /* fancyhdr sets the head's baseline \headsep = 2\baselineskip (28pt)
+       above the text block, at the bottom of the top margin (§7.1: top =
+       geometry top + headheight + headsep); a top margin box is centred
+       vertically by default, so it is pushed down to that position. */ -}}
+{{- $box := printf "font-family:et-book,Palatino,\"Palatino Linotype\",Georgia,serif;font-size:8pt;font-style:normal;text-transform:uppercase;letter-spacing:%s;vertical-align:bottom;padding-bottom:28pt" $ls -}}
+{{- /* html/template treats a CSS string like a URL: an action right after
+       the opening quote goes through its URL filter (a title with a colon
+       would read as a scheme and become #ZgotmplZ), and an {{ if }} inside
+       the string makes the context ambiguous. So each running head is one
+       action, after a literal zero-width space (\00200B), and is escaped by
+       the CSS string escaper. The escapes use all six hex digits: a CSS
+       escape reads up to six, so "\200B" before a title starting with
+       0-9 or A-F ("Figures", "Edward") would swallow its first letter. */ -}}
+{{- $handout := printf "%s\u2003" $title -}}
+<style>{{ $root | safeCSS }}{{ $print | safeCSS }}
+{{- if eq $mode "handout" }}
+@page :first{@top-right{content:none}}
+@page{@top-right{content:"\00200B{{ $handout }}" counter(page);{{ $box | safeCSS }}}}
+{{- else if eq $mode "chapter" }}
+@page :first{@top-left{content:none}@top-right{content:none}}
+@page :left{@top-left{content:counter(page) "\002003{{ $book }}";{{ $box | safeCSS }}}}
+@page :right{@top-right{content:"\00200B{{ $chapter }}\002003" counter(page);{{ $box | safeCSS }}}}
+{{- else if eq $mode "printbook" }}
+@page :first{@top-left{content:none}@top-right{content:none}}
+@page :left{@top-left{content:counter(page) "\002003{{ $book }}";{{ $box | safeCSS }}}}
+{{- end -}}
+</style>

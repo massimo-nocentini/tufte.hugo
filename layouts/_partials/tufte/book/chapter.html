@@ -1,0 +1,41 @@
+{{- /*
+  A book chapter on its own HTML page (\chapter of tufte-book):
+
+    <article class="chapter matter-MATTER" id="tufte-chapter"[ style="counter-reset: sidenote-counter N"]>
+      <header class="chapter-head title-block">[<p class="chapter-number">Chapter 3</p>]<h1 class="chapter-title">TITLE[THANKS]</h1>[<p class="subtitle">…</p>]</header>
+      [<section class="abstract">…</section>]
+      CONTENT
+      <nav class="book-nav" …>…</nav>
+    </article>
+
+  N = the sidenotes printed before the chapter in the whole-book document:
+  the landing (its body, and its \thanks only without a title page),
+  earlier part pages and chapters
+  (tufte/offsets.html), so the CSS counter continues through the book
+  (tufte.book.continuous, default true) exactly as in print.html. Book chapters show no post-meta line, no post-nav and no
+  comments: book-nav links the chapters in reading order.
+
+  Takes: a dict with
+    page  the chapter page
+    root  the book root (tufte/book/root.html)
+*/ -}}
+{{- $p := .page -}}
+{{- $root := .root -}}
+{{- $ch := false -}}
+{{- range partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
+  {{- if eq .Page $p }}{{ $ch = . }}{{ end -}}
+{{- end -}}
+{{- $matter := "main" -}}
+{{- with $ch }}{{ with .Matter }}{{ $matter = . }}{{ end }}{{ end -}}
+{{- $style := "" -}}
+{{- $continuous := partialCached "tufte/opt.html" (dict "page" $p "key" "book.continuous") (or $p.RelPermalink $p.Path) "book.continuous" -}}
+{{- if partial "tufte/truthy.html" $continuous -}}
+  {{- $off := partialCached "tufte/offsets.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- $n := int ($off.sidenote | default 0) -}}
+  {{- if gt $n 0 }}{{ $style = printf "counter-reset: sidenote-counter %d" $n }}{{ end -}}
+{{- end }}
+<article class="chapter matter-{{ $matter }}" id="tufte-chapter"{{ with $style }} style="{{ . | safeCSS }}"{{ end }}>
+  {{ partial "tufte/book/chapter-body.html" (dict "page" $p "root" $root "chapter" $ch) }}
+  {{ partial "tufte/book/nav.html" (dict "page" $p "root" $root) }}
+</article>
+{{- /* no trailing newline */ -}}

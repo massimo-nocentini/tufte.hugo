@@ -1,0 +1,68 @@
+{{- /*
+  A title as inline HTML. Every template that shows a title goes through
+  this partial (or tufte/plain-title.html, which plainifies its output),
+  so a title reads the same everywhere: Markdown in it (`code`, *emphasis*,
+  [links](…), ~~strike~~) is rendered with the page's RenderString.
+
+  Two modes:
+  - list (default), for summary titles, the archive, term and taxonomy
+    lists and the post navigation, where the title sits inside a link:
+    links in it are unwrapped (no <a> inside the list's <a>), and math
+    ($…$, $$…$$, \(…\), \[…\]) is left as written, as in
+    tufte/plain-title.html (a list page may not load the KaTeX stylesheet
+    for it). The math spans are taken out before rendering (placeholders)
+    and put back escaped, so the Markdown around them is still rendered
+    and the Markdown characters inside them (a_1, a*b) are not.
+  - heading (`heading` true), for the h1 of pages, sections, terms,
+    taxonomies, the archive, book parts and chapters (tufte/title-block.html,
+    tufte/book/part.html, list.print.html): links are kept and math is
+    typeset (the passthrough render hook; tufte/head.html loads KaTeX when
+    the title holds math delimiters).
+
+  A title without Markdown characters is only escaped. Quotes, -- and
+  ... count as Markdown here: they go through RenderString too, so the
+  typographer gives them the same curly quotes, dashes and ellipsis as the
+  xref names (tufte/labels.html renders the title) and the h1.
+
+  Takes: a dict with
+    page     the page whose RenderString is used
+    title    optional: the text (default: the page's LinkTitle)
+    heading  optional bool: heading mode
+  Returns: template.HTML.
+*/ -}}
+{{- $p := .page -}}
+{{- $t := printf "%v" (.title | default $p.LinkTitle) -}}
+{{- $heading := eq .heading true -}}
+{{- $out := htmlEscape $t -}}
+{{- if findRE "[`*_~$\\\\\\['\"]|--|\\.\\.\\." $t 1 -}}
+  {{- /* Tokens that cover the whole title: code spans, math, a lone $ or \,
+         other text. Math is kept (heading) or taken out (list: TUFTETMnEND
+         placeholders, put back escaped after rendering). A "<" outside
+         code spans and math is written as &lt;, so the title's text is
+         never read as raw HTML (Goldmark would drop it, and warn). */ -}}
+  {{- $mathRE := `(?s)^(?:\$\$.+?\$\$|\$[^$]+\$|\\\(.+?\\\)|\\\[.+?\\\])$` -}}
+  {{- $src := "" -}}
+  {{- $math := slice -}}
+  {{- range findRE "(?s)`+[^`]+`+|\\$\\$.+?\\$\\$|\\$[^$]+\\$|\\\\\\(.+?\\\\\\)|\\\\\\[.+?\\\\\\]|\\$|\\\\|[^$\\\\`]+|`+" $t -}}
+    {{- if strings.HasPrefix . "`" -}}
+      {{- $src = printf "%s%s" $src . -}}
+    {{- else if findRE $mathRE . 1 -}}
+      {{- if $heading -}}
+        {{- $src = printf "%s%s" $src . -}}
+      {{- else -}}
+        {{- $src = printf "%sTUFTETM%dEND" $src (len $math) -}}
+        {{- $math = $math | append . -}}
+      {{- end -}}
+    {{- else -}}
+      {{- $src = printf "%s%s" $src (replace . "<" "&lt;") -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $out = $p.RenderString $src | string | strings.TrimSpace -}}
+  {{- if not $heading -}}
+    {{- $out = replaceRE `</?a\b[^>]*>` "" $out -}}
+    {{- range $i, $m := $math -}}
+      {{- $out = replace $out (printf "TUFTETM%dEND" $i) (htmlEscape $m) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return ($out | safeHTML) -}}

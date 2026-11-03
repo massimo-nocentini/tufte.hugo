@@ -1,0 +1,37 @@
+{{- /*
+  Navigation between the chapters of a book, in reading order
+  (tufte/book/chapters.html: matter, part, weight, file name; never
+  .PrevInSection):
+
+    <nav class="book-nav" aria-label="BOOK"><a class="prev" rel="prev" href="…">← Prev</a><a class="contents" href="ROOT">Contents</a><a class="next" rel="next" href="…">Next →</a></nav>
+
+  A missing neighbour leaves an empty span, so the three slots keep their
+  place. Pages that are not chapters (a part page) get the Contents link
+  only.
+
+  Takes: a dict with
+    page  the current page
+    root  the book root
+*/ -}}
+{{- $p := .page -}}
+{{- $root := .root -}}
+{{- $chapters := partialCached "tufte/book/chapters.html" $root (or $root.RelPermalink $root.Path) -}}
+{{- $prev := false }}{{ $next := false }}{{ $found := false -}}
+{{- /* Chapters that are not rendered (build.render = never) have no
+       page to link to: they are skipped, as in post-nav.html. */ -}}
+{{- range $chapters -}}
+  {{- if $found -}}
+    {{- if and (not $next) .Page.RelPermalink }}{{ $next = .Page }}{{ end -}}
+  {{- else if eq .Page $p -}}
+    {{- $found = true -}}
+  {{- else if .Page.RelPermalink -}}
+    {{- $prev = .Page -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $found }}{{ $prev = false }}{{ end }}
+<nav class="book-nav" aria-label="{{ partial "tufte/plain-title.html" (dict "page" $root) }}">
+  {{- with $prev }}<a class="prev" rel="prev" href="{{ .RelPermalink }}">&larr;&nbsp;{{ partial "tufte/plain-title.html" (dict "page" .) }}</a>{{ else }}<span class="prev"></span>{{ end -}}
+  <a class="contents" href="{{ $root.RelPermalink }}">{{ T "contents" }}</a>
+  {{- with $next }}<a class="next" rel="next" href="{{ .RelPermalink }}">{{ partial "tufte/plain-title.html" (dict "page" .) }}&nbsp;&rarr;</a>{{ else }}<span class="next"></span>{{ end -}}
+</nav>
+{{- /* no trailing newline */ -}}

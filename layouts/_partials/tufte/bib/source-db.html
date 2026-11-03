@@ -1,0 +1,74 @@
+{{- /*
+  The bibliography entries one page brings itself (SPEC-LATEX §5.1): its
+  front matter `bibliography` (file or files) and `references` (inline
+  entries), later ones winning on the same key.
+
+  Takes: a page.
+  Returns: a map  lowercased cite key → raw entry (empty when the page has
+  neither).
+  Callers cache it per source page, so a book root's file is read once per
+  build however many chapters cite from it:
+    partialCached "tufte/bib/source-db.html" $src (or $src.RelPermalink $src.Path)
+  A file's text is also parsed once per build however many pages name it
+  (the .bib parse and the entry walk are cached by the md5 of the text).
+
+  Files: a path to a page resource, else a global asset (assets/), in .json,
+  .yaml, .yml, .toml (decoded with transform.Unmarshal) or .bib (bibtex-lite,
+  tufte/bib/bibtex.html). Warnings (tufte-bib-format) name this page.
+*/ -}}
+{{- $src := . -}}
+{{- $S := newScratch -}}
+{{- $S.Set "db" dict -}}
+{{- $where := "" -}}
+{{- with $src.File }}{{ $where = .Path }}{{ else }}{{ $where = $src.RelPermalink }}{{ end -}}
+
+{{- /* front matter `bibliography`: file(s) */ -}}
+{{- $files := slice -}}
+{{- with $src.Params.bibliography -}}
+  {{- if reflect.IsSlice . -}}
+    {{- range . }}{{ $files = $files | append (printf "%v" .) }}{{ end -}}
+  {{- else if eq (printf "%T" .) "string" -}}
+    {{- $files = $files | append . -}}
+  {{- end -}}
+{{- end -}}
+{{- range $path := $files -}}
+  {{- $res := $src.Resources.Get $path -}}
+  {{- if not $res }}{{ $res = resources.Get $path }}{{ end -}}
+  {{- if not $res -}}
+    {{- warnidf "tufte-bib-format" "tufte.hugo: %s: bibliography file %q not found (looked in the page bundle and in assets/)" $where $path -}}
+    {{- continue -}}
+  {{- end -}}
+  {{- $ext := lower (path.Ext $path) -}}
+  {{- $data := false -}}
+  {{- $text := "" -}}
+  {{- if eq $ext ".bib" -}}
+    {{- $text = printf "%s" $res.Content -}}
+    {{- $data = partialCached "tufte/bib/bibtex.html" $text (printf "bibtex|%s" (md5 $text)) -}}
+  {{- else if in (slice ".json" ".yaml" ".yml" ".toml") $ext -}}
+    {{- with try (transform.Unmarshal $res) -}}
+      {{- with .Err -}}
+        {{- warnidf "tufte-bib-format" "tufte.hugo: %s: cannot decode bibliography file %q: %s" $where $path . -}}
+      {{- else -}}
+        {{- $data = .Value -}}
+        {{- $text = printf "%s" $res.Content -}}
+      {{- end -}}
+    {{- end -}}
+  {{- else -}}
+    {{- warnidf "tufte-bib-format" "tufte.hugo: %s: unsupported bibliography file %q (use .bib, .json, .yaml or .toml)" $where $path -}}
+  {{- end -}}
+  {{- if $data -}}
+    {{- range $k, $v := partialCached "tufte/bib/site-db.html" $data (printf "file|%s|%s" $ext (md5 $text)) -}}
+      {{- $S.SetInMap "db" $k $v -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* front matter `references`: inline entries */ -}}
+{{- with $src.Params.references -}}
+  {{- if or (reflect.IsMap .) (reflect.IsSlice .) -}}
+    {{- range $k, $v := partial "tufte/bib/site-db.html" . -}}
+      {{- $S.SetInMap "db" $k $v -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return ($S.Get "db") -}}

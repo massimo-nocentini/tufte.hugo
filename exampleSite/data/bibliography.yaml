@@ -1,0 +1,74 @@
+# Site bibliography, in the theme's native (BibTeX-like) schema.
+#
+# A hand conversion of tufte-latex's sample-handout.bib. Keys are lowercase
+# (cite keys are matched case-insensitively), `\LaTeX` became plain "LaTeX"
+# and `--` an en dash. Tufte2006's non-standard `place` field is left out:
+# BibTeX ignores it, so the reference PDFs print no address for that book
+# (the theme would read `place` as an alias of `address`).
+#
+# The same file could be produced from a .bib database with pandoc, as
+# CSL-JSON (also understood by the theme):
+#   pandoc sample-handout.bib -t csljson -o data/bibliography.json
+
+tufte2006:
+  type: book
+  author: Edward R. Tufte
+  title: Beautiful Evidence
+  publisher: Graphics Press, LLC
+  year: 2006
+  month: May
+  edition: First
+  isbn: 0-9613921-7-7
+
+tufte2001:
+  type: book
+  author: Edward R. Tufte
+  title: The Visual Display of Quantitative Information
+  publisher: Graphics Press
+  address: Cheshire, Connecticut
+  year: 2001
+  isbn: 0-9613921-4-2
+
+tufte1990:
+  type: book
+  author: Edward R. Tufte
+  title: Envisioning Information
+  publisher: Graphics Press
+  address: Cheshire, Connecticut
+  year: 1990
+  isbn: 0-9613921-1-8
+
+tufte1997:
+  type: book
+  author: Edward R. Tufte
+  title: Visual Explanations
+  publisher: Graphics Press
+  address: Cheshire, Connecticut
+  year: 1997
+  isbn: 0-9613921-2-6
+
+bringhurst2005:
+  type: book
+  author: Robert Bringhurst
+  title: The Elements of Typography
+  publisher: Hartley & Marks
+  year: 2005
+  edition: "3.1"
+  isbn: 0-88179-205-5
+
+mittelbach2004:
+  type: book
+  author: Frank Mittelbach and Michel Goossens
+  title: The LaTeX Companion
+  publisher: Addison–Wesley
+  year: 2004
+  edition: Second
+  isbn: 0-201-36299-6
+
+pkg-geometry:
+  type: misc
+  author: Hideo Umeki
+  title: The geometry package
+  year: 2008
+  month: dec
+  howpublished: \url{http://ctan.org/pkg/geometry}

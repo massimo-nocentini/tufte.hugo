@@ -1,0 +1,138 @@
+{{- /*
+  The title block of a page (\maketitle), followed by its abstract.
+
+  Handouts (tufte.titleBlock):
+    "css"   (default) the Tufte CSS header: h1, subtitle, post-meta line
+            <header class="title-block"><h1>TITLE[THANKS]</h1>[<p class="subtitle">…</p>]<p class="post-meta sans">…</p></header>
+            The post-meta line names the AUTHORS (with their thanks
+            sidenotes) and shows DATE as below (`dateText`, `showDate`).
+    "latex" the tufte-handout \maketitle: italic author and date lines
+            <header class="title-block latex"><h1>TITLE[THANKS]</h1>[<p class="subtitle">…</p>]<p class="title-author">AUTHORS</p><p class="title-date">DATE</p></header>
+            followed by the categories/tags line only.
+  Book chapters (called by tufte/book/chapter-body.html with a dict):
+    <header class="chapter-head title-block">[<p class="chapter-number">Chapter 3</p>]<h1 class="chapter-title">TITLE[THANKS]</h1>[<p class="subtitle">…</p>]</header>
+
+  THANKS: front matter `thanks` (a string or a list, \thanks): one numbered
+  sidenote per entry inside the h1. Authors given as {name, thanks} get
+  their sidenote right after the name. These sidenotes precede the content,
+  so tufte/counts.html adds `len thanks` to the sidenote count.
+  AUTHORS: front matter `author` (string, list of strings, list of
+  {name, thanks}), else params.author.name; joined "A and B", "A, B and C".
+  DATE: `dateText`, else the date in params.dateFormat; none when
+  `showDate: false` or the page has no date.
+  Abstract: front matter `abstract` (Markdown; shortcodes run, and are
+  numbered and resolved with the content: tufte/abstract.html) →
+    <section class="abstract">BLOCKS</section>
+
+  Titles containing Markdown (`code`, *emphasis*, links, $math$) are
+  rendered inline (tufte/title-html.html, heading mode); plain titles are
+  written as they are.
+
+  Takes: the page, or a dict with
+    page     the page
+    chapter  the chapter dict of tufte/book/chapters.html (book chapters)
+    print    optional bool: in the whole-book print document
+  Returns: template.HTML.
+*/ -}}
+{{- $p := . -}}
+{{- $chapter := false -}}
+{{- $print := false -}}
+{{- if reflect.IsMap . -}}
+  {{- $p = .page -}}
+  {{- $chapter = .chapter | default false -}}
+  {{- $print = eq .print true -}}
+{{- end -}}
+{{- $key := (or $p.RelPermalink $p.Path) -}}
+
+{{- /* Sidenote markup for a \thanks text. */ -}}
+{{- $thanks := slice -}}
+{{- with $p.Params.thanks -}}
+  {{- if reflect.IsSlice . }}{{ $thanks = . }}{{ else }}{{ $thanks = slice . }}{{ end -}}
+{{- end -}}
+{{- $thanksHTML := "" -}}
+{{- range $thanks -}}
+  {{- with . -}}
+    {{- $id := partial "func/note-id.html" $p -}}
+    {{- $text := $p.RenderString (printf "%v" .) | string | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" -}}
+    {{- $thanksHTML = printf `%s<label for="sn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote">%s</span>` $thanksHTML $id $id $text -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* The title, rendered when it holds Markdown. */ -}}
+{{- $title := $p.Title -}}
+{{- $titleHTML := string (partial "tufte/title-html.html" (dict "page" $p "title" $title "heading" true)) -}}
+
+{{- $out := "" -}}
+{{- if $chapter -}}
+  {{- /* Book chapter head. */ -}}
+  {{- $num := "" -}}
+  {{- if $chapter.Numbered -}}
+    {{- if eq $chapter.Matter "appendix" -}}
+      {{- $num = printf "%s %v" (T "appendix") $chapter.Display -}}
+    {{- else -}}
+      {{- $num = printf "%s %v" (T "chapter") $chapter.Display -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $out = `<header class="chapter-head title-block">` -}}
+  {{- with $num }}{{ $out = printf `%s<p class="chapter-number">%s</p>` $out (htmlEscape .) }}{{ end -}}
+  {{- $out = printf `%s<h1 class="chapter-title">%s%s</h1>` $out $titleHTML $thanksHTML -}}
+  {{- with $p.Params.subtitle }}{{ $out = printf `%s<p class="subtitle">%s</p>` $out (htmlEscape .) }}{{ end -}}
+  {{- $out = printf "%s</header>" $out -}}
+{{- else -}}
+  {{- $mode := lower (printf "%v" (or (partialCached "tufte/opt.html" (dict "page" $p "key" "titleblock") $key "titleblock") "css")) -}}
+  {{- if and (ne $mode "css") (ne $mode "latex") -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.titleBlock must be \"css\" or \"latex\", not %q (%s)" $mode (or (and $p.File $p.File.Path) $p.RelPermalink) -}}
+    {{- $mode = "css" -}}
+  {{- end -}}
+  {{- if eq $mode "latex" -}}
+    {{- /* Authors, with their {name, thanks} sidenotes. */ -}}
+    {{- $authorHTML := (partial "tufte/authors.html" (dict "page" $p "notes" true)).html -}}
+    {{- /* Date. */ -}}
+    {{- $dateHTML := "" -}}
+    {{- if ne $p.Params.showdate false -}}
+      {{- with $p.Params.datetext -}}
+        {{- $dateHTML = htmlEscape (printf "%v" .) -}}
+      {{- else -}}
+        {{- if not $p.Date.IsZero -}}
+          {{- $dateHTML = printf `<time datetime="%s">%s</time>` ($p.Date.Format "2006-01-02T15:04:05Z07:00") (htmlEscape (partial "func/date.html" $p.Date)) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $out = `<header class="title-block latex">` -}}
+    {{- $out = printf `%s<h1>%s%s</h1>` $out $titleHTML $thanksHTML -}}
+    {{- with $p.Params.subtitle }}{{ $out = printf `%s<p class="subtitle">%s</p>` $out (htmlEscape .) }}{{ end -}}
+    {{- with $authorHTML }}{{ $out = printf `%s<p class="title-author">%s</p>` $out . }}{{ end -}}
+    {{- with $dateHTML }}{{ $out = printf `%s<p class="title-date">%s</p>` $out . }}{{ end -}}
+    {{- $out = printf "%s</header>" $out -}}
+    {{- /* Taxonomy links only (date and author are above). */ -}}
+    {{- $terms := slice -}}
+    {{- range $tax := slice "categories" "tags" -}}
+      {{- $cls := cond (eq $tax "tags") "post-tag" "post-category" -}}
+      {{- $links := slice -}}
+      {{- range $p.GetTerms $tax -}}
+        {{- $links = $links | append (printf `<a class="%s" href="%s">%s</a>` $cls .RelPermalink (htmlEscape .LinkTitle)) -}}
+      {{- end -}}
+      {{- with $links -}}
+        {{- $terms = $terms | append (printf `<span class="post-%s">%s</span>` $tax (delimit . (cond (eq $tax "tags") " " ", "))) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- with $terms -}}
+      {{- $out = printf `%s<p class="post-meta sans">%s</p>` $out (delimit . " &middot; ") -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $out = `<header class="title-block">` -}}
+    {{- $out = printf `%s<h1>%s%s</h1>` $out $titleHTML $thanksHTML -}}
+    {{- with $p.Params.subtitle }}{{ $out = printf `%s<p class="subtitle">%s</p>` $out (htmlEscape .) }}{{ end -}}
+    {{- /* The post-meta line, with the authors' {name, thanks} sidenotes
+           (post-meta.html honours dateText and showDate). */ -}}
+    {{- $a := partial "tufte/authors.html" (dict "page" $p "notes" true) -}}
+    {{- $out = printf "%s%s</header>" $out (partial "post-meta.html" (dict "page" $p "authorHTML" $a.html "authorNotes" $a.notes) | string) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* Abstract (front matter); the `abstract` shortcode gives the same
+       markup. It is processed with the content (tufte/abstract.html), so
+       cite, xref and sidenote shortcodes in it are numbered and resolved
+       like the body's. */ -}}
+{{- $out = printf "%s%s" $out (partial "tufte/abstract.html" (dict "page" $p "print" $print) | string) -}}
+{{- return ($out | safeHTML) -}}

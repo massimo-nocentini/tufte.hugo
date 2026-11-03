@@ -1,0 +1,17 @@
+{{- /*
+  Normalises a label key (SPEC-LATEX §3.0.2).
+
+  "fig:x", "Fig:X", " fig-x " all become "fig-x": trim spaces, lowercase,
+  ":" → "-", then anchorize. Used for every label=, {#…} id coming from
+  images/tables/equations, xref/eqref refs, the label shortcode, front
+  matter label and the #key part of path#key. Idempotent.
+
+  Takes: a string (or anything printable).
+  Returns: the normalised key string ("" for empty input).
+*/ -}}
+{{- $s := lower (trim (printf "%v" .) " \t\n") -}}
+{{- $s = replace $s ":" "-" -}}
+{{- with $s -}}
+  {{- $s = anchorize . -}}
+{{- end -}}
+{{- return $s -}}

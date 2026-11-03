@@ -102,6 +102,15 @@ Set a few words in {{</* sans */>}}Gill Sans{{</* /sans */>}}.
 
 Here they are at work: a sidenote,{{< sidenote >}}The content of a note is Markdown: *italics*, `code` and [links](https://gohugo.io) are all fine.{{< /sidenote >}} a margin note,{{< marginnote >}}Margin notes have no number.{{< /marginnote >}} and a few words in {{< sans >}}a sans-serif face{{< /sans >}}.
 
+For a short text, the four of them also have a one-line form, with the text as the only positional parameter (or as the named parameter `text`) and a self-closing `/>}}`:
+
+```markdown
+A short aside.{{</* sidenote "Written on one line." /*/>}} Another one.{{</* marginnote text="Also on one line." /*/>}}
+{{</* newthought "Small capitals" /*/>}} open a thought, {{</* sans "Gill Sans" /*/>}} changes the face.
+```
+
+{{< newthought "Like this" />}}: a one-line sidenote{{< sidenote "This note was written on one line, with its text as a positional parameter." />}} and a one-line margin note.{{< marginnote text="Written with the named parameter `text`." />}} The named parameters of `sidenote` (`number`, `offset`, `label`, `cite`) and `marginnote` (`offset`, `cite`) are described in [From LaTeX to Hugo]({{< relref "posts/latex-to-hugo.md" >}}).
+
 Block shortcodes stand on lines of their own and take Markdown inside:
 
 ```markdown
@@ -135,6 +144,8 @@ A self-hosted video becomes a Tufte figure, with its caption in the margin (or i
 ```markdown
 {{</* video src="flow.mp4" poster="flow.jpg" caption="Water flow, *slowed down*." */>}}
 ```
+
+(The example site ships no video file, so this one is not shown live.)
 
 Figures and embeds are covered in [Figures and Tables]({{< relref "posts/figures-and-tables.md" >}}), math and code in [Math and Code]({{< relref "posts/math-and-code.md" >}}), and footnotes in [Footnotes as Sidenotes]({{< relref "posts/footnotes-as-sidenotes.md" >}}).
 
@@ -172,3 +183,17 @@ GitHub-style alerts are rendered as quiet, labelled blocks:
 The theme leaves empty partials for you to override from your site's `layouts/_partials/` folder: `head_custom.html`, `header_custom.html`, `before_content.html`, `after_content.html`, `footer_custom.html` and `scripts_custom.html`. Stylesheets listed in `params.customCSS` are appended to the theme's CSS bundle, so their rules win.
 
 On a multilingual site, the header links every page to its translations, and the head lists them as `hreflang` alternates. Translations for the theme's few words, such as "Read more" or "Older posts", are provided in English, Italian, French, German and Spanish.
+
+## Writing like tufte-latex
+
+Everything the Tufte-LaTeX classes offer has a counterpart: numbered figures
+and tables with their captions in the margin, citations in the margin and a
+bibliography, cross-references, lists of figures and tables, an index, and
+multi-chapter books with a title page and contents. Options go under
+`[params.tufte]` in the site configuration, or under `tufte:` in front
+matter; `tufte: {style: latex}` gives a page the look of `tufte-handout`.
+[From LaTeX to Hugo]({{< relref "posts/latex-to-hugo.md" >}}) maps every
+LaTeX command to its shortcode, with live examples; the
+[handout]({{< relref "posts/sample-handout/index.md" >}}) and the
+[book]({{< relref "books/sample-book/_index.md" >}}) are ports of the two
+Tufte-LaTeX samples.

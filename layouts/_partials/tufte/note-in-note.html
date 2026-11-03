@@ -1,0 +1,46 @@
+{{- /*
+  A note inside a note (area B helper). In tufte-latex a \sidenote or
+  \marginnote inside a \sidenote, \marginnote or \caption stops the build
+  ("Float(s) lost"); in HTML the inner note would float out of the margin
+  column. So the HTML of a note or caption holder is cleaned as
+  func/footnotes.html cleans a Markdown footnote turned sidenote:
+
+  1. A citation sidenote (a cite that ran without a holder, e.g. inside a
+     smallcaps shortcode in the note) becomes a nested citation block, which
+     the holder's tufte/cite-gather.html call then gathers after its text.
+  2. Any other note (sidenote, margin note, margin figure, footnotetext)
+     loses its toggle (label and checkbox) and its text stays inline, as
+     <span class="note-in-note">…</span>; tufte-note-in-note is warned.
+     The inner note's mark is gone, so it steps no counter.
+
+  Callers: the sidenote, marginnote, footnotetext and marginblock
+  shortcodes (on their rendered inner text, before cite-gather) and
+  tufte/figure.html (on the caption).
+
+  Takes a dict:
+    page    the page                                   required
+    html    the holder's rendered inner HTML           required
+    holder  what holds it, for the warning ("sidenote", "figure caption")
+    where   position for the warning (e.g. .Position); default the page path
+  Returns: the HTML string.
+*/ -}}
+{{- $t := string .html -}}
+{{- if strings.Contains $t `<span class="sidenote citation"` -}}
+  {{- $t = replaceRE `(?s)<label for="[^"]*" class="margin-toggle sidenote-number"></label><input type="checkbox" id="[^"]*" class="margin-toggle"/><span class="sidenote citation"[^>]*>(.*?)</span><i class="sn-end" hidden></i>` `<span class="citation-block" data-nested="1">$1</span><i class="cite-end" hidden></i>` $t -}}
+{{- end -}}
+{{- if strings.Contains $t `class="margin-toggle` -}}
+  {{- $toggleRE := `<label for="[^"]*" class="margin-toggle[^"]*"[^>]*>[^<]*</label><input type="checkbox" id="[^"]*" class="margin-toggle"/>|<input type="checkbox" id="[^"]*" class="margin-toggle"/>` -}}
+  {{- if findRE $toggleRE $t 1 -}}
+    {{- $t = replaceRE $toggleRE "" $t -}}
+    {{- $t = replaceRE `<(span|div) class="(?:sidenote|marginnote)\b[^"]*"[^>]*>` `<$1 class="note-in-note">` $t -}}
+    {{- $t = replace $t `<i class="sn-end" hidden></i>` "" -}}
+    {{- /* A margin figure's wrapper paragraph or footnotetext's cannot sit
+           in a span either. */ -}}
+    {{- $t = replaceRE `<p class="(?:margin-figure-anchor|footnotetext-anchor)[^"]*"([^>]*)>((?s:.*?))</p>` `<span class="note-in-note-anchor"$1>$2</span>` $t -}}
+    {{- $at := .page.RelPermalink -}}
+    {{- with .page.File }}{{ $at = .Path }}{{ end -}}
+    {{- with .where }}{{ $at = printf "%v" . }}{{ end -}}
+    {{- warnidf "tufte-note-in-note" "tufte.hugo: a %s in %s holds a sidenote or margin note, which cannot float inside it (in LaTeX: \"Float(s) lost\"): the inner note is shown inline in its text; use a cite (it becomes a citation block) or move the inner note out" (.holder | default "note") $at -}}
+  {{- end -}}
+{{- end -}}
+{{- return $t -}}

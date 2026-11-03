@@ -1,0 +1,89 @@
+{{- /*
+  Raw per-page counts of numbered things (SPEC-LATEX §4.1, §6.2), read on
+  the phase-1 HTML of the full content.
+
+    sidenote  numbered sidenote marks (labels of class sidenote-number
+              without data-number: sidenotes, footnotes, citations,
+              footnotemarks) plus the title-block \thanks notes (front
+              matter `thanks`, and in a handout each author's `thanks`),
+              which precede the content; none on a book title page
+    figure, table, listing
+              number tokens of that kind; 0 when the page's floats are not
+              numbered (floats.number false, or "auto" in a handout without
+              any labelled float, xref or listoffigures/tables/listings)
+    eq        equation number tokens (always numbered), except those of
+              a \tag{X} equation (data-number)
+    thanks    the title-block notes alone (included in sidenote)
+
+  Takes: a page.
+  Returns: dict sidenote figure table listing eq thanks (ints).
+  Callers: partialCached "tufte/counts.html" $p (or $p.RelPermalink $p.Path)
+*/ -}}
+{{- /* Memoized in the page's Store (not in hugo server): see
+       tufte/opts.html. */ -}}
+{{- $memoRes := false -}}
+{{- with cond hugo.IsServer nil (.Store.Get "tufteMemoCounts") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $p := . -}}
+{{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) (or $p.RelPermalink $p.Path) false | string -}}
+{{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $inBook := false -}}
+{{- with $root }}{{ $inBook = true }}{{ end -}}
+
+{{- /* Floats numbered? (same rule as tufte/labels.html) */ -}}
+{{- $fn := partialCached "tufte/opt.html" (dict "page" $p "key" "floats.number") (or $p.RelPermalink $p.Path) "floats.number" -}}
+{{- $num := false -}}
+{{- if eq (lower (printf "%v" $fn)) "auto" -}}
+  {{- $num = or $inBook (gt (len (findRE `data-labeled="1"|class="xref"|class="tufte-placeholder" data-what="lo[ftl]"` $raw 1)) 0) -}}
+{{- else -}}
+  {{- $num = partial "tufte/truthy.html" $fn -}}
+{{- end -}}
+
+{{- /* Title-block notes. A book landing with a title page
+       (book.titlepage, \maketitlepage) counts none: the title page prints
+       \thanklesstitle, so its `thanks` are unnumbered (marked "*") and its
+       authors are names only (tufte/book/titlepage.html). */ -}}
+{{- $titlePage := false -}}
+{{- if and $inBook (eq $root $p) -}}
+  {{- $titlePage = partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.titlepage") (or $p.RelPermalink $p.Path) "book.titlepage") -}}
+{{- end -}}
+{{- $thanks := 0 -}}
+{{- if not $titlePage -}}
+  {{- with index $p.Params "thanks" -}}
+    {{- if reflect.IsSlice . }}{{ $thanks = len . }}{{ else }}{{ $thanks = 1 }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Author {name, thanks} sidenotes: written by the title block of a
+       handout (both title block styles) and of a book landing without a
+       title page (chapter heads show no authors). */ -}}
+{{- $authorNotes := and (not $titlePage) (or (not $inBook) (eq $root $p)) -}}
+{{- if $authorNotes -}}
+  {{- $thanks = add $thanks (partial "tufte/authors.html" (dict "page" $p)).notes -}}
+{{- end -}}
+
+{{- $sn := 0 -}}
+{{- range findRE `<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>` $raw -}}
+  {{- if not (strings.Contains . "data-number=") }}{{ $sn = add $sn 1 }}{{ end -}}
+{{- end -}}
+
+{{- $fig := 0 -}}{{- $tab := 0 -}}{{- $lst := 0 -}}{{- $eq := 0 -}}
+{{- range findRE `<span class="tufte-num" data-kind="[a-z]+"[^>]*>` $raw -}}
+  {{- $k := replaceRE `^.*?data-kind="([a-z]+)".*$` "$1" . -}}
+  {{- /* An equation numbered by its own \tag (data-number) steps nothing. */ -}}
+  {{- if strings.Contains . `data-number="` }}{{ $k = "" }}{{ end -}}
+  {{- if eq $k "figure" }}{{ $fig = add $fig 1 }}{{ else if eq $k "table" }}{{ $tab = add $tab 1 }}{{ else if eq $k "listing" }}{{ $lst = add $lst 1 }}{{ else if eq $k "eq" }}{{ $eq = add $eq 1 }}{{ end -}}
+{{- end -}}
+{{- if not $num -}}
+  {{- $fig = 0 -}}{{- $tab = 0 -}}{{- $lst = 0 -}}
+{{- end -}}
+{{- $memoRes = dict
+  "sidenote" (add $sn $thanks)
+  "figure" $fig
+  "table" $tab
+  "listing" $lst
+  "eq" $eq
+  "thanks" $thanks -}}
+{{- if not hugo.IsServer }}{{ $p.Store.Set "tufteMemoCounts" (dict "v" $memoRes) }}{{ end -}}
+{{- end -}}
+{{- return $memoRes -}}

@@ -39,3 +39,41 @@
     font-display: swap;
 }
 
+
+/* Old-style figures for numerals = "oldstyle" (body.tufte-osf in
+   tufte-latex.css), the web counterpart of mathpazo's osf option: a family
+   that only covers the digits 0-9, listed before et-book, so letters keep
+   coming from et-book and only the figures change. The italic face of
+   et-book already has old-style figures; bold has no old-style face, so
+   bold figures stay lining (last face below). */
+@font-face {
+    font-family: "et-book-osf-digits";
+    src: url("../et-book/et-book-roman-old-style-figures/et-book-roman-old-style-figures.eot");
+    src: url("../et-book/et-book-roman-old-style-figures/et-book-roman-old-style-figures.eot?#iefix") format("embedded-opentype"), url("../et-book/et-book-roman-old-style-figures/et-book-roman-old-style-figures.woff") format("woff"), url("../et-book/et-book-roman-old-style-figures/et-book-roman-old-style-figures.ttf") format("truetype");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0030-0039;
+}
+
+@font-face {
+    font-family: "et-book-osf-digits";
+    src: url("../et-book/et-book-display-italic-old-style-figures/et-book-display-italic-old-style-figures.eot");
+    src: url("../et-book/et-book-display-italic-old-style-figures/et-book-display-italic-old-style-figures.eot?#iefix") format("embedded-opentype"), url("../et-book/et-book-display-italic-old-style-figures/et-book-display-italic-old-style-figures.woff") format("woff"), url("../et-book/et-book-display-italic-old-style-figures/et-book-display-italic-old-style-figures.ttf") format("truetype");
+    font-weight: normal;
+    font-style: italic;
+    font-display: swap;
+    unicode-range: U+0030-0039;
+}
+
+/* Bold: the lining figures of et-book bold (without this face the browser
+   would embolden the regular old-style digits). */
+@font-face {
+    font-family: "et-book-osf-digits";
+    src: url("../et-book/et-book-bold-line-figures/et-book-bold-line-figures.eot");
+    src: url("../et-book/et-book-bold-line-figures/et-book-bold-line-figures.eot?#iefix") format("embedded-opentype"), url("../et-book/et-book-bold-line-figures/et-book-bold-line-figures.woff") format("woff"), url("../et-book/et-book-bold-line-figures/et-book-bold-line-figures.ttf") format("truetype");
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0030-0039;
+}

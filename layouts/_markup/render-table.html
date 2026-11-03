@@ -12,42 +12,82 @@
     {.fullwidth}
 
   → <div class="table-wrapper fullwidth"><table class="fullwidth">…</table></div>
+
+  A table float (\begin{table}\caption…\label…, SPEC-LATEX §3.4) when
+  the attributes have a caption (numbered) or an id (a label: without a
+  caption the table is not numbered, and xref gives the enclosing section
+  number, else its title, as \ref does after a \label with no \caption):
+
+    | A | B |
+    |---|---|
+    {#tab:x caption="Font sizes, *in points*." short="Font sizes"}
+
+  renders exactly like {{< table caption=… label="tab:x" >}}: id → label,
+  plus short, numbered, captionpos, offset, cite and the fullwidth class.
 */ -}}
 {{- $fullwidth := false -}}
 {{- $extra := "" -}}
+{{- $float := dict -}}
+{{- $floatKeys := slice "caption" "id" "short" "numbered" "captionpos" "offset" "cite" -}}
+{{- /* A caption or an id ({#tab:x}, a \label) makes a float: the id is
+       then the label (normalised, registered for xref), as for an image. */ -}}
+{{- $isFloat := or (ne (printf "%v" (index .Attributes "caption" | default "")) "") (ne (printf "%v" (index .Attributes "id" | default "")) "") -}}
+{{- $classes := slice -}}
 {{- range $k, $v := .Attributes -}}
   {{- $val := printf "%v" $v -}}
   {{- if and (eq $k "class") (findRE `(^|\s)fullwidth(\s|$)` $val 1) -}}
     {{- $fullwidth = true -}}
   {{- end -}}
-  {{- if and $val (findRE `^[a-zA-Z][a-zA-Z0-9_:.-]*$` $k 1) (not (strings.HasPrefix (lower $k) "on")) -}}
+  {{- if and $isFloat (in $floatKeys (lower $k)) -}}
+    {{- $float = merge $float (dict (lower $k) $v) -}}
+  {{- else if and $isFloat (eq $k "class") -}}
+    {{- range findRE `\S+` $val }}{{ if ne . "fullwidth" }}{{ $classes = $classes | append . }}{{ end }}{{ end -}}
+  {{- else if and $val (findRE `^[a-zA-Z][a-zA-Z0-9_:.-]*$` $k 1) (not (strings.HasPrefix (lower $k) "on")) -}}
     {{- $extra = printf `%s %s="%s"` $extra $k (htmlEscape $val) -}}
   {{- end -}}
 {{- end -}}
-<div class="table-wrapper{{ if $fullwidth }} fullwidth{{ end }}">
-<table{{ $extra | safeHTMLAttr }}>
-{{- with .THead }}
-<thead>
-  {{- range . }}
-<tr>
-    {{- range . }}
-<th{{ with .Alignment }} style="text-align: {{ . | safeCSS }}"{{ end }}>{{ .Text }}</th>
-    {{- end }}
-</tr>
-  {{- end }}
-</thead>
-{{- end }}
-{{- with .TBody }}
-<tbody>
-  {{- range . }}
-<tr>
-    {{- range . }}
-<td{{ with .Alignment }} style="text-align: {{ . | safeCSS }}"{{ end }}>{{ .Text }}</td>
-    {{- end }}
-</tr>
-  {{- end }}
-</tbody>
-{{- end }}
-</table>
-</div>
-{{- /* no trailing newline */ -}}
+{{- if and $isFloat $fullwidth -}}
+  {{- $extra = printf ` class="fullwidth"%s` $extra -}}
+{{- end -}}
+{{- $table := "" -}}
+{{- with .THead -}}
+  {{- $rows := "" -}}
+  {{- range . -}}
+    {{- $cells := "" -}}
+    {{- range . -}}
+      {{- $cells = printf "%s\n<th%s>%s</th>" $cells (cond (ne (printf "%v" .Alignment) "") (printf ` style="text-align: %s"` (htmlEscape (printf "%v" .Alignment))) "") (string .Text) -}}
+    {{- end -}}
+    {{- $rows = printf "%s\n<tr>%s\n</tr>" $rows $cells -}}
+  {{- end -}}
+  {{- $table = printf "%s\n<thead>%s\n</thead>" $table $rows -}}
+{{- end -}}
+{{- with .TBody -}}
+  {{- $rows := "" -}}
+  {{- range . -}}
+    {{- $cells := "" -}}
+    {{- range . -}}
+      {{- $cells = printf "%s\n<td%s>%s</td>" $cells (cond (ne (printf "%v" .Alignment) "") (printf ` style="text-align: %s"` (htmlEscape (printf "%v" .Alignment))) "") (string .Text) -}}
+    {{- end -}}
+    {{- $rows = printf "%s\n<tr>%s\n</tr>" $rows $cells -}}
+  {{- end -}}
+  {{- $table = printf "%s\n<tbody>%s\n</tbody>" $table $rows -}}
+{{- end -}}
+{{- $html := printf "<div class=\"table-wrapper%s\">\n<table%s>%s\n</table>\n</div>" (cond $fullwidth " fullwidth" "") $extra $table -}}
+{{- if $isFloat -}}
+  {{- $type := cond $fullwidth "fullwidth" "main" -}}
+  {{- $html = partial "tufte/figure.html" (dict
+    "Page" .Page
+    "Body" $html
+    "Kind" "table"
+    "Type" $type
+    "Caption" (index $float "caption" | default "")
+    "Class" (delimit $classes " ")
+    "Label" (index $float "id" | default "")
+    "Short" (index $float "short" | default "")
+    "Numbered" (index $float "numbered")
+    "CaptionPos" (index $float "captionpos" | default "")
+    "Offset" (index $float "offset" | default "")
+    "Cite" (index $float "cite" | default "")
+  ) -}}
+{{- end -}}
+{{- $html | safeHTML -}}
