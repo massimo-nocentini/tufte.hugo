@@ -82,7 +82,7 @@
     {{- $authorHTML := (partial "tufte/authors.html" (dict "page" $p "notes" true)).html -}}
     {{- /* Date. */ -}}
     {{- $dateHTML := "" -}}
-    {{- if ne $p.Params.showdate false -}}
+    {{- if partial "func/flag.html" (dict "value" $p.Params.showdate "default" true) -}}
       {{- with $p.Params.datetext -}}
         {{- $dateHTML = htmlEscape (printf "%v" .) -}}
       {{- else -}}
@@ -103,7 +103,7 @@
       {{- $cls := cond (eq $tax "tags") "post-tag" "post-category" -}}
       {{- $links := slice -}}
       {{- range $p.GetTerms $tax -}}
-        {{- $links = $links | append (printf `<a class="%s" href="%s">%s</a>` $cls .RelPermalink (htmlEscape .LinkTitle)) -}}
+        {{- $links = $links | append (printf `<a class="%s" href="%s">%s</a>` $cls .RelPermalink (string (partial "tufte/title-html.html" (dict "page" .)))) -}}
       {{- end -}}
       {{- with $links -}}
         {{- $terms = $terms | append (printf `<span class="post-%s">%s</span>` $tax (delimit . (cond (eq $tax "tags") " " ", "))) -}}

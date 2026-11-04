@@ -1,7 +1,9 @@
 {{- /*
   Makes the Markdown footnotes defined inside one front-matter field of a
   book's front pages (an epigraph quote, the copyright page, the
-  dedication…: tufte/book/front-fields.html) its own. Each field is a
+  dedication…: tufte/book/front-fields.html), of any page's `abstract`
+  (func/content-raw.html) or of one `thanks` text (title or author:
+  tufte/title-notes.html) its own. Each field is a
   Markdown document of its own, so `[^1]` defined in the epigraph and
   `[^1]` defined in the dedication are two footnotes; but a footnote
   rendered from an inner text carries its Markdown label (data-md,
@@ -9,7 +11,7 @@
   item. A label defined in the field ([^L]: … at the start of a line) is
   therefore renamed L-TAG, in its references and its definition (the
   fn-/sn- prefix, which picks a real footnote or a sidenote, is kept).
-  References to footnotes defined elsewhere (the landing's text) are left
+  References to footnotes defined elsewhere (the page's text) are left
   alone, so they stay one footnote with the text's.
 
   Takes: a dict with

@@ -15,7 +15,7 @@
     class  extra classes for the figure
 
   Output (Tufte CSS):
-    <figure class="iframe-wrapper"><iframe src="…" title="…" frameborder="0" loading="lazy" allowfullscreen></iframe></figure>
+    <figure class="iframe-wrapper"><iframe src="…" title="…" loading="lazy" allowfullscreen></iframe></figure>
 */ -}}
 {{- $src := "" -}}{{- $title := "" -}}{{- $ratio := "" -}}{{- $allow := "" -}}{{- $class := "" -}}
 {{- if .IsNamedParams -}}
@@ -51,5 +51,5 @@
        kept, also with markup.goldmark.renderer.unsafe = false. */ -}}
 {{- $url := partial "tufte/safe-url.html" $src -}}
 {{- $out := printf `<figure class="iframe-wrapper%s"%s>` (cond (ne (printf "%v" $class) "") (printf " %s" (htmlEscape (printf "%v" $class))) "") (cond (ne $style "") (printf ` style="%s"` (htmlEscape $style)) "") -}}
-{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" frameborder=\"0\" loading=\"lazy\"%s allowfullscreen></iframe>\n</figure>" $out (htmlEscape $url) (htmlEscape (printf "%v" ($title | default (partial "func/t.html" "embeddedContent") | default "Embedded content"))) (cond (ne (printf "%v" $allow) "") (printf ` allow="%s"` (htmlEscape (printf "%v" $allow))) "") -}}
+{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" loading=\"lazy\"%s allowfullscreen></iframe>\n</figure>" $out (htmlEscape $url) (htmlEscape (printf "%v" ($title | default (partial "func/t.html" "embeddedContent") | default "Embedded content"))) (cond (ne (printf "%v" $allow) "") (printf ` allow="%s"` (htmlEscape (printf "%v" $allow))) "") -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

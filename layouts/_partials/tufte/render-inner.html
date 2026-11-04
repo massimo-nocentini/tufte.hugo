@@ -91,6 +91,12 @@
   render hook made here is marked <hN data-tufte-inner id="…">;
   func/content-raw.html then gives the marked headings ids that are unique
   on the page (ID-1, ID-2…; the page's own headings keep theirs) and drops
+  the mark. A heading whose id is written in this text ({#sec:x} or
+  {id="sec:x"}) is an author label instead: it is marked
+  <hN data-tufte-xinner id="…"> and keeps its id here, and
+  tufte/labels.html treats it with the page's headings (the first heading
+  in document order with an explicit id keeps it, a later one is renamed
+  ID-2… and tufte-duplicate-label is warned); tufte/postprocess.html drops
   the mark.
 
   Returns: the HTML string.
@@ -210,6 +216,15 @@
   {{- $md = replaceRE `(?s)\{\{%(.*?)%\}\}` "TUFTESCPO${1}TUFTESCPC" $md -}}
 {{- end -}}
 
+{{- /* Goldmark's footnote extension (func/fn-ext.html): when it is off
+       (markup.goldmark.extensions.footnote = false), "[^x]" is literal
+       text, as in the page's own text, so no definition is copied from
+       the page below, and a "[^x]: …" line is no footnote definition. */ -}}
+{{- $fnExt := false -}}
+{{- if strings.Contains $md "[^" -}}
+  {{- $fnExt = partialCached "func/fn-ext.html" $page (partial "func/lang.html" $page.Language).name -}}
+{{- end -}}
+
 {{- /* Inline mode: block markers at the start of a line are text.
        RenderString parses the text as a whole Markdown document, so a
        caption, note or verse line that starts like a block ("1869. Minard's
@@ -273,7 +288,7 @@
         {{- $l = replaceRE `^([ \t]*)([-+*])` `${1}\${2}` $l | replaceRE `^([ \t]*[0-9]{1,9})([.)])` `${1}\${2}` -}}
       {{- end -}}
     {{- else if $literal -}}
-      {{- $l = replaceRE "^([ \\t]*)(>|~~~|```)" `${1}\${2}` $l | replaceRE `^([ \t]*)(\[[^\]^][^\]]*\]:)` `${1}\${2}` -}}
+      {{- $l = replaceRE "^([ \\t]*)(>|~~~|```)" `${1}\${2}` $l | replaceRE (cond $fnExt `^([ \t]*)(\[[^\]^][^\]]*\]:)` `^([ \t]*)(\[[^\]][^\]]*\]:)`) `${1}\${2}` -}}
     {{- end -}}
     {{- $out = $out | append $l -}}
   {{- end -}}
@@ -291,8 +306,9 @@
        and indented code. A definition may sit in a block quote
        (> [^x]: …) or a list item (- [^x]: …), as Goldmark allows: the
        container's markers are removed from its lines. A reference with no
-       definition anywhere is warned (tufte-undefined-ref). */ -}}
-{{- if strings.Contains $md "[^" -}}
+       definition anywhere is warned (tufte-undefined-ref). Not when
+       Goldmark's footnote extension is off ($fnExt above). */ -}}
+{{- if and $fnExt (strings.Contains $md "[^") -}}
   {{- $probe := $md | replaceRE "(?ms)^[ \\t]*```.*?^[ \\t]*```[^\\n]*$" "" | replaceRE "(?ms)^[ \\t]*~~~.*?^[ \\t]*~~~[^\\n]*$" "" | replaceRE "`[^`\\n]*`" "" -}}
   {{- /* Nor indented code, math, or an escaped \[^x] (func/fn-strip.html). */ -}}
   {{- $probe = partial "func/fn-strip.html" (dict "md" (partial "func/fn-strip.html" (dict "md" $probe "what" "code")) "what" "inline") -}}
@@ -439,6 +455,15 @@
        raw HTML runs are still tokens here): marked for the page-wide id
        dedup of func/content-raw.html (see "Headings" above). */ -}}
 {{- if strings.Contains $html ` id="` -}}
+  {{- /* An id written in this text (as tufte/labels.html reads them in
+         the Markdown): an author label, see "Headings" above. */ -}}
+  {{- range uniq (findRE `<h[1-6] id="[^"]+"` $html) -}}
+    {{- $hid := htmlUnescape (replaceRE `^<h[1-6] id="([^"]+)"$` "$1" .) -}}
+    {{- $q := replaceRE `([.+*?()|\[\]{}^$\\])` `\$1` $hid -}}
+    {{- if findRE (printf `\{(?:[^}\n]*#%s|(?:[^}\n]*\s)?id=["']?%s["']?)[\s}]` $q $q) $md 1 -}}
+      {{- $html = replace $html . (replace . ` id="` ` data-tufte-xinner id="` 1) -}}
+    {{- end -}}
+  {{- end -}}
   {{- $html = replaceRE `<(h[1-6]) id="` `<$1 data-tufte-inner id="` $html -}}
 {{- end -}}
 {{- if $scEsc -}}
@@ -581,7 +606,7 @@
        touched; the HTML of nested shortcodes is restored below). */ -}}
 {{- if not $isBlock -}}
   {{- $html = partial "func/inline-figures.html" $html -}}
-  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- $html = partial "func/flatten-p.html" $html | strings.TrimSpace -}}
   {{- if not $keepBlocks -}}
     {{- $flat := partial "tufte/inline-blocks.html" $html -}}
     {{- if ne $flat $html -}}
@@ -594,13 +619,25 @@
   {{- $html = replace $html (printf "TUFTEFNMARK%dEND" $i) $m -}}
 {{- end -}}
 
-{{- /* 4. Restore raw HTML runs. */ -}}
+{{- /* 4. Restore raw HTML runs. In inline mode a run with block elements
+       (a <div>, or the HTML of a third-party shortcode kept by innerHTML,
+       e.g. highlight) cannot sit in the note's <span> either: it goes
+       through the same flattening as a nested theme shortcode
+       (tufte/inline-nested.html), and tufte-block-in-note is warned. */ -}}
+{{- $rawFlat := false -}}
 {{- range $i, $h := $saved -}}
   {{- $tok := printf "TUFTEHTML%dEND" $i -}}
+  {{- if and (not $isBlock) (not $keepBlocks) (strings.Contains $html $tok) -}}
+    {{- $r := partial "tufte/inline-nested.html" $h -}}
+    {{- if $r.changed }}{{ $h = $r.html }}{{ $rawFlat = true }}{{ end -}}
+  {{- end -}}
   {{- if in $blockTags (replaceRE $nameRE "$1" $h | lower) -}}
     {{- $html = replace $html (printf "<p>%s</p>" $tok) $h -}}
   {{- end -}}
   {{- $html = replace $html $tok $h -}}
+{{- end -}}
+{{- if $rawFlat -}}
+  {{- warnidf "tufte-block-in-note" "tufte.hugo: raw HTML with block elements (a div, pre, table, list, or the HTML of a third-party shortcode such as highlight) in inline text in %s: a note or caption is a <span>, so it is shown as inline blocks; use marginblock for margin material with blocks, or a real footnote ({{< footnote >}}, [^fn-x])" $at -}}
 {{- end -}}
 
 {{- /* 5. Swap nest tokens (a few passes: stored HTML may itself hold

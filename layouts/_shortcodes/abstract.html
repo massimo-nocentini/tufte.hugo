@@ -11,6 +11,6 @@
 
   Output: <section class="abstract">BLOCKS</section>
 */ -}}
-{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "inner" (strings.TrimSpace .Inner) "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "inner" (strings.TrimSpace .InnerDeindent) "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
 {{- $out := printf "<section class=\"abstract\">\n%s\n</section>" $html -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

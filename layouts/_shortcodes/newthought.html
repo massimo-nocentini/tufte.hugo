@@ -10,7 +10,7 @@
 
   Output (Tufte CSS): <span class="newthought">TEXT</span>
 */ -}}
-{{- $text := strings.TrimSpace .Inner -}}
+{{- $text := strings.TrimSpace .InnerDeindent -}}
 {{- if not $text -}}
   {{- if .IsNamedParams -}}
     {{- $text = printf "%v" (.Get "text" | default "") -}}
@@ -20,8 +20,8 @@
 {{- end -}}
 {{- $html := "" -}}
 {{- with $text -}}
-  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.Inner) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
-  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.InnerDeindent) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = partial "func/flatten-p.html" $html | strings.TrimSpace -}}
 {{- end -}}
 {{- $out := printf `<span class="newthought">%s</span>` $html -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

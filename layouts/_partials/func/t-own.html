@@ -5,10 +5,12 @@
   fallback).
 
   A theme language (the five i18n/*.yaml files, every key in each) has
-  them all. Another language has the keys of the site's own file
-  i18n/<lang>.yaml (.yml, .toml or .json; the language key as written,
-  or with its region in capitals: pt-br, pt-BR), read relative to the
-  project directory (os.ReadFile). Keys compare lowercased, as Hugo's T.
+  them all. Another language has the keys of the site's own files
+  i18n/<lang>.yaml (.yml, .toml or .json) whose base name is the language
+  key in any casing, as Hugo reads them (pt-br, pt-BR, zh-Hans,
+  zh-Hant-TW, sr-Latn), listed and read relative to the project directory
+  (os.ReadDir, os.ReadFile), so that the result does not depend on the
+  filesystem being case-insensitive. Keys compare lowercased, as Hugo's T.
 
   Takes: the language key (string). Called through partialCached.
   Returns: dict
@@ -20,25 +22,28 @@
 {{- if in (slice "en" "it" "fr" "de" "es") $name -}}
   {{- $out = dict "all" true "keys" (dict) -}}
 {{- else -}}
-  {{- $names := slice $name -}}
-  {{- with findRESubmatch `^([a-z]+)-([a-z]+)$` $name 1 -}}
-    {{- $names = $names | append (printf "%s-%s" (index . 0 1) (upper (index . 0 2))) -}}
+  {{- $files := slice -}}
+  {{- with try (os.ReadDir "i18n") -}}
+    {{- range .Value -}}
+      {{- if not .IsDir -}}
+        {{- $ext := strings.TrimPrefix "." (path.Ext .Name) -}}
+        {{- if and (in (slice "yaml" "yml" "toml" "json") $ext) (eq (lower (strings.TrimSuffix (path.Ext .Name) .Name)) $name) -}}
+          {{- $files = $files | append (dict "f" (printf "i18n/%s" .Name) "ext" $ext) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
   {{- $keys := dict -}}
-  {{- range $n := $names -}}
-    {{- range $ext := slice "yaml" "yml" "toml" "json" -}}
-      {{- $f := printf "i18n/%s.%s" $n $ext -}}
-      {{- if os.FileExists $f -}}
-        {{- with try (os.ReadFile $f | transform.Unmarshal (dict "format" (cond (eq $ext "yml") "yaml" $ext))) -}}
-          {{- with .Value -}}
-            {{- if reflect.IsMap . -}}
-              {{- range $k, $v := . }}{{ $keys = merge $keys (dict (lower $k) true) }}{{ end -}}
-            {{- else -}}
-              {{- /* go-i18n v1 list: - id: key  translation: … */ -}}
-              {{- range . -}}
-                {{- if reflect.IsMap . }}{{ with .id }}{{ $keys = merge $keys (dict (lower (printf "%v" .)) true) }}{{ end }}{{ end -}}
-              {{- end -}}
-            {{- end -}}
+  {{- range $files -}}
+    {{- $ext := .ext -}}
+    {{- with try (os.ReadFile .f | transform.Unmarshal (dict "format" (cond (eq $ext "yml") "yaml" $ext))) -}}
+      {{- with .Value -}}
+        {{- if reflect.IsMap . -}}
+          {{- range $k, $v := . }}{{ $keys = merge $keys (dict (lower $k) true) }}{{ end -}}
+        {{- else -}}
+          {{- /* go-i18n v1 list: - id: key  translation: … */ -}}
+          {{- range . -}}
+            {{- if reflect.IsMap . }}{{ with .id }}{{ $keys = merge $keys (dict (lower (printf "%v" .)) true) }}{{ end }}{{ end -}}
           {{- end -}}
         {{- end -}}
       {{- end -}}

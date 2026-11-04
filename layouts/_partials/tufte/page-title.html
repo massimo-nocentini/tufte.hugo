@@ -9,15 +9,28 @@
                            or one without a title) and the key exists
     archive page           i18n "archives", when the page has no title
                            (layout: archive)
+    any other page but     its linkTitle when it has no title (Hugo does
+    the home page          not require one; an _index.md without title
+                           leaves a section, book, part or term untitled),
+                           else, for a term, the term; for a section
+                           (book, part), its directory name, humanized
+                           ("my-book" -> "My Book"); else i18n "untitled".
+                           The home page keeps .Title (Hugo gives it the
+                           site title).
 
   Any other page, or a title set in front matter: .Title. Used by the
   <title> and social titles (head.html), the h1 of taxonomy.html and
-  archive.html, the back link of term.html and the RSS channel title.
+  archive.html, the back link of term.html, the RSS channel and item
+  titles, and by tufte/title-html.html (so tufte/plain-title.html and
+  tufte/name-title.html too) whenever the title it is given is empty: the
+  h1 of the title block, summary titles, archive and term lists, the post
+  and book navigation, the book contents and cross-reference names never
+  print an empty title.
 
   Takes: the page.
   Returns: the title (string).
 */ -}}
-{{- $t := .Title -}}
+{{- $t := strings.TrimSpace (printf "%v" .Title) -}}
 {{- if eq .Kind "404" -}}
   {{- with partial "func/t.html" "pageNotFound" }}{{ $t = . }}{{ end -}}
 {{- else if eq .Kind "taxonomy" -}}
@@ -29,5 +42,16 @@
   {{- end -}}
 {{- else if and (not $t) (eq .Layout "archive") -}}
   {{- with partial "func/t.html" "archives" }}{{ $t = . }}{{ end -}}
+{{- else if and (not $t) (ne .Kind "home") -}}
+  {{- $t = strings.TrimSpace (printf "%v" .LinkTitle) -}}
+  {{- if and (not $t) (eq .Kind "term") -}}
+    {{- with .Data.Term }}{{ $t = strings.TrimSpace (printf "%v" .) }}{{ end -}}
+  {{- end -}}
+  {{- if and (not $t) (eq .Kind "section") .File -}}
+    {{- /* As Hugo titles a section that has no _index.md: its directory
+           name (here humanized: "my-book" -> "My Book"). */ -}}
+    {{- with .File.ContentBaseName }}{{ $t = strings.TrimSpace (title (humanize .)) }}{{ end -}}
+  {{- end -}}
+  {{- if not $t }}{{ with partial "func/t.html" "untitled" }}{{ $t = . }}{{ end }}{{ end -}}
 {{- end -}}
 {{- return $t -}}

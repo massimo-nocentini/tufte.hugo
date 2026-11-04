@@ -6,9 +6,10 @@
 
   The first definition wins; the same explicit label in two pages gives one
   tufte-duplicate-label warning (this partial is cached, so it is warned
-  once per build). Same ranks as tufte/labels.html: heading ids (they
-  repeat across chapters: "introduction", …) < \label anchors < the rest;
-  a higher rank wins silently, headings never conflict.
+  once per build). Same ranks as tufte/labels.html: automatic heading ids
+  (they repeat across chapters: "introduction", …) < \label anchors < the
+  rest, explicit heading ids ({#sec:x}) included; a higher rank wins
+  silently, automatic heading ids never conflict.
 
   Takes: the book root page.
   Returns: map normalised key → entry dict (see tufte/labels.html).
@@ -38,12 +39,15 @@
     {{- /* Markdown footnote labels are page-local (tufte/labels.html). */ -}}
     {{- if eq $v.local true }}{{ continue }}{{ end -}}
     {{- $old := index ($E.Get "e") $k -}}
+    {{- /* An explicit heading id ({#sec:x}) is an author label: rank 2,
+           as in tufte/labels.html, so the same one in two chapters is
+           warned; automatic ids (they repeat: "introduction") stay 0. */ -}}
     {{- $rank := 2 -}}
-    {{- if isset $ranks $v.kind }}{{ $rank = index $ranks $v.kind }}{{ end -}}
+    {{- if and (isset $ranks $v.kind) (not (and (eq $v.kind "heading") (eq $v.explicit true))) }}{{ $rank = index $ranks $v.kind }}{{ end -}}
     {{- $oldRank := 0 -}}
     {{- with $old -}}
       {{- $oldRank = 2 -}}
-      {{- if isset $ranks .kind }}{{ $oldRank = index $ranks .kind }}{{ end -}}
+      {{- if and (isset $ranks .kind) (not (and (eq .kind "heading") (eq .explicit true))) }}{{ $oldRank = index $ranks .kind }}{{ end -}}
     {{- end -}}
     {{- if not $old -}}
       {{- $E.SetInMap "e" $k $v -}}

@@ -45,11 +45,8 @@
   {{- if $margin -}}
     {{- $pieces = $pieces | append (string (partial "tufte/bib/entries.html" (dict "page" $p "keys" . "postnote" ""))) -}}
   {{- else -}}
-    {{- $refs := slice -}}
-    {{- range . -}}
-      {{- $refs = $refs | append (printf `<a class="citation-ref" href="#ref-%s" data-cite="%s"><span class="cite-num" data-key="%s"></span></a>` (htmlEscape .) (htmlEscape .) (htmlEscape .)) -}}
-    {{- end -}}
-    {{- $nobib = printf ` [%s]` (delimit $refs ", ") -}}
+    {{- /* An unknown key prints [key?], unnumbered (tufte/bib/nobib-refs.html). */ -}}
+    {{- $nobib = printf ` [%s]` (partial "tufte/bib/nobib-refs.html" (dict "page" $p "keys" .)) -}}
   {{- end -}}
 {{- end -}}
 {{- $block := "" -}}

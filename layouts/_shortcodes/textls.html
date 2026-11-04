@@ -11,7 +11,7 @@
 
   Output: <span class="ls" style="letter-spacing:0.1em">TEXT</span>
 */ -}}
-{{- $amount := "" -}}{{- $text := strings.TrimSpace .Inner -}}
+{{- $amount := "" -}}{{- $text := strings.TrimSpace .InnerDeindent -}}
 {{- if .IsNamedParams -}}
   {{- $amount = printf "%v" (.Get "amount" | default "") -}}
   {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
@@ -30,8 +30,8 @@
 {{- end -}}
 {{- $html := "" -}}
 {{- with $text -}}
-  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.Inner) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
-  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.InnerDeindent) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = partial "func/flatten-p.html" $html | strings.TrimSpace -}}
 {{- end -}}
 {{- $style := "" -}}
 {{- with $ls }}{{ $style = printf ` style="letter-spacing:%s"` . }}{{ end -}}

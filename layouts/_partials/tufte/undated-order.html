@@ -1,0 +1,37 @@
+{{- /*
+  Undated pages in reading order, for the lists that put them after the
+  dated ones (layouts/rss.xml, tufte/archive-list.html): the chapters of
+  each book in its reading order (tufte/book/sequence.html: matter,
+  weight, file name, parts kept together), book after book in the order
+  of their first page in the input, then the pages outside any book in
+  the input order (the collection's: Hugo's default order, weight then
+  title).
+
+  Takes: the undated pages (a slice of pages).
+  Returns: the same pages, reordered (a slice).
+*/ -}}
+{{- $out := slice -}}
+{{- $want := newScratch -}}
+{{- $roots := slice -}}
+{{- range . -}}
+  {{- $want.SetInMap "p" (or .RelPermalink .Path) true -}}
+  {{- with partialCached "tufte/book/root.html" . (or .RelPermalink .Path) -}}
+    {{- if not (in $roots .) }}{{ $roots = $roots | append . }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- $placed := newScratch -}}
+{{- range $roots -}}
+  {{- range partialCached "tufte/book/sequence.html" . (or .RelPermalink .Path) -}}
+    {{- if eq .Kind "chapter" -}}
+      {{- $k := or .Page.RelPermalink .Page.Path -}}
+      {{- if and (index ($want.Get "p") $k) (not (index ($placed.Get "p" | default dict) $k)) -}}
+        {{- $out = $out | append .Page -}}
+        {{- $placed.SetInMap "p" $k true -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- range . -}}
+  {{- if not (index ($placed.Get "p" | default dict) (or .RelPermalink .Path)) }}{{ $out = $out | append . }}{{ end -}}
+{{- end -}}
+{{- return $out -}}

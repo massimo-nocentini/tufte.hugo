@@ -161,14 +161,14 @@
           {{- $c := .Page -}}
           {{- $ck := or $c.RelPermalink $c.Path -}}
           {{- $body := printf "%s%s" (partial "tufte/abstract.html" (dict "page" $c "print" true)) (partialCached "func/content.html" (dict "page" $c "summary" false "print" true) $ck false "print") -}}
-          {{- if or (findRE $mathRE $body 1) (findRE `\$|\\\(|\\\[` (printf "%v" (slice $c.Title $c.Params.thanks $c.Params.author)) 1) (eq $c.Params.math true) }}{{ $math = true }}{{ end -}}
+          {{- if or (findRE $mathRE $body 1) (findRE `\$|\\\(|\\\[` (printf "%v" (slice $c.Title $c.Params.thanks $c.Params.author)) 1) (partial "tufte/truthy.html" $c.Params.math) }}{{ $math = true }}{{ end -}}
         {{- end -}}
       {{- end -}}
       {{- range partialCached "tufte/book/parts.html" . $key -}}
         {{- if not $math -}}
           {{- $q := .Page -}}
           {{- $body := printf "%s%s" (partial "tufte/abstract.html" $q) (partialCached "func/content.html" $q (or $q.RelPermalink $q.Path) false) -}}
-          {{- if or (findRE $mathRE $body 1) (findRE `\$|\\\(|\\\[` $q.Title 1) (eq $q.Params.math true) }}{{ $math = true }}{{ end -}}
+          {{- if or (findRE $mathRE $body 1) (findRE `\$|\\\(|\\\[` $q.Title 1) (partial "tufte/truthy.html" $q.Params.math) }}{{ $math = true }}{{ end -}}
         {{- end -}}
       {{- end -}}
     {{- end -}}
@@ -183,13 +183,21 @@
     {{- range (partial "func/paginate.html" .).Pages -}}
       {{- if not $math -}}
         {{- $sum := partialCached "func/content.html" (dict "page" . "summary" true) (or .RelPermalink .Path) true -}}
-        {{- if or (findRE $mathRE $sum 1) (eq .Params.math true) }}{{ $math = true }}{{ end -}}
+        {{- if or (findRE $mathRE $sum 1) (partial "tufte/truthy.html" .Params.math) }}{{ $math = true }}{{ end -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
+{{- /* Front matter math: a bool or a string ("true", "false", "yes",
+       "off"…, as func/flag.html reads other booleans); "auto" or "" keep
+       the detection above. */ -}}
 {{- if isset .Params "math" -}}
-  {{- $math = eq .Params.math true -}}
+  {{- $fm := lower (trim (printf "%v" .Params.math) " ") -}}
+  {{- if in (slice "true" "yes" "1" "on") $fm -}}
+    {{- $math = true -}}
+  {{- else if in (slice "false" "no" "0" "off") $fm -}}
+    {{- $math = false -}}
+  {{- end -}}
 {{- end -}}
 {{- /* KaTeX CSS, plus the KaTeX scripts with params.math.engine = "client";
        URLs and SRI hashes from data/tufte/vendor.toml. */ -}}

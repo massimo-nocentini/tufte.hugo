@@ -32,8 +32,9 @@
   {{- $parts := split $html $open -}}
   {{- $head := index $parts 0 -}}
   {{- $rest := printf "%s%s" $open (delimit (after 1 $parts) $open) -}}
-  {{- /* Tags at odd indexes, text at even ones. */ -}}
-  {{- $pieces := split (replaceRE `(<span[\s>][^>]*>|</span>)` "\x1f$1\x1f" $rest) "\x1f" -}}
+  {{- /* Tags at odd indexes, text at even ones. A bare <span> is one
+       tag: KaTeX writes <span></span> in every subscript. */ -}}
+  {{- $pieces := split (replaceRE `(<span(?:\s[^>]*)?>|</span>)` "\x1f$1\x1f" $rest) "\x1f" -}}
   {{- $S := newScratch -}}
   {{- $S.Set "buf" dict -}}
   {{- $stack := slice -}}

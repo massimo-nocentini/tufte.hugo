@@ -1,10 +1,21 @@
 {{- /*
-  An id of the current build: the time of its first call. Always called
-  as partialCached "tufte/build-stamp.html" "stamp" "stamp", so it is
-  computed once per build; Hugo empties partialCached on every rebuild of
-  `hugo server` (and `hugo --watch`), and the next call gives a new id.
-  Read by tufte/memo.html.
+  An id of the current build. Always called as
+  partialCached "tufte/build-stamp.html" "stamp" "stamp" (read by
+  tufte/memo.html).
+
+  The id lives in hugo.Store, not in partialCached: partialCached's cache is
+  bounded, and on large books (from about 160 chapters) it evicts even this
+  entry several times per build; an id recomputed on every eviction would
+  invalidate every .Store memo each time. hugo.Store is never evicted, but
+  it also survives the rebuilds of `hugo server` and `hugo --watch`, so the
+  id is changed at the end of each build instead: baseof.html holds a
+  templates.Defer with a fixed key, which Hugo runs once per build after
+  every page has been rendered. The memos of one
+  build therefore never count in the next one (an edit shows on the next
+  rebuild), and an eviction inside a build gives the same id back.
+
+  The first build of a process reads 0.
 
   Returns: an int.
 */ -}}
-{{- return now.UnixNano -}}
+{{- return (or (hugo.Store.Get "tufteBuildStamp") 0) -}}

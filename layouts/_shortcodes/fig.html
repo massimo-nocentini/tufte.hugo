@@ -34,7 +34,7 @@
 {{- if .IsNamedParams -}}
   {{- $get = .Params -}}
 {{- end -}}
-{{- $text := strings.TrimSpace .Inner -}}
+{{- $text := strings.TrimSpace .InnerDeindent -}}
 {{- $cap := "" -}}
 {{- with $text -}}
   {{- $cap = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}

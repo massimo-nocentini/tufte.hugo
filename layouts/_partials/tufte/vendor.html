@@ -44,9 +44,36 @@
         {{- if in (slice "" "." "/") $name }}{{ $name = "asset" }}{{ end -}}
         {{- $ext := cond (eq $kind "css") ".css" ".js" -}}
         {{- if ne (lower (path.Ext $name)) $ext }}{{ $name = printf "%s%s" $name $ext }}{{ end -}}
-        {{- $r := . | resources.Copy (path.Join ($.dir | default "vendor") $name) | fingerprint "sha384" -}}
-        {{- if and $integrity (ne $r.Data.Integrity $integrity) -}}
-          {{- errorf "tufte.hugo: %s does not match its SRI hash %s (got %s)" $url $integrity $r.Data.Integrity -}}
+        {{- $copy := . | resources.Copy (path.Join ($.dir | default "vendor") $name) -}}
+        {{- $r := $copy | fingerprint "sha384" -}}
+        {{- if $integrity -}}
+          {{- /* Any SRI form a browser accepts: sha256-, sha384- or
+                 sha512-, several hashes separated by spaces, ?options.
+                 As in a browser, only the strongest algorithm listed
+                 counts and the file must match one of its hashes; the
+                 file is fingerprinted with that algorithm. */ -}}
+          {{- $rank := dict "sha256" 1 "sha384" 2 "sha512" 3 -}}
+          {{- $hashes := slice -}}
+          {{- $best := "" -}}
+          {{- $bestRank := 0 -}}
+          {{- range findRE `\S+` $integrity -}}
+            {{- $tok := replaceRE `\?.*$` "" . -}}
+            {{- $alg := lower (index (split $tok "-") 0) -}}
+            {{- with index $rank $alg -}}
+              {{- $hashes = $hashes | append (printf "%s%s" $alg (strings.TrimPrefix (index (split $tok "-") 0) $tok)) -}}
+              {{- if gt . $bestRank }}{{ $bestRank = . }}{{ $best = $alg }}{{ end -}}
+            {{- end -}}
+          {{- end -}}
+          {{- if not $best -}}
+            {{- errorf "tufte.hugo: the SRI hash %q of %s has no sha256-, sha384- or sha512- value (params.selfHosted)" $integrity $url -}}
+          {{- else -}}
+            {{- $r = $copy | fingerprint $best -}}
+            {{- $ok := false -}}
+            {{- range $hashes }}{{ if eq . $r.Data.Integrity }}{{ $ok = true }}{{ end }}{{ end -}}
+            {{- if not $ok -}}
+              {{- errorf "tufte.hugo: %s does not match its SRI hash %s (its %s hash is %s; as in browsers, only the hashes of the strongest algorithm listed count)" $url $integrity $best $r.Data.Integrity -}}
+            {{- end -}}
+          {{- end -}}
         {{- end -}}
         {{- $href = $r.RelPermalink -}}
         {{- $integrity = $r.Data.Integrity -}}

@@ -22,7 +22,7 @@
     <label for="sn-ID" class="margin-toggle sidenote-number"[ id="KEY" data-key="KEY"][ data-number="X"]></label><input type="checkbox" id="sn-ID" class="margin-toggle"/><span class="sidenote"[ data-number="X"][ style="--tufte-offset:…"]>TEXT[<span class="citation-block">…</span>]</span><i class="sn-end" hidden></i>
 */ -}}
 {{- $p := .Page -}}
-{{- $text := strings.TrimSpace .Inner -}}
+{{- $text := strings.TrimSpace .InnerDeindent -}}
 {{- $number := "" -}}{{- $offset := "" -}}{{- $label := "" -}}{{- $cite := "" -}}
 {{- if .IsNamedParams -}}
   {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
@@ -45,11 +45,11 @@
   {{- /* A text= or positional text was not run by Hugo: its shortcodes run
          now ("shortcodes" "run"); in .Inner they already ran, and only
          escaped ones are left. */ -}}
-  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.Inner) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.InnerDeindent) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
   {{- /* A sidenote or margin note nested in it cannot float. */ -}}
   {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $.Name) "where" $.Position) -}}
   {{- /* A span cannot hold paragraphs: turn paragraph breaks into <br>. */ -}}
-  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- $html = partial "func/flatten-p.html" $html | strings.TrimSpace -}}
 {{- end -}}
 {{- /* Citations: those of nested cite shortcodes and of cite=, in one
        block after the text (tufte/cite-gather.html). */ -}}

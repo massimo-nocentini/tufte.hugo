@@ -7,22 +7,25 @@
   the full page and shortcode and render-hook floats interleave.
 
   One ordered scan over:
-    <h2>…<h6> with an id   headings: name = plain title, where = enclosing
-                           h2 title; a sec token inside an h2/h3 numbers it
+    <h2>…<h6> with an id   headings: name = plain title, where = innermost
+                           enclosing h2/h3 title; a sec token inside an h2/h3 numbers it
                            ("2", "2.1", "CH.2" when the chapter is numbered)
     tufte-num tokens       figure/table/listing (numbered when floats are,
                            see below), eq (always, except a \tag{X}: its
                            data-number X is the display and the counter
                            does not step); name = data-short, else
-                           the caption HTML (caption-text span)
+                           the caption HTML (caption-text span); those in
+                           a real footnote's text in display order, like
+                           the sidenote marks (below)
     sidenote marks         counted (unless data-number), in display order
                            when some sit in a real footnote's text (shown
                            in the footnote list); labelled ones
                            (data-key) become kind "sidenote" entries
     tufte-anchor span/div  kind "label" (\label anywhere): display = the
-                           current section number (in a numbered chapter,
-                           the chapter's outside a numbered section, as
-                           after \chapter), name = section title
+                           current section number (in a numbered chapter
+                           or on a part page, the chapter's or part's
+                           outside a numbered section, as after \chapter
+                           or \part), name = section title
     span.run-in with id    kind "label" (\paragraph): name = run-in title
                            (its HTML, nested spans balanced, notes removed)
     i.tufte-float          a labelled float without a number (numbered =
@@ -49,9 +52,18 @@
   from the title) 0 < \label anchors (tufte-anchor) 1 < everything else 2 (floats,
   equations, sidenotes, the page label, and headings with an explicit id
   {#…} in the Markdown, which are author labels). A higher rank wins; on
-  equal ranks the first one wins. tufte-duplicate-label is warned for every
-  clash except two headings (Goldmark dedupes their ids) and a float's own
-  anchor element (a tufte-anchor with the float's key and id). When a
+  equal ranks the first one wins. Explicit is decided per heading, not per
+  id: of the N headings with one id written K times in the Markdown, the
+  last K are explicit (Goldmark dedupes an automatic id only against the
+  ids before it). A heading of a shortcode's inner text whose id is
+  written there (data-tufte-xinner, tufte/render-inner.html) is explicit
+  and is ranked in document order with the page's own headings (an
+  automatic page id it repeats yields, before or after it).
+  tufte-duplicate-label is warned for every
+  clash except two automatic heading ids (Goldmark dedupes them; an
+  explicit id written twice is renamed ID-2… on the later heading, and an
+  automatic id that a later explicit id repeats is renamed ID-2…, see
+  "hrenames") and a float's own anchor element (a tufte-anchor with the float's key and id). When a
   non-heading element carries the same HTML id as a heading, its id is
   renamed (KEY-KIND, see "renames"), so the page never has two elements
   with one id and the heading keeps the id its TOC links use.
@@ -65,14 +77,15 @@
               word: the kind whose word xref fmt "full" prints when the
               display is a section or chapter number borrowed by a
               \label, run-in heading or textless float ("label",
-              "chapter", "appendix"; "" = kind)
+              "chapter", "appendix", "part"; "" = kind)
               kind ∈ heading figure table listing eq sidenote label
               chapter appendix part page; name/caption/where are HTML
               (a page label's name is its title rendered as inline
               Markdown);
               anchor is the real id ("" for a page entry)
-    order     map kind → slice of keys in document order, for figure,
-              table, listing, eq
+    order     map kind → slice of keys in the order of their numbers
+              (document order, with the texts of real footnotes where
+              their list shows them), for figure, table, listing, eq
     tokens    map "KIND|KEY" → display of each number token (figure table
               listing eq sec), first one wins: a token gets its own number
               even when its key lost to another label
@@ -86,6 +99,16 @@
               tokens by position (xref still resolves to the first entry)
     renames   map old id → new id of non-heading elements whose id equals
               a heading's (applied by tufte/postprocess.html)
+    hrenames  map heading id → slice by position: element i is the new id
+              (ID-2, ID-3…) of the (i+1)th heading with that id, "" = kept;
+              the later headings that repeat an explicit id, and an
+              automatic id that an explicit one repeats (applied by
+              tufte/postprocess.html, over all the headings in the HTML;
+              a heading of a shortcode's inner text with an explicit id,
+              marked data-tufte-xinner, takes part)
+    htoc      the same, by position among the page's own headings only
+              (no data-tufte-xinner): tufte/page-toc.html and
+              tufte/book/toc-headings.html link the nth TOC entry to it
     xrefs     map 16-hex hash → xref marker HTML: an xref inside a heading
               or run-in title is unresolved in phase 1 (its text is the raw
               key), so the title (name, where) keeps it as the token
@@ -103,6 +126,13 @@
 {{- else -}}
 {{- $p := . -}}
 {{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) (or $p.RelPermalink $p.Path) false | string -}}
+{{- /* plainnat's extra letters (1999a) in the names of headings and
+       captions: only postprocess fills the body's markers, and the names
+       leave phase 1 here (tufte/bib/fill-extra.html reads the
+       bibliography, never labels). */ -}}
+{{- if strings.Contains $raw "bib-extra" -}}
+  {{- $raw = partial "tufte/bib/fill-extra.html" (dict "page" $p "html" $raw) -}}
+{{- end -}}
 {{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
 {{- $inBook := false -}}
 {{- with $root }}{{ $inBook = true }}{{ end -}}
@@ -157,9 +187,10 @@
 {{- $off := partialCached "tufte/offsets.html" $p (or $p.RelPermalink $p.Path) -}}
 {{- $floatPrefix := $off.prefix | default "" -}}
 {{- /* Titles as plain text (Markdown such as `code` rendered, tags
-       removed), HTML-escaped. */ -}}
-{{- $plainTitle := partial "tufte/plain-title.html" (dict "page" $p "title" $p.Title) | htmlEscape -}}
-{{- $plainLinkTitle := partial "tufte/plain-title.html" (dict "page" $p) | htmlEscape -}}
+       removed) with their math typeset, HTML-escaped, as a heading's name
+       (tufte/name-title.html). */ -}}
+{{- $plainTitle := partial "tufte/name-title.html" (dict "page" $p "title" $p.Title) -}}
+{{- $plainLinkTitle := partial "tufte/name-title.html" (dict "page" $p) -}}
 
 {{- $S := newScratch -}}
 {{- $S.Set "figure" $off.figure -}}
@@ -177,14 +208,43 @@
        the section with footnotePlacement = "section". So when there are
        any, the marks are numbered in that display order (SN map: for id →
        number), each footnote's text once (at its first reference, as the
-       list holds it). */ -}}
+       list holds it).
+       The same holds for the number tokens of the floats and labelled
+       equations in a real footnote's text (an image with a caption, a
+       table, a $$…\label{…}$$ in [^fn-x]: …): they are numbered in that
+       display order too (NM map: the token's index in $raw → its number
+       and display position), so the page, the lists and the xrefs read
+       1, 2, 3 down the page. Each token of $raw is tagged with its index
+       (data-tufteix) in the copy the display order is built from. */ -}}
 {{- $SN := newScratch -}}
 {{- $SN.Set "n" dict -}}
+{{- $NM := newScratch -}}
+{{- $NM.Set "m" dict -}}
+{{- $numTokRE := `<span class="tufte-num"[^>]*></span>` -}}
 {{- $labelRE := `<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>` -}}
 {{- if strings.Contains $raw `<span class="tufte-fn"` -}}
   {{- $sp := partial "tufte/fn-split.html" $raw -}}
   {{- $inFn := false -}}
-  {{- range $sp.items }}{{ if strings.Contains .text "sidenote-number" }}{{ $inFn = true }}{{ end }}{{ end -}}
+  {{- $numInFn := false -}}
+  {{- range $sp.items -}}
+    {{- if strings.Contains .text "sidenote-number" }}{{ $inFn = true }}{{ end -}}
+    {{- if findRE `<span class="tufte-num" data-kind="(?:figure|table|listing|eq)"` .text 1 }}{{ $numInFn = true }}{{ end -}}
+  {{- end -}}
+  {{- if $numInFn -}}
+    {{- /* Tag every token with its index, as the scan below meets them
+           (only when the split finds each token the scan does). */ -}}
+    {{- $parts := split $raw `<span class="tufte-num"` -}}
+    {{- if eq (sub (len $parts) 1) (len (findRE $numTokRE $raw)) -}}
+      {{- $rawM := index $parts 0 -}}
+      {{- range $i, $part := after 1 $parts -}}
+        {{- $rawM = printf `%s<span class="tufte-num" data-tufteix="%d"%s` $rawM $i $part -}}
+      {{- end -}}
+      {{- $sp = partial "tufte/fn-split.html" $rawM -}}
+      {{- $inFn = true -}}
+    {{- else -}}
+      {{- $numInFn = false -}}
+    {{- end -}}
+  {{- end -}}
   {{- if $inFn -}}
     {{- $posTok := `<i class="tufte-fnpos" data-n="%d" hidden></i>` -}}
     {{- $texts := slice -}}
@@ -204,14 +264,31 @@
     {{- else -}}
       {{- $placement = partialCached "tufte/opt.html" (dict "page" $p "key" "footnoteplacement" "default" "page") (or $p.RelPermalink $p.Path) "footnoteplacement" -}}
     {{- end -}}
-    {{- $sections := "h2" -}}
-    {{- with $p.Param "sections" }}{{ $sections = lower (strings.TrimSpace (printf "%v" .)) }}{{ end -}}
+    {{- $sections := partial "func/sections-mode.html" $p -}}
     {{- $dom := "" -}}
     {{- if and (eq (lower (printf "%v" $placement)) "section") (ne $sections "none") -}}
       {{- /* Each section ends with the notes first referenced in it, the
              last one with those left over. */ -}}
       {{- $done := newScratch -}}
-      {{- $chunks := split (string (partial "func/sectionize.html" $body)) "\n</section>\n" -}}
+      {{- /* The sections are those of the final page, where postprocess
+             has replaced each generated list placeholder (bibliography,
+             lists of figures/tables/listings, index) with its <h2>…:
+             an empty <h2> in front of each one that gets a heading (no
+             heading="") splits here as that <h2> will (or does not, when
+             the placeholder is nested in a blockquote, a div…). */ -}}
+      {{- $sb := $body -}}
+      {{- range uniq (findRE `<div class="tufte-placeholder" data-what="(?:bibliography|lof|lot|lol|index)"[^>]*></div>` $sb) -}}
+        {{- $noHead := false -}}
+        {{- if strings.Contains . `data-opts="` -}}
+          {{- range split (replaceRE `(?s)^.*data-opts="([^"]*)".*$` "$1" . | htmlUnescape) ";" -}}
+            {{- if and (strings.Contains . "=") (eq (replaceRE `(?s)^([^=]*)=.*$` "$1" . | strings.TrimSpace | lower) "heading") -}}
+              {{- $noHead = not (replaceRE `(?s)^[^=]*=(.*)$` "$1" . | strings.TrimSpace) -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+        {{- if not $noHead }}{{ $sb = replace $sb . (printf "<h2></h2>%s" .) }}{{ end -}}
+      {{- end -}}
+      {{- $chunks := split (string (partial "func/sectionize.html" $sb)) "\n</section>\n" -}}
       {{- range $i, $chunk := $chunks -}}
         {{- $add := "" -}}
         {{- range findRE `<i class="tufte-fnpos" data-n="[0-9]+" hidden></i>` $chunk -}}
@@ -251,25 +328,56 @@
         {{- end -}}
       {{- end -}}
     {{- end -}}
+    {{- if $numInFn -}}
+      {{- /* The number tokens in display order, stepped as the scan below
+             steps them in document order (a token only in $raw, not
+             shown, gets no entry and is skipped there). */ -}}
+      {{- $cnt := newScratch -}}
+      {{- range $kd := slice "figure" "table" "listing" "eq" }}{{ $cnt.Set $kd ($S.Get $kd) }}{{ end -}}
+      {{- range $pos, $tok := findRE `<span class="tufte-num" data-tufteix="[0-9]+"[^>]*></span>` $dom -}}
+        {{- $ix := replaceRE `^.*data-tufteix="([0-9]+)".*$` "$1" $tok -}}
+        {{- $kd := replaceRE `(?s)^.*data-kind="([^"]*)".*$` "$1" $tok -}}
+        {{- $d := "" -}}
+        {{- if and (strings.Contains $tok `data-key="`) (in (slice "figure" "table" "listing" "eq") $kd) (not (and (eq $kd "eq") (strings.Contains $tok `data-number="`))) (or $num (eq $kd "eq")) -}}
+          {{- $cnt.Add $kd 1 -}}
+          {{- $d = printf "%s%d" $floatPrefix ($cnt.Get $kd) -}}
+        {{- end -}}
+        {{- if not (isset ($NM.Get "m") $ix) -}}
+          {{- $NM.SetInMap "m" $ix (dict "d" $d "pos" $pos) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}
 {{- $snNum := $SN.Get "n" -}}
+{{- $numMap := $NM.Get "m" -}}
+{{- /* The index of the next number token met by the scan (see NM). */ -}}
+{{- $S.Set "tokix" 0 -}}
 {{- $h2 := $h2Start -}}
 {{- $h3 := 0 -}}
 {{- /* The current \@currentlabel for a \label, a run-in heading or a
-       labelled float with no text: in a numbered chapter (or appendix)
-       its number ("2", "A"), as after \chapter, kept by an unnumbered h2
+       labelled float with no text: in a numbered chapter (or appendix,
+       or on a part page) its number ("2", "A", "I"), as after \chapter
+       or \part, kept by an unnumbered h2
        (an unnumbered \section does not step a counter), and the section
        number in a numbered section; "" elsewhere (handouts, unnumbered,
        front- and back-matter chapters), so the reference prints the
        title. secWord: the word xref fmt "full" prints with it (chapter,
-       appendix; "" = by kind). */ -}}
+       appendix, part; "" = by kind). */ -}}
 {{- $chapNum := "" -}}
 {{- $chapWord := "" -}}
 {{- with $chap -}}
   {{- if .Numbered -}}
     {{- $chapNum = .Display -}}
     {{- $chapWord = cond (eq .Matter "appendix") "appendix" "chapter" -}}
+  {{- end -}}
+{{- else -}}
+  {{- /* A part page: tufte-book numbers parts (secnumdepth -1 > -2, so
+         \part runs \refstepcounter{part}), so a \label in its text gives
+         "I" ("Part I" with fmt "full"), like its own label. */ -}}
+  {{- with $part -}}
+    {{- $chapNum = .Display -}}
+    {{- $chapWord = "part" -}}
   {{- end -}}
 {{- end -}}
 {{- $secnum := $chapNum -}}
@@ -291,7 +399,7 @@
       {{- $kind = "part" -}}
       {{- $d = $part.Display -}}
     {{- end -}}
-    {{- $list = $list | append (dict "key" $k "kind" $kind "display" $d "name" (strings.TrimSpace (replaceRE `</?a\b[^>]*>` "" (string (partial "tufte/title-html.html" (dict "page" $p "title" $p.Title "heading" true))))) "short" "" "caption" "" "anchor" "" "where" $plainLinkTitle "level" 0 "page" $p) -}}
+    {{- $list = $list | append (dict "key" $k "kind" $kind "display" $d "name" $plainTitle "short" "" "caption" "" "anchor" "" "where" $plainLinkTitle "level" 0 "page" $p) -}}
   {{- end -}}
 {{- end -}}
 
@@ -309,12 +417,15 @@
 
 {{- /* Whole headings by opening tag: the scan matches only the opening
        tag, so the marks inside a heading (a footnote turned sidenote, a
-       sidenote, a \label anchor) are scanned too, in document order. */ -}}
+       sidenote, a \label anchor) are scanned too, in document order.
+       Two headings with one opening tag (an explicit id written twice)
+       are taken in order ("n" counts the ones met). */ -}}
 {{- $H := newScratch -}}
 {{- $H.Set "h" dict -}}
-{{- range findRE `(?s)<h[2-6][^>]*\bid="[^"]+"[^>]*>.*?</h[2-6]>` $raw -}}
+{{- $H.Set "n" dict -}}
+{{- range findRE `(?s)<h[2-6][^>]*\sid="[^"]+"[^>]*>.*?</h[2-6]>` $raw -}}
   {{- $open := replaceRE `(?s)^(<h[2-6][^>]*>).*$` "$1" . -}}
-  {{- if not (isset ($H.Get "h") $open) }}{{ $H.SetInMap "h" $open . }}{{ end -}}
+  {{- $H.SetInMap "h" $open ((index ($H.Get "h") $open | default slice) | append .) -}}
 {{- end -}}
 {{- /* Cross-references inside heading and run-in titles (see "xrefs"). */ -}}
 {{- $X := newScratch -}}
@@ -322,16 +433,60 @@
 {{- /* Ids written in the Markdown ({#id} or {id="…"}): author labels. */ -}}
 {{- $md := string $p.RawContent -}}
 {{- $S.Set "tokens" dict -}}
-{{- $scanRE := `(?s)<h[2-6][^>]*\bid="[^"]+"[^>]*>|<span class="tufte-num"[^>]*></span>|<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>|<(?:span|div) class="tufte-anchor" id="[^"]+"></(?:span|div)>|<span class="run-in" id="[^"]+">|<i class="tufte-float"[^>]*></i>` -}}
+{{- /* Explicit heading ids met so far, the new ids of the headings
+       renamed (see "hrenames", by position among all the headings with
+       the id, and "htoc", by position among the page's own headings), the
+       position of each heading among those with its id ("hall": all of
+       them; "hpos": the page's own), and how many headings carry each id
+       ("hcount": the page's own; "hxcount": those of a shortcode's inner
+       text with the id written there, marked data-tufte-xinner by
+       tufte/render-inner.html: always explicit, and not in .Fragments or
+       the TOCs). */ -}}
+{{- $S.Set "hseen" dict -}}
+{{- $S.Set "hren" dict -}}
+{{- $S.Set "htoc" dict -}}
+{{- $S.Set "hall" dict -}}
+{{- $S.Set "hpos" dict -}}
+{{- $S.Set "hcount" dict -}}
+{{- $S.Set "hxcount" dict -}}
+{{- range findRE `<h[2-6][^>]*\sid="[^"]+"` $raw -}}
+  {{- $hid := replaceRE `^.*\sid="([^"]+)"$` "$1" . -}}
+  {{- $ck := cond (strings.Contains . ` data-tufte-xinner `) "hxcount" "hcount" -}}
+  {{- $S.SetInMap $ck $hid (add (int (index ($S.Get $ck) $hid | default 0)) 1) -}}
+{{- end -}}
+{{- $scanRE := `(?s)<h[2-6][^>]*\sid="[^"]+"[^>]*>|<span class="tufte-num"[^>]*></span>|<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>|<(?:span|div) class="tufte-anchor" id="[^"]+"></(?:span|div)>|<span class="run-in" id="[^"]+">|<i class="tufte-float"[^>]*></i>` -}}
 {{- range $open := findRE $scanRE $raw -}}
   {{- $m := $open -}}
-  {{- if strings.HasPrefix $open "<h" }}{{ $m = index ($H.Get "h") $open | default $open }}{{ end -}}
+  {{- if strings.HasPrefix $open "<h" -}}
+    {{- $hn := int (index ($H.Get "n") $open | default 0) -}}
+    {{- with index ($H.Get "h") $open }}{{ $m = index . (cond (lt $hn (len .)) $hn (sub (len .) 1)) }}{{ end -}}
+    {{- $H.SetInMap "n" $open (add $hn 1) -}}
+  {{- end -}}
   {{- if strings.HasPrefix $m "<h" -}}
     {{- /* Heading. */ -}}
     {{- $level := int (replaceRE `(?s)^<h([2-6]).*$` "$1" $m) -}}
-    {{- $id := replaceRE `(?s)^<h[2-6][^>]*\bid="([^"]+)".*$` "$1" $m -}}
+    {{- $id := replaceRE `(?s)^<h[2-6][^>]*?\sid="([^"]+)".*$` "$1" $m -}}
     {{- $q := replaceRE `([.+*?()|\[\]{}^$\\])` `\$1` $id -}}
-    {{- $explicit := gt (len (findRE (printf `\{[^}\n]*(?:#%s|\bid=["']?%s["']?)[\s}]` $q $q) $md 1)) 0 -}}
+    {{- /* Explicit or automatic, per heading: Goldmark never changes an
+           explicit id and dedupes an automatic one only against the ids
+           met before it, so among the N headings with this id, written
+           explicitly K times in the Markdown, the last K are explicit and
+           an automatic one (it yields, below) comes first. A heading of
+           a shortcode's inner text with the id written there
+           (data-tufte-xinner) is explicit; it is left out of N and K. */ -}}
+    {{- $xin := strings.Contains (replaceRE `(?s)^(<h[2-6][^>]*>).*$` "$1" $m) ` data-tufte-xinner ` -}}
+    {{- $hall := int (index ($S.Get "hall") $id | default 0) -}}
+    {{- $S.SetInMap "hall" $id (add $hall 1) -}}
+    {{- $hpos := int (index ($S.Get "hpos") $id | default 0) -}}
+    {{- if not $xin }}{{ $S.SetInMap "hpos" $id (add $hpos 1) }}{{ end -}}
+    {{- $nExpl := len (findRE (printf `\{(?:[^}\n]*#%s|(?:[^}\n]*\s)?id=["']?%s["']?)[\s}]` $q $q) $md) -}}
+    {{- $nx := int (index ($S.Get "hxcount") $id | default 0) -}}
+    {{- $nExpl = math.Max 0 (sub $nExpl $nx) | int -}}
+    {{- $nHeads := int (index ($S.Get "hcount") $id | default 1) -}}
+    {{- $explicit := or $xin (and (gt $nExpl 0) (ge $hpos (sub $nHeads $nExpl))) -}}
+    {{- /* An automatic id yields to the explicit ones, also to an inner
+           text's (Goldmark never saw that one, before or after). */ -}}
+    {{- $yields := and (not $explicit) (or (gt $nExpl 0) (gt $nx 0)) -}}
     {{- $inner := replaceRE `(?s)^<h[2-6][^>]*>(.*)</h[2-6]>$` "$1" $m -}}
     {{- $inner = replaceRE `(?s)<a class="heading-anchor"[^>]*>.*?</a>` "" $inner -}}
     {{- /* Margin material (sidenotes, margin notes, with nested spans). */ -}}
@@ -367,6 +522,10 @@
       {{- $secnum = $d -}}
       {{- $secWord = "" -}}
     {{- end -}}
+    {{- /* The innermost enclosing h2/h3 names what follows (\nameref of a
+           \label after \subsection gives the subsection's title): an h2
+           resets it (above), an h3 sets it, numbered or not. */ -}}
+    {{- if eq $level 3 }}{{ $where = $title }}{{ end -}}
     {{- $word := "" -}}
     {{- if ge $level 4 -}}
       {{- /* Run-in heading (\paragraph): like the paragraph shortcode,
@@ -376,12 +535,52 @@
       {{- $word = $secWord -}}
     {{- end -}}
     {{- $hk := partial "tufte/key.html" $id -}}
-    {{- if and $hasSec (le $level 3) (not (isset ($S.Get "tokens") (printf "sec|%s" $hk))) -}}
-      {{- $S.SetInMap "tokens" (printf "sec|%s" $hk) $d -}}
+    {{- /* An explicit id written on two headings ({#sec:x} twice; Goldmark
+           dedupes automatic ids only): the later heading gets ID-2, ID-3…;
+           an automatic id that a later heading's explicit id repeats
+           ("## Intro" → intro-1, then "## Other {#intro-1}") yields: the
+           automatic heading gets ID-2… and the author's heading keeps its
+           id. Applied by tufte/postprocess.html, followed by the TOCs, so
+           the page has no duplicate id; the renamed heading's number token
+           gets the new key, so it keeps its own number. The clash is
+           warned below. */ -}}
+    {{- $anchor := $id -}}
+    {{- $tkey := $hk -}}
+    {{- if or $yields (and $explicit (isset ($S.Get "hseen") $id)) -}}
+      {{- range $i := seq 2 99 -}}
+        {{- $c := printf "%s-%d" $id $i -}}
+        {{- if not (or (strings.Contains $raw (printf ` id="%s"` $c)) (isset ($S.Get "hseen") $c)) }}{{ $anchor = $c }}{{ break }}{{ end -}}
+      {{- end -}}
+      {{- /* hrenames[id][i] = the new id of the (i+1)th heading with this
+             id ("" = kept); htoc the same among the page's own headings
+             (those of .Fragments and the TOCs). */ -}}
+      {{- $news := index ($S.Get "hren") $id | default slice -}}
+      {{- range $j := $hall }}{{ if ge $j (len $news) }}{{ $news = $news | append "" }}{{ end }}{{ end -}}
+      {{- $S.SetInMap "hren" $id ($news | append $anchor) -}}
+      {{- if not $xin -}}
+        {{- $tn := index ($S.Get "htoc") $id | default slice -}}
+        {{- range $j := $hpos }}{{ if ge $j (len $tn) }}{{ $tn = $tn | append "" }}{{ end }}{{ end -}}
+        {{- $S.SetInMap "htoc" $id ($tn | append $anchor) -}}
+      {{- end -}}
+      {{- $S.SetInMap "hseen" $anchor true -}}
+      {{- $tkey = partial "tufte/key.html" $anchor -}}
     {{- end -}}
-    {{- $list = $list | append (dict "key" $hk "kind" "heading" "display" $d "word" $word "name" $title "short" "" "caption" "" "anchor" $id "where" $where "level" $level "explicit" $explicit "page" $p) -}}
+    {{- if $explicit }}{{ $S.SetInMap "hseen" $id true }}{{ end -}}
+    {{- if and $hasSec (le $level 3) (not (isset ($S.Get "tokens") (printf "sec|%s" $tkey))) -}}
+      {{- $S.SetInMap "tokens" (printf "sec|%s" $tkey) $d -}}
+    {{- end -}}
+    {{- $list = $list | append (dict "key" $hk "kind" "heading" "display" $d "word" $word "name" $title "short" "" "caption" "" "anchor" $anchor "where" $where "level" $level "explicit" $explicit "renamed" (ne $anchor $id) "page" $p) -}}
   {{- else if strings.HasPrefix $m `<span class="tufte-num"` -}}
     {{- /* Number token. */ -}}
+    {{- $tokIx := int ($S.Get "tokix") -}}
+    {{- $S.Add "tokix" 1 -}}
+    {{- /* Its number and position in display order (NM, above), else in
+           document order. */ -}}
+    {{- $nm := dict "d" "" "pos" $tokIx -}}
+    {{- $shown := true -}}
+    {{- if $numMap -}}
+      {{- with index $numMap (string $tokIx) }}{{ $nm = . }}{{ else }}{{ $shown = false }}{{ end -}}
+    {{- end -}}
     {{- $kind := replaceRE `(?s)^.*data-kind="([^"]*)".*$` "$1" $m -}}
     {{- if and (strings.Contains $m `data-key="`) (in (slice "figure" "table" "listing" "eq") $kind) -}}
       {{- $rawKey := replaceRE `(?s)^.*data-key="([^"]*)".*$` "$1" $m -}}
@@ -395,6 +594,8 @@
                ("1869. Minard's map") is text (tufte/block-escape.html). */ -}}
         {{- with $short -}}
           {{- $short = strings.TrimSpace (string ($p.RenderString (dict "display" "inline") (partial "tufte/block-escape.html" (htmlUnescape .)))) -}}
+          {{- /* A cite in it: its extra letter (1999a), as above. */ -}}
+          {{- if strings.Contains $short "bib-extra" }}{{ $short = partial "tufte/bib/fill-extra.html" (dict "page" $p "html" $short) }}{{ end -}}
         {{- end -}}
       {{- end -}}
       {{- $d := "" -}}
@@ -404,12 +605,14 @@
       {{- $fixed := and (eq $kind "eq") (strings.Contains $m `data-number="`) -}}
       {{- if $fixed -}}
         {{- $d = replaceRE `(?s)^.*data-number="([^"]*)".*$` "$1" $m | htmlUnescape -}}
+      {{- else if $numMap -}}
+        {{- $d = $nm.d -}}
       {{- else if or $num (eq $kind "eq") -}}
         {{- $S.Add $kind 1 -}}
         {{- $d = printf "%s%d" $floatPrefix ($S.Get $kind) -}}
       {{- end -}}
       {{- $tk := printf "%s|%s" $kind $k -}}
-      {{- if not (isset ($S.Get "tokens") $tk) -}}
+      {{- if and $shown (not (isset ($S.Get "tokens") $tk)) -}}
         {{- $S.SetInMap "tokens" $tk (cond $fixed "" $d) -}}
       {{- end -}}
       {{- /* The occurrence of this KIND|KEY (1, 2… with a duplicate label). */ -}}
@@ -427,8 +630,11 @@
       {{- if not (strings.Contains $raw (printf `id="%s"` $k)) -}}
         {{- if strings.Contains $raw (printf `id="%s"` $rawKey) }}{{ $anchor = $rawKey }}{{ end -}}
       {{- end -}}
-      {{- $list = $list | append (dict "key" $k "kind" $kind "display" $d "name" $name "short" $short "caption" $cap "anchor" $anchor "where" $where "level" 0 "page" $p "tok" (cond $fixed "" $d) "occ" $occ) -}}
-      {{- $S.Add (printf "order-%s" $kind) (slice $k) -}}
+      {{- if $shown -}}
+        {{- $e := dict "key" $k "kind" $kind "display" $d "name" $name "short" $short "caption" $cap "anchor" $anchor "where" $where "level" 0 "page" $p "tok" (cond $fixed "" $d) "occ" $occ "dpos" $nm.pos -}}
+        {{- $list = $list | append $e -}}
+        {{- $S.Add "numtoks" (slice $e) -}}
+      {{- end -}}
     {{- end -}}
   {{- else if strings.HasPrefix $m "<label" -}}
     {{- /* Sidenote mark (once: the marks in the text of a real footnote
@@ -489,6 +695,7 @@
     {{- if strings.Contains $m `data-short="` -}}
       {{- with replaceRE `(?s)^.*data-short="([^"]*)".*$` "$1" $m -}}
         {{- $short = strings.TrimSpace (string ($p.RenderString (dict "display" "inline") (partial "tufte/block-escape.html" (htmlUnescape .)))) -}}
+        {{- if strings.Contains $short "bib-extra" }}{{ $short = partial "tufte/bib/fill-extra.html" (dict "page" $p "html" $short) }}{{ end -}}
       {{- end -}}
     {{- end -}}
     {{- $cap := "" -}}
@@ -555,12 +762,18 @@
 {{- /* Build the map. Ranks (see the header): automatic heading ids 0 <
        \label anchors 1 < the rest 2, explicit heading ids included. A
        higher rank wins, equal ranks keep the first; every clash is warned
-       except two headings (Goldmark dedupes their ids) and a float with
-       its own anchor element (a tufte-anchor with the float's key and id). */ -}}
+       except two automatic heading ids (Goldmark dedupes them) and a
+       float with its own anchor element (a tufte-anchor with the float's
+       key and id). The warnings say what happened, by case (D: "CAT|KEY"
+       → notes, in order): "hh" an explicit id on two headings, "auto" an
+       automatic heading id that yields, "other" the rest; each heading is
+       named once per key. */ -}}
 {{- $floatKinds := slice "figure" "table" "listing" "eq" -}}
 {{- $E := newScratch -}}
 {{- $E.Set "e" dict -}}
-{{- $dups := slice -}}
+{{- $D := newScratch -}}
+{{- $D.Set "order" slice -}}
+{{- $D.Set "notes" dict -}}
 {{- range $list -}}
   {{- $e := . -}}
   {{- if and (ne .kind "heading") .anchor -}}
@@ -578,23 +791,58 @@
       {{- if gt $rank $oldRank -}}
         {{- $E.SetInMap "e" $e.key $e -}}
       {{- end -}}
-      {{- $bothHeadings := and (eq $e.kind "heading") (eq $old.kind "heading") -}}
+      {{- $bothHeadings := and (eq $e.kind "heading") (eq $old.kind "heading") (ne $e.explicit true) (ne $old.explicit true) -}}
       {{- $ownAnchor := and (eq $e.anchor $old.anchor) (or (and (eq $e.kind "label") (in $floatKinds $old.kind)) (and (eq $old.kind "label") (in $floatKinds $e.kind))) -}}
       {{- /* A Markdown footnote label (local) yields silently: its id
              (fn-HASH-label) clashes with nothing. */ -}}
       {{- $local := or (eq $e.local true) (eq $old.local true) -}}
       {{- if not (or $bothHeadings $ownAnchor $local) -}}
-        {{- $desc := $e.key -}}
-        {{- range slice $old $e -}}
-          {{- if eq .kind "heading" }}{{ $desc = printf "%s (also the id of heading %q)" $desc (htmlUnescape (partial "tufte/plain-math.html" (dict "html" .name "math" "tex"))) }}{{ end -}}
+        {{- $cat := "other" -}}
+        {{- $notes := slice -}}
+        {{- if and (eq $e.kind "heading") (eq $old.kind "heading") (eq $e.explicit true) (eq $old.explicit true) -}}
+          {{- $cat = "hh" -}}
+          {{- $notes = $notes | append (printf "on headings %q and %q, the later one is now %s" (htmlUnescape (partial "tufte/plain-math.html" (dict "html" $old.name "math" "tex"))) (htmlUnescape (partial "tufte/plain-math.html" (dict "html" $e.name "math" "tex"))) $e.anchor) -}}
+        {{- else -}}
+          {{- range slice $old $e -}}
+            {{- if eq .kind "heading" -}}
+              {{- $hn := htmlUnescape (partial "tufte/plain-math.html" (dict "html" .name "math" "tex")) -}}
+              {{- if eq .explicit true -}}
+                {{- $notes = $notes | append (printf "also the id of heading %q" $hn) -}}
+              {{- else -}}
+                {{- $cat = "auto" -}}
+                {{- if eq .renamed true -}}
+                  {{- $notes = $notes | append (printf "also the automatic id of heading %q, which is now %s" $hn .anchor) -}}
+                {{- else -}}
+                  {{- $notes = $notes | append (printf "also the automatic id of heading %q" $hn) -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end -}}
+          {{- end -}}
         {{- end -}}
-        {{- $dups = $dups | append (replaceRE `TUFTEXREF[0-9a-f]{16}END` "…" $desc) -}}
+        {{- $ck := printf "%s|%s" $cat $e.key -}}
+        {{- if not (isset ($D.Get "notes") $ck) }}{{ $D.Set "order" (($D.Get "order") | append $ck) }}{{ end -}}
+        {{- $D.SetInMap "notes" $ck ((index ($D.Get "notes") $ck | default slice) | append $notes) -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
-{{- with $dups -}}
-  {{- warnidf "tufte-duplicate-label" "tufte.hugo: duplicate label(s) %s in %s (the first one wins; an automatic heading id yields to any other label: rename the label, or give the heading an explicit {#id})" (delimit (uniq .) ", ") $at -}}
+{{- $msgs := dict
+  "hh" "tufte.hugo: explicit heading id(s) written on two headings: %s in %s (the first heading keeps the id and the later one is renamed: rename one of the {#id}s)"
+  "auto" "tufte.hugo: duplicate label(s) %s in %s (an automatic heading id yields to any other label: rename the label, or give the heading an explicit {#id})"
+  "other" "tufte.hugo: duplicate label(s) %s in %s (the first one wins: rename one of them)"
+-}}
+{{- range $cat := slice "hh" "auto" "other" -}}
+  {{- $items := slice -}}
+  {{- range $ck := $D.Get "order" -}}
+    {{- if strings.HasPrefix $ck (printf "%s|" $cat) -}}
+      {{- $desc := strings.TrimPrefix (printf "%s|" $cat) $ck -}}
+      {{- with uniq (index ($D.Get "notes") $ck) }}{{ $desc = printf "%s (%s)" $desc (delimit . "; ") }}{{ end -}}
+      {{- $items = $items | append (replaceRE `TUFTEXREF[0-9a-f]{16}END` "…" $desc) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $items -}}
+    {{- warnidf "tufte-duplicate-label" (index $msgs $cat) (delimit . ", ") $at -}}
+  {{- end -}}
 {{- end -}}
 
 {{- /* Every number token's own entry, by KIND|KEY in document order: a
@@ -635,13 +883,29 @@
   {{- end -}}
 {{- end -}}
 
+{{- /* The lists follow the numbers: the order of display (dpos, NM
+       above; the document order when no float sits in a real footnote).
+       Ids and duptokens stay in document order: postprocess gives them
+       (steps 1c and 3) before it moves the footnote texts into their
+       list. */ -}}
+{{- $occs := $O.Get "occ" -}}
+{{- if $numMap -}}
+  {{- $O.Set "socc" dict -}}
+  {{- range $tk, $es := $occs }}{{ $O.SetInMap "socc" $tk (sort $es "dpos") }}{{ end -}}
+  {{- $occs = $O.Get "socc" -}}
+{{- end -}}
+{{- $OR := newScratch -}}
+{{- range $kd := slice "figure" "table" "listing" "eq" }}{{ $OR.Set $kd slice }}{{ end -}}
+{{- with $S.Get "numtoks" -}}
+  {{- range sort . "dpos" }}{{ $OR.Add .kind (slice .key) }}{{ end -}}
+{{- end -}}
 {{- $order := dict
-  "figure" ($S.Get "order-figure" | default slice)
-  "table" ($S.Get "order-table" | default slice)
-  "listing" ($S.Get "order-listing" | default slice)
-  "eq" ($S.Get "order-eq" | default slice)
+  "figure" ($OR.Get "figure")
+  "table" ($OR.Get "table")
+  "listing" ($OR.Get "listing")
+  "eq" ($OR.Get "eq")
 -}}
-{{- $memoRes = dict "numbered" $num "entries" ($E.Get "e") "order" $order "tokens" ($S.Get "tokens") "occurrences" ($O.Get "occ") "duptokens" ($O.Get "dup") "renames" $renames "xrefs" ($X.Get "x") "chapter" $chap "page" $p -}}
+{{- $memoRes = dict "numbered" $num "entries" ($E.Get "e") "order" $order "tokens" ($S.Get "tokens") "occurrences" $occs "duptokens" ($O.Get "dup") "renames" $renames "hrenames" ($S.Get "hren") "htoc" ($S.Get "htoc") "xrefs" ($X.Get "x") "chapter" $chap "page" $p -}}
 {{- $p.Store.Set "tufteMemoLabels" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $memoRes -}}

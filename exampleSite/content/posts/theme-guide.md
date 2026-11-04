@@ -46,6 +46,7 @@ Hugo does not merge `[markup]` from a theme, so three Goldmark settings must be 
 ```toml
 [markup.goldmark.parser]
   wrapStandAloneImageWithinParagraph = false  # images on their own line become figures
+  autoHeadingID = true                        # the default: keep it (section numbers, xref, TOC)
   [markup.goldmark.parser.attribute]
     block = true                              # {.sans}, {.fullwidth}, quote attribution
 
@@ -76,11 +77,13 @@ All parameters live under `[params]` and have sensible defaults. The ones you wi
 | `math.enable`     | `"auto"`       | Load the KaTeX stylesheet only where math appears         |
 | `customCSS`       | `[]`           | Extra stylesheets from your `assets/` folder              |
 
-Author and social links go in `[params.author]` and `[params.social]`; comments use Giscus (`[params.giscus]`) or Hugo's Disqus template.
+Author and social links go in `[params.author]` and `[params.social]`; comments use Giscus (`[params.giscus]`) or Hugo's Disqus template, and `[params] comments = false` (short for `[params.comments] enable = false`) turns them off site-wide.
 
 ## Front matter
 
-Besides the usual `title`, `date`, `tags` and `categories`, posts may set:
+Besides the usual `title` (optional: a short note without one is called by its `linkTitle`, else “Untitled”, i18n key
+`untitled`, and a section, book or part whose `_index.md` has none by its directory name, humanized, wherever a
+title is shown, so no heading or link is left empty), `date`, `tags` and `categories`, posts may set:
 
 - `subtitle`, shown in the style of Tufte's subtitles below the title;
 - `sections`, `footnotes` and `toc`, overriding the site parameters for one page (this page sets `toc: true`);
@@ -141,7 +144,35 @@ A sidenote sits next to the sentence it annotates,{{< sidenote >}}This numbered 
 
 [^fn-details]: A real footnote, referenced from inside the collapsible block, listed below the text.
 
-A self-hosted video becomes a Tufte figure, with its caption in the margin (or in a `figcaption` with `type="fullwidth"`):
+A block shortcode can be indented where Markdown asks for it, in a numbered step or in a real footnote of several paragraphs: the indentation of its opening tag is removed from the text inside it.[^fn-indented]
+
+1. Write the data as a Markdown table, indented under the step:
+
+    {{< table caption="A table inside a numbered step." >}}
+    | Step | Ink |
+    |------|-----|
+    | 1    | low |
+    {{< /table >}}
+
+2. Show the code that reads it:
+
+    {{< listing caption="A listing inside a numbered step." >}}
+    ```go
+    if ink > data {
+        erase(ink)
+    }
+    ```
+    {{< /listing >}}
+
+[^fn-indented]: A real footnote whose second block is a listing, indented by four spaces like every continuation of a footnote.
+
+    {{< listing caption="A listing inside a real footnote." >}}
+    ```go
+    ratio := data / ink
+    ```
+    {{< /listing >}}
+
+A self-hosted video becomes a Tufte figure, with its caption in the margin (with `type="fullwidth"`, a `figcaption` in the margin column under the video, as for a full-width image):
 
 ```markdown
 {{</* video src="flow.mp4" poster="flow.jpg" caption="Water flow, *slowed down*." */>}}
@@ -188,6 +219,14 @@ GitHub-style alerts are rendered as quiet, labelled blocks:
 
 > [!CAUTION]
 > Do not edit the vendored `tufte.css`; override it in a stylesheet listed in `customCSS`.
+
+Lists nest, and the notes and figure captions of a nested item still go to the margin column:
+
+- An outer item.
+  - A nested item with a sidenote.{{< sidenote >}}A note in a nested list item, in the margin column like any other.{{< /sidenote >}}
+  - A nested item with a figure:
+
+    ![The graph of y = sin x](/images/latex/sine.svg "A figure in a nested list item: it fills the item, its caption is in the margin.")
 
 ## Customisation
 

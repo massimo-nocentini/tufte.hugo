@@ -7,6 +7,9 @@
   unresolved cross-references (the label key as link text) and hidden
   sidenote-end markers. Summaries resolve numbers and references against
   the full page; links are relative to the site, as on the list pages.
+  Items are newest first by publication date; undated pages (book
+  chapters, in each book's reading order) come last, without <pubDate>
+  (see below).
   The language tag comes from func/lang.html (Hugo 0.158 renamed
   LanguageCode to Locale).
 
@@ -43,6 +46,12 @@
 {{- $pages := slice }}
 {{- if or $.IsHome $.IsSection }}
   {{- $pages = $pctx.RegularPages }}
+  {{- /* A book or a part of one: its chapters include those of its parts
+         (sub-sections), as in the book's contents (tufte/book/chapters.html
+         reads each part's RegularPagesRecursive). */}}
+  {{- if and $.IsSection (partialCached "tufte/book/root.html" $ (or $.RelPermalink $.Path)) }}
+    {{- $pages = $.RegularPagesRecursive }}
+  {{- end }}
 {{- else }}
   {{- $pages = $pctx.Pages }}
 {{- end }}
@@ -50,9 +59,36 @@
 {{- $linked := slice }}
 {{- range $pages }}{{ if .Permalink }}{{ $linked = $linked | append . }}{{ end }}{{ end }}
 {{- $pages = $linked }}
+{{- /* Newest first by publication date, not in Hugo's default order
+       (weight first): book chapters carry a weight and no date, so they
+       would come first, dated year 0001, and push every post past the
+       feed limit. Undated pages follow the dated ones, and their items
+       have no <pubDate> (optional in RSS 2.0): the chapters of each book
+       in its reading order (tufte/book/sequence.html: matter, weight,
+       file name, parts kept together), book after book in the order of
+       their first undated page, then the undated pages outside any book
+       in Hugo's default order (weight, then title):
+       tufte/undated-order.html, shared with tufte/archive-list.html. */}}
+{{- $dated := slice }}{{ $undated := slice }}
+{{- range $pages }}{{ if .PublishDate.IsZero }}{{ $undated = $undated | append . }}{{ else }}{{ $dated = $dated | append . }}{{ end }}{{ end }}
+{{- with $dated }}{{ $dated = .ByPublishDate.Reverse }}{{ end }}
+{{- range partial "tufte/undated-order.html" $undated }}{{ $dated = $dated | append . }}{{ end }}
+{{- $pages = $dated }}
 {{- $limit := .Site.Config.Services.RSS.Limit }}
 {{- if ge $limit 1 }}
   {{- $pages = $pages | first $limit }}
+{{- end }}
+{{- /* <lastBuildDate>: the latest non-zero Lastmod of the items, else the
+       channel page's own (a dated book root whose chapters are all
+       undated); none at all when every date is zero (never year 0001). */}}
+{{- $built := "" }}
+{{- range $pages }}
+  {{- if not .Lastmod.IsZero }}
+    {{- if or (not $built) (.Lastmod.After $built) }}{{ $built = .Lastmod }}{{ end }}
+  {{- end }}
+{{- end }}
+{{- if not $built }}
+  {{- if not .Lastmod.IsZero }}{{ $built = .Lastmod }}{{ else if not .Date.IsZero }}{{ $built = .Date }}{{ end }}
 {{- end }}
 {{- $lang := partial "func/lang.html" site.Language }}
 {{- printf "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>" | safeHTML }}
@@ -72,8 +108,8 @@
     <language>{{ $lang.locale }}</language>{{ with $authorEmail }}
     <managingEditor>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</managingEditor>{{ end }}{{ with $authorEmail }}
     <webMaster>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</webMaster>{{ end }}{{ with site.Copyright }}
-    <copyright>{{ . }}</copyright>{{ end }}{{ if and (not .Date.IsZero) $pages }}
-    <lastBuildDate>{{ (index $pages.ByLastmod.Reverse 0).Lastmod.Format "Mon, 02 Jan 2006 15:04:05 -0700" | safeHTML }}</lastBuildDate>{{ end }}
+    <copyright>{{ . }}</copyright>{{ end }}{{ with $built }}
+    <lastBuildDate>{{ .Format "Mon, 02 Jan 2006 15:04:05 -0700" | safeHTML }}</lastBuildDate>{{ end }}
     {{- with .OutputFormats.Get "rss" }}
     {{ printf "<atom:link href=%q rel=\"self\" type=%q />" .Permalink .MediaType | safeHTML }}
     {{- end }}
@@ -91,16 +127,22 @@
       {{- end }}
     {{- end }}
     <item>
-      <title>{{ partial "tufte/plain-title.html" (dict "page" . "title" .Title) }}</title>
+      {{- /* The title the page itself shows (tufte/page-title.html: an
+             untitled archive page is "Archives"), as for the channel. */}}
+      <title>{{ partial "tufte/plain-title.html" (dict "page" . "title" (partial "tufte/page-title.html" .)) }}</title>
       <link>{{ .Permalink }}</link>
+      {{- if not .PublishDate.IsZero }}
       <pubDate>{{ .PublishDate.Format "Mon, 02 Jan 2006 15:04:05 -0700" | safeHTML }}</pubDate>
+      {{- end }}
       {{- if and $authorEmail (not .Params.author) }}
       <author>{{ $authorEmail }}{{ with $authorName }} ({{ . }}){{ end }}</author>
       {{- else }}{{ with (partial "tufte/authors.html" (dict "page" .)).plain }}
       <dc:creator>{{ . }}</dc:creator>
       {{- end }}{{ end }}
       <guid>{{ .Permalink }}</guid>
+      {{- if strings.TrimSpace (string $summary) }}
       <description>{{ string $summary | transform.XMLEscape | safeHTML }}</description>
+      {{- end }}
     </item>
     {{- end }}
   </channel>

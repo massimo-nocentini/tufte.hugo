@@ -11,6 +11,8 @@
   hides the date, `dateText` replaces it with free text ("Spring 2026").
   Authors: tufte/authors.html (a string, a list of strings or a list of
   {name, thanks}; names joined "A, B and C").
+  Term link texts go through tufte/title-html.html (list mode: Markdown
+  rendered, links unwrapped), as in the taxonomy and term lists.
   Takes: the page, or a dict with
     page         the page
     authorHTML   optional: the author HTML to show (tufte/title-block.html
@@ -30,7 +32,7 @@
 {{- end -}}
 {{- $tags := $p.GetTerms "tags" -}}
 {{- $categories := $p.GetTerms "categories" -}}
-{{- $showDate := ne $p.Params.showdate false -}}
+{{- $showDate := partial "func/flag.html" (dict "value" $p.Params.showdate "default" true) -}}
 {{- $dateText := "" -}}
 {{- with $p.Params.datetext }}{{ $dateText = printf "%v" . }}{{ end -}}
 {{- if or (not $p.Date.IsZero) $tags $categories (and $showDate $dateText) (gt $notes 0) (and $p.Params.author $author) -}}
@@ -67,7 +69,7 @@
     <span class="post-categories">
       {{- range $i, $c := . -}}
         {{- if $i }}, {{ end -}}
-        <a class="post-category" href="{{ $c.RelPermalink }}">{{ $c.LinkTitle }}</a>
+        <a class="post-category" href="{{ $c.RelPermalink }}">{{ partial "tufte/title-html.html" (dict "page" $c) }}</a>
       {{- end -}}
     </span>
     {{- $sep = true -}}
@@ -77,7 +79,7 @@
     <span class="post-tags">
       {{- range $i, $t := . -}}
         {{- if $i }} {{ end -}}
-        <a class="post-tag" href="{{ $t.RelPermalink }}">{{ $t.LinkTitle }}</a>
+        <a class="post-tag" href="{{ $t.RelPermalink }}">{{ partial "tufte/title-html.html" (dict "page" $t) }}</a>
       {{- end -}}
     </span>
   {{- end -}}

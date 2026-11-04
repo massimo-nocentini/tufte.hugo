@@ -1,14 +1,26 @@
 {{- /*
   Comments for regular pages that belong to a section (posts), through
   giscus (Params.giscus) and/or Disqus (services.disqus.shortname).
-  Params.comments.enable (default true) switches them off site-wide; front
+  Params.comments.enable (default true; or Params.comments = true|false)
+  switches them off site-wide; front
   matter "comments: true|false" overrides it for one page (true also enables
   comments on pages outside sections).
   Takes: the page.
 */ -}}
 {{- $enabled := true -}}
-{{- with site.Params.comments -}}
-  {{- if isset . "enable" }}{{ $enabled = .enable }}{{ end -}}
+{{- /* params.comments is a table ([params.comments] enable = …) or a
+       single value (comments = false, HUGO_PARAMS_COMMENTS=false), which
+       replaces the theme's table: Hugo cannot merge a scalar into a map.
+       isset on a scalar warns (and fails --panicOnWarning builds). */ -}}
+{{- $c := site.Params.comments -}}
+{{- if reflect.IsMap $c -}}
+  {{- if isset $c "enable" }}{{ $enabled = index $c "enable" }}{{ end -}}
+{{- else if ne $c nil -}}
+  {{- if in (slice "true" "false" "yes" "no" "1" "0" "on" "off") (lower (strings.TrimSpace (printf "%v" $c))) -}}
+    {{- $enabled = $c -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: params.comments must be a table ([params.comments] enable = …) or true or false, not %q (%T); comments stay on" (printf "%v" $c) $c -}}
+  {{- end -}}
 {{- end -}}
 {{- if not .Section }}{{ $enabled = false }}{{ end -}}
 {{- if isset .Params "comments" }}{{ $enabled = .Params.comments }}{{ end -}}

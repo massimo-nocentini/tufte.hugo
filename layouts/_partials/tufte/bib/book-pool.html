@@ -1,0 +1,42 @@
+{{- /*
+  The entries the parts and chapters of a book bring themselves (their
+  front matter `bibliography` and `references`: tufte/bib/source-db.html),
+  merged into one book-wide pool, as LaTeX has one database per document:
+  a key defined by one chapter can be cited from any other chapter, and the
+  book's bibliography list finds it too. On a key defined by several pages,
+  the first one in reading order (tufte/book/sequence.html) wins, as BibTeX
+  keeps the first of repeated entries, and that entry wins on every page
+  of the book, the defining ones included (tufte/bib/db.html: a chapter's
+  own sources do not override the book's keys, and a redefinition with a
+  different entry warns tufte-duplicate-cite), so each citation shows the
+  entry the book's bibliography lists. The book root's own sources are not
+  in the pool (tufte/bib/db.html puts them above it: the root comes first).
+
+  This partial never reads page content.
+
+  Takes: the book root.
+  Returns: a map  lowercased cite key → raw entry.
+  Callers: partialCached "tufte/bib/book-pool.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- /* Memoized in the page's Store for the current build
+       (tufte/memo.html): partialCached's bounded cache evicts it on
+       large books, and every chapter reads it. */ -}}
+{{- $memoRes := false -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoBibPool") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $root := . -}}
+{{- $S := newScratch -}}
+{{- $S.Set "db" dict -}}
+{{- $rk := or $root.RelPermalink $root.Path -}}
+{{- range partialCached "tufte/book/sequence.html" $root $rk -}}
+  {{- $pg := .Page -}}
+  {{- if eq (or $pg.RelPermalink $pg.Path) $rk }}{{ continue }}{{ end -}}
+  {{- range $k, $v := partialCached "tufte/bib/source-db.html" $pg (or $pg.RelPermalink $pg.Path) -}}
+    {{- if not (isset ($S.Get "db") $k) }}{{ $S.SetInMap "db" $k $v }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- $memoRes = ($S.Get "db") -}}
+{{- .Store.Set "tufteMemoBibPool" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
+{{- end -}}
+{{- return $memoRes -}}

@@ -3,8 +3,12 @@
   index-gap marks a new group at level 1).
 
   Takes: a string, the lowercased sort key of a level-1 entry.
-  Returns: a string, its group letter:
-    - the first rune, when it is ASCII (a–z, digits, symbols);
+  Returns: a string, its group (makeindex's groups, in the order of
+  tufte/index/order.html):
+    - "numbers" for a key made only of ASCII digits ("42", "1984");
+    - "symbols" for any other key whose first rune is ASCII but not a
+      letter ("+ (plus)", "1984. orwell"): one group for all of them;
+    - the first rune, when it is an ASCII letter (a–z);
     - else its base letter (é → e, ä → a, ß → s, æ → a, ά → α…), but only
       when the language collator that `sort` uses (the one that ordered the
       entries) puts the rune at the base letter's primary level, i.e. sorts
@@ -14,7 +18,12 @@
     - else the rune itself (ł where it sorts after l, non-Latin scripts).
 */ -}}
 {{- $init := substr . 0 1 -}}
-{{- if and $init (not (findRE `^[\x00-\x7f]` $init)) -}}
+{{- /* one return, at the end: Hugo 0.146 refuses a return inside a block */ -}}
+{{- if findRE `^[0-9]+$` . -}}
+  {{- $init = "numbers" -}}
+{{- else if findRE `^[\x00-\x40\x5b-\x60\x7b-\x7f]` $init -}}
+  {{- $init = "symbols" -}}
+{{- else if and $init (not (findRE `^[\x00-\x7f]` $init)) -}}
   {{- $fold := dict
     "à" "a" "á" "a" "â" "a" "ã" "a" "ä" "a" "å" "a" "ā" "a" "ă" "a" "ą" "a" "ǎ" "a" "æ" "a"
     "ç" "c" "ć" "c" "ĉ" "c" "ċ" "c" "č" "c"

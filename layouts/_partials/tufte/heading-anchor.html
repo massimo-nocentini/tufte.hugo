@@ -1,0 +1,18 @@
+{{- /*
+  The final id of a heading: tufte/heading-id.html (placeholders removed),
+  made unique on the page by tufte/heading-ids.html when the heading held
+  a shortcode. Used by render-heading.html (the id it writes) and by the
+  TOCs (tufte/page-toc.html, tufte/book/toc-headings.html), so that their
+  links match.
+
+  Takes: a dict with
+    page  the page whose content holds the heading
+    id    the Goldmark id (.Anchor, or a TOC link / .Fragments ID)
+  Returns: the id (string).
+*/ -}}
+{{- $raw := string .id -}}
+{{- $id := partial "tufte/heading-id.html" $raw -}}
+{{- if and .page (strings.Contains (lower $raw) "hahahugoshortcode") -}}
+  {{- with index (partialCached "tufte/heading-ids.html" .page (or .page.RelPermalink .page.Path)) $raw }}{{ $id = . }}{{ end -}}
+{{- end -}}
+{{- return $id -}}

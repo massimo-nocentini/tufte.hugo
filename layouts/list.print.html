@@ -1,12 +1,11 @@
 {{ define "main" }}
 {{- /*
   The whole book as one HTML document, for printing to PDF (the "print"
-  output format: the book root sets `outputs: [html, print]` and gets
+  output format: the book root sets `outputs: [html, rss, print]` and gets
   …/print.html). Like a tufte-book PDF: the front pages of the landing,
   then every chapter in reading order, each one an
   <article class="chapter" id="tufte-cN" style="page: cN"> whose ids are
-  prefixed with tufte-cN- (the tufte- namespace: the landing's own ids
-  keep their names and cannot collide with them) and whose links to other chapters are in-document
+  prefixed with tufte-cN- and whose links to other chapters are in-document
   anchors (tufte/book/chapter-body.html). Its stylesheet
   (tufte/book/print-style.html, in <head> through tufte/head-style.html)
   adds the named pages that carry the chapter running heads
@@ -26,6 +25,13 @@
 </article>
 {{- else -}}
 {{- $landing := partial "tufte/book/landing.html" $root | string -}}
+{{- /* The landing's own ids keep their names, except those in the
+       namespace of the document's ids (tufte-landing, tufte-cN…,
+       tufte-pK…, and tufte-l-…, the prefix used here): a heading
+       "## Tufte c0" (id tufte-c0) or {#tufte-p1} becomes tufte-l-tufte-c0,
+       with its for= and #links; tufte/book/print-links.html renames the
+       links to them from the chapters the same way. */ -}}
+{{- $landing = replaceRE `( (?:id|for)="|href="#)(tufte-(?:landing"|l-|[cp][0-9]))` `${1}tufte-l-${2}` $landing -}}
 {{- /* id tufte-landing: the target of links to the book root
        (tufte/book/print-targets.html). */ -}}
 {{- $landing = replace $landing `<article class="book-landing">` `<article class="book-landing" id="tufte-landing">` -}}

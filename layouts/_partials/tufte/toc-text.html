@@ -20,7 +20,9 @@
      callers remove the shortcode placeholders, so the words a shortcode
      prints (the NASA of a smallcaps shortcode, an xref number) would be
      lost. When the caller says a placeholder was removed (shortcode =
-     true), the rendered heading is used the same way, whatever it holds.
+     true), the rendered heading is used the same way, whatever it holds;
+     the extra letter of an author-year citation (1999a) is filled in
+     (tufte/bib/fill-extra.html).
 
   Takes: a dict with
     page       the page holding the heading
@@ -28,6 +30,10 @@
     text       the entry text from Hugo's TOC, margin material already removed
     shortcode  optional: true when the text held a shortcode placeholder
     nth        optional: which of the headings with this id (default 1)
+    xinner     optional: true for a heading of a shortcode's inner text
+               with an explicit id (marked data-tufte-xinner by
+               tufte/render-inner.html); nth then counts those only, and
+               otherwise they are skipped
   Returns: string (HTML).
 */ -}}
 {{- $p := .page -}}
@@ -41,8 +47,9 @@
     {{- $nth := int (.nth | default 1) -}}
     {{- $parts := split $raw (printf ` id="%s"` .id) -}}
     {{- $after := "" }}{{ $seen := 0 -}}
+    {{- $hre := cond (eq .xinner true) `<h[1-6] data-tufte-xinner$` `<h[1-6]$` -}}
     {{- range $i, $part := $parts -}}
-      {{- if and (gt $i 0) (findRE `<h[1-6]$` (index $parts (sub $i 1)) 1) -}}
+      {{- if and (gt $i 0) (findRE $hre (index $parts (sub $i 1)) 1) -}}
         {{- $seen = add $seen 1 -}}
         {{- if eq $seen $nth }}{{ $after = $part }}{{ break }}{{ end -}}
       {{- end -}}
@@ -70,6 +77,11 @@
         {{- $t = replaceRE `<i class="(?:sn-end|cap-end)" hidden></i>` "" $t -}}
         {{- $t = replaceRE `</?a\b[^>]*>` "" $t -}}
         {{- $t = replaceRE `\s+id="[^"]*"` "" $t -}}
+        {{- /* plainnat's extra letters (1999a) of author-year citations:
+               only postprocess fills them in the body. */ -}}
+        {{- if strings.Contains $t "bib-extra" -}}
+          {{- $t = partial "tufte/bib/fill-extra.html" (dict "page" $p "html" $t) -}}
+        {{- end -}}
         {{- $text = strings.TrimSpace $t -}}
       {{- end -}}
     {{- end -}}

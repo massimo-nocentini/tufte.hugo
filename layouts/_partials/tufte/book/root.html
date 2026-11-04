@@ -12,7 +12,12 @@
   outer book (its numbers, contents, navigation and print.html agree),
   and tufte/book/chapters.html warns (tufte-book-structure). A page with
   `build: {list: never}` is in no page collection, hence in no book: it
-  renders as an ordinary page.
+  renders as an ordinary page. So is a section with `build: {list: never}`
+  (it is not in its parent's Sections, so tufte/book/chapters.html and
+  parts.html cannot read it as a part) and every page under it, though
+  those pages are listed: the unlisted section cuts the book's tree there,
+  and tufte/book/chapters.html warns (tufte-book-structure). A book
+  section that is itself unlisted is still the book of its own pages.
 
   Takes: a page.
   Returns: the book root page, or false.
@@ -21,14 +26,21 @@
 {{- $root := false -}}
 {{- $p := . -}}
 {{- if in (slice "home" "section" "page") $p.Kind -}}
-  {{- if and (or $p.IsSection $p.IsHome) (partial "tufte/truthy.html" (index $p.Params "book")) -}}
-    {{- $root = $p -}}
-  {{- end -}}
-  {{- /* Ancestors run from the parent up to the home page: the last
-         match is the outermost book. */ -}}
-  {{- range $p.Ancestors -}}
-    {{- if and (or .IsSection .IsHome) (partial "tufte/truthy.html" (index .Params "book")) -}}
+  {{- /* The page, then its ancestors from the parent up to the home
+         page: the last match is the outermost book. An unlisted section
+         (`build: {list: never}`: not in its parent's Sections) cuts the
+         tree: no book above it can read it or the pages under it (it can
+         still be a book itself). */ -}}
+  {{- $chain := slice $p -}}
+  {{- range $p.Ancestors }}{{ $chain = $chain | append . }}{{ end -}}
+  {{- $cut := false -}}
+  {{- range $chain -}}
+    {{- if and (not $cut) (or .IsSection .IsHome) (partial "tufte/truthy.html" (index .Params "book")) -}}
       {{- $root = . -}}
+    {{- end -}}
+    {{- if and .IsSection (not .IsHome) -}}
+      {{- $sec := . -}}
+      {{- with .Parent }}{{ if not (in .Sections $sec) }}{{ $cut = true }}{{ end }}{{ end -}}
     {{- end -}}
   {{- end -}}
   {{- /* A page that is not in the book's reading order is not a chapter:

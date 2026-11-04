@@ -8,5 +8,5 @@
 
   Output: <figure class="fullwidth tufte-table" id="K"><div class="table-wrapper fullwidth"><table class="fullwidth">…</table></div><figcaption class="caption-margin">…</figcaption></figure>
 */ -}}
-{{- $out := partial "tufte/float-body.html" (dict "ctx" . "inner" .Inner "kind" "table" "type" "fullwidth") -}}
+{{- $out := partial "tufte/float-body.html" (dict "ctx" . "inner" .InnerDeindent "kind" "table" "type" "fullwidth") -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

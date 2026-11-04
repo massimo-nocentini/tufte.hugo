@@ -50,10 +50,10 @@ configuration, or of the `tufte:` map in a page's front matter.
 | 13 | `\cite` inside `\sidenote`, `\marginnote`, `\caption` | a nested `{{</* cite */>}}`, or `cite="a,b"` on the note or figure | should | the reference is appended under the note |
 | 14 | natbib `\citet`, `\citep`, `\citeauthor`, `\citeyear` (+ page) | `{{</* cite keys="a" mode="text" page="42" */>}}`; modes `text`, `paren`, `author`, `year` | could | inline text, no sidenote |
 | 15 | `\bibentry{key}` | `{{</* bibentry "key" */>}}` | must | the formatted entry, inline |
-| 16 | `\bibliography{f}` + `\bibliographystyle` | automatic at the end of a handout; `{{</* bibliography */>}}` anywhere (standalone) | must | `tufte.bibliography.style = "tufte"` (citation order) or `"plainnat"` (sorted) |
+| 16 | `\bibliography{f}` + `\bibliographystyle` | automatic at the end of a handout; `{{</* bibliography */>}}` anywhere (standalone) | must | `tufte.bibliography.style = "tufte"` (citation order) or `"plainnat"` (sorted; with `nobib` the `[n]` follow the sorted list) |
 | 17 | `\nobibliography` | `tufte: {bibliography: {list: false}}` | must |  |
 | 18 | `\nocite{a}`, `\nocite{*}` | `{{</* nocite "a,b" */>}}`, `{{</* nocite "*" */>}}`, front matter `nocite: [a]` | should |  |
-| 19 | class option `nobib` | `tufte.bibliography.margin = false` | should | a citation becomes `[n]`, linked to the list |
+| 19 | class option `nobib` | `tufte.bibliography.margin = false` | should | a citation becomes `[n]`, linked to the list (numbered in the order of `bibliography.style`) |
 | 20 | `.bib` database | `data/bibliography.yaml` (native), `data/bibliography.json` (CSL-JSON), front matter `bibliography: refs.json` or `references:` | must | see [Bibliography](https://github.com/massimo-nocentini/tufte.hugo#bibliography) |
 | 21 | `.bib` read directly | `bibliography: refs.bib` (page resource or asset) | could | a simple BibTeX reader; pandoc → CSL-JSON is more robust |
 | 22 | `\doi{}`, `\url{}` in entries | fields `doi`, `url` | must | rendered as links |
@@ -69,7 +69,7 @@ configuration, or of the `tufte:` map in a page's front matter.
 | 32 | `margintable[offset]` | `{{</* margintable caption="…" offset="…" */>}}…{{</* /margintable */>}}` | should |  |
 | 33 | booktabs | Markdown tables | should | rules come from the CSS; `\cmidrule` and `\multicolumn` are **wont** (no Markdown syntax) |
 | 34 | algorithm / listing floats | `{{</* listing caption="…" label="lst:x" style="ruled" */>}}` + a fenced code block | could | styles `plain`, `ruled`, `boxed` |
-| 35 | subfigures, `\fbox` image grids | `{{</* subfigures cols=2 type="fullwidth" caption="…" */>}}` with images on consecutive lines | could | a blank line between images would make them separate figures |
+| 35 | subfigures, `\fbox` image grids | `{{</* subfigures cols=2 type="fullwidth" caption="…" */>}}` with images on consecutive lines | could | linked images (thumbnails) keep their link and subcaption |
 | 36 | `\ref` | `{{</* xref "fig:x" */>}}` | must | forward references work |
 | 37 | `Figure~\ref{fig:x}` | `{{</* xref "fig:x" "full" */>}}` | must | with a non-breaking space |
 | 38 | `\nameref` | `{{</* xref "sec:x" "name" */>}}` | must |  |
@@ -98,7 +98,7 @@ configuration, or of the `tufte:` map in a page's front matter.
 | 61 | frontispiece | book root `frontispiece: {src, alt, caption}` | could | an unnumbered figure, caption in the margin, before the title page |
 | 62 | `\blankpage`, `\cleardoublepage`, `\clearpage` | `{{</* clearpage */>}}`; `halftitle: true` | could | print only |
 | 63 | running heads (fancyhdr) | `tufte.print.runningHeads = true` | could | print only, Chromium ≥ 131 |
-| 64 | the book printed as one PDF | book root `outputs: [html, print]` → `…/print.html` | should | see [Printing](https://github.com/massimo-nocentini/tufte.hugo#printing-and-pdf) |
+| 64 | the book printed as one PDF | book root `outputs: [html, rss, print]` → `…/print.html` | should | see [Printing](https://github.com/massimo-nocentini/tufte.hugo#printing-and-pdf) |
 | 65 | `\index{…}` with `!`, `@`, `\|see{}`, `\|seealso{}`, `\|(`, `\|)` | `{{</* index "classes!a4paper" */>}}`, same syntax | should |  |
 | 66 | `\printindex` | `{{</* printindex */>}}` (standalone) | should | three columns |
 | 67 | the index as a site taxonomy | — | **wont** | `/index/` clashes with Hugo's index files; use the shortcode |
@@ -138,7 +138,7 @@ configuration, or of the `tufte:` map in a page's front matter.
 | 101 | `hyper`, `colorlinks`, PDF metadata | — | **wont** | links are native; colours via `customCSS`; metadata is in `<head>` |
 | 102 | `tufte-*-local.tex` hooks | `params.customCSS`, the `*_custom.html` partials | must | body classes `tufte-book`/`tufte-handout` allow scoping |
 | 103 | `\hangp`, `\hangleft`, `\hangstar` | — | **wont** | sample-book macros, not class features; CSS `hanging-punctuation` (Safari only) is used |
-| 104 | setspace `doublespace` | — | **wont** | not loaded by the classes |
+| 104 | setspace `doublespace` | — | **wont** | loaded by `tufte-common.def`, but it is a general line-spacing package, not a class feature: set the leading with CSS (`line-height`) through `customCSS` |
 | 105 | doc macros (`\doccmd`…), text shortcuts (`\TL`, `\monthyear`) | inline code, your own shortcodes | **wont** | not class features |
 | 106 | TeX machinery (`\morefloats`, engine detection, `\TufteRecalculate`, other paper options) | — | **wont** | no meaning in HTML |
 {.fullwidth}
@@ -341,3 +341,9 @@ lists “quote !” under “index”.{{< index `index!quote "!` >}}
 The index of this page:
 
 {{< printindex >}}
+
+The references below are written with `{{</* bibliography heading="Works cited" */>}}`
+instead of the automatic list, which a handout leaves out when it has its own
+`bibliography` shortcode; `all=true` would list every entry of the database.
+
+{{< bibliography heading="Works cited" >}}

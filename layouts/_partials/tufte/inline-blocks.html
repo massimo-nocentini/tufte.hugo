@@ -4,7 +4,8 @@
   sidenote) without the browser closing the paragraph around it.
 
   Paragraphs must already be flattened (</p><p> → <br>, <p> removed). Each
-  remaining block element becomes a <span> that keeps its attributes and
+  remaining block element becomes a <span> that keeps its global
+  attributes (class, id, style, data-*, lang, …; not start, value, open) and
   records its tag in data-sn, which tufte-latex.css lays out as the block
   it was (list items, code blocks, quotes, tables):
 
@@ -16,12 +17,80 @@
     <details>, <summary>, <nav>, <address>, <article> likewise
     <hr>                   → <br>
 
+  An item of an ordered list also gets its number as data-n (from the
+  list's start and the item's value), printed by the CSS in its marker.
+
   Takes: the HTML (string or template.HTML).
   Returns: the HTML string (unchanged when it holds no block element).
 */ -}}
 {{- $html := string . -}}
 {{- $tags := `ul|ol|li|pre|div|blockquote|table|thead|tbody|tfoot|tr|th|td|caption|dl|dt|dd|figure|figcaption|h[1-6]|section|header|footer|aside|details|summary|nav|address|article` -}}
 {{- if findRE (printf `(?i)<(?:%s|hr)[\s/>]` $tags) $html 1 -}}
+  {{- /* A span cannot use the start attribute of an <ol> (nor the value of
+         an <li>), and the list-item counter of a span list is not reliable
+         across engines: each item of an ordered list gets its number as
+         data-n, which tufte-latex.css prints in its ::marker. The walk
+         keeps a stack of lists (for an <ol>, the next number). */ -}}
+  {{- if findRE `(?i)<ol[\s>]` $html 1 -}}
+    {{- $mark := "\ue000" -}}
+    {{- $parts := split (replaceRE `(?i)(</?(?:ol|ul|li)(?:\s[^>]*)?>)` (printf "%s$1" $mark) $html) $mark -}}
+    {{- $stack := slice -}}
+    {{- $out := index $parts 0 -}}
+    {{- range after 1 $parts -}}
+      {{- $piece := . -}}
+      {{- $tag := index (findRE `^<[^>]*>` $piece 1) 0 -}}
+      {{- $name := lower (replaceRE `^</?([A-Za-z]+).*$` "$1" $tag) -}}
+      {{- $closing := hasPrefix $tag "</" -}}
+      {{- if eq $name "ol" "ul" -}}
+        {{- if $closing -}}
+          {{- if $stack -}}{{- $stack = first (sub (len $stack) 1) $stack -}}{{- end -}}
+        {{- else if eq $name "ul" -}}
+          {{- $stack = $stack | append (dict "ol" false "n" 0) -}}
+        {{- else -}}
+          {{- $start := 1 -}}
+          {{- with findRESubmatch `(?i)\sstart\s*=\s*["']?(-?[0-9]+)` $tag 1 -}}
+            {{- $start = int (index (index . 0) 1) -}}
+          {{- end -}}
+          {{- $stack = $stack | append (dict "ol" true "n" $start) -}}
+        {{- end -}}
+      {{- else if and (eq $name "li") (not $closing) $stack -}}
+        {{- $top := index $stack (sub (len $stack) 1) -}}
+        {{- if $top.ol -}}
+          {{- $n := $top.n -}}
+          {{- with findRESubmatch `(?i)\svalue\s*=\s*["']?(-?[0-9]+)` $tag 1 -}}
+            {{- $n = int (index (index . 0) 1) -}}
+          {{- end -}}
+          {{- $piece = replaceRE `^<(?i:li)` (printf `<li data-n="%d"` $n) $piece 1 -}}
+          {{- $stack = (first (sub (len $stack) 1) $stack) | append (dict "ol" true "n" (add $n 1)) -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $out = printf "%s%s" $out $piece -}}
+    {{- end -}}
+    {{- $html = $out -}}
+  {{- end -}}
+  {{- /* A span takes only the global attributes: the element-only ones
+         (start, reversed, type, value, open, cite, colspan, rowspan,
+         scope, headers, …) are dropped, data-n already holds the list
+         numbers. aria-label and aria-labelledby are not allowed on a
+         span without a role (a <nav aria-label>): they stay only next to
+         an explicit role. Attribute order is kept (postprocess.html
+         matches `<span data-sn="div" class="tufte-placeholder"`). */ -}}
+  {{- $global := slice "class" "id" "style" "lang" "dir" "title" "tabindex" "hidden" "role" "translate" "inert" "spellcheck" "accesskey" "itemscope" "itemprop" "itemtype" "itemid" "itemref" -}}
+  {{- range $t := findRE (printf `(?i)<(?:%s)\s[^>]*>` $tags) $html | uniq -}}
+    {{- $name := replaceRE `^<([A-Za-z0-9]+)[\s\S]*$` "$1" $t -}}
+    {{- $attrs := replaceRE `^<[A-Za-z0-9]+|/?>$` "" $t -}}
+    {{- $hasRole := findRE `(?i)\srole\s*=` $attrs 1 -}}
+    {{- $keep := "" -}}
+    {{- range findRE `\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>]+))?` $attrs -}}
+      {{- $an := lower (replaceRE `^\s+([^\s=]+)[\s\S]*$` "$1" .) -}}
+      {{- $ok := or (in $global $an) (hasPrefix $an "data-") (findRE `^on[a-z]+$` $an 1) -}}
+      {{- if and (hasPrefix $an "aria-") (or $hasRole (not (in (slice "aria-label" "aria-labelledby") $an))) -}}
+        {{- $ok = true -}}
+      {{- end -}}
+      {{- if $ok }}{{ $keep = printf "%s%s" $keep . }}{{ end -}}
+    {{- end -}}
+    {{- $html = replace $html $t (printf "<%s%s>" $name $keep) -}}
+  {{- end -}}
   {{- $html = replaceRE (printf `(?i)<(%s)(\s[^>]*)?>` $tags) `<span data-sn="$1"$2>` $html -}}
   {{- $html = replaceRE (printf `(?i)</(?:%s)\s*>` $tags) `</span>` $html -}}
   {{- $html = replaceRE `(?i)<hr\s*/?>` `<br>` $html -}}

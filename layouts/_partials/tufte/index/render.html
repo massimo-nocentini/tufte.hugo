@@ -36,9 +36,12 @@
   ("; see also X"). A range |( … |) that closes in another chapter or
   section prints OPEN–CLOSE (two links joined by an en dash, makeindex's
   "1–3"), absorbing the plain locators inside it; closed where it opened,
-  it prints one locator. A new initial
-  letter at level 1 gets the class index-gap; the letter is the base letter
-  of the first rune when the language collator sorts it there
+  it prints one locator. Each level is ordered as makeindex orders it
+  (tufte/index/order.html): symbols, then numbers in numeric order, then
+  letters with the language's collation. A new group at level 1 gets the
+  class index-gap: all symbols are one group, all numbers another, and
+  each initial letter its own; the letter is the base letter of the first
+  rune when the language collator sorts it there
   (tufte/index/initial.html: é with e, but Spanish ñ apart from n).
 */ -}}
 {{- define "_partials/inline/tufte-index-level.html" -}}
@@ -51,7 +54,8 @@
   {{- range $items }}{{ $keys = $keys | append (index . $sk) }}{{ end -}}
   {{- $lis := slice -}}
   {{- $prev := "" -}}
-  {{- range sort (uniq $keys) -}}
+  {{- /* symbols, numbers (numerically), letters: tufte/index/order.html */ -}}
+  {{- range partial "tufte/index/order.html" (uniq $keys) -}}
     {{- $k := . -}}
     {{- $sub := where $items $sk $k -}}
     {{- $self := where $sub "depth" $d -}}
@@ -63,8 +67,12 @@
     {{- /* locators, one per chapter/section, in reading order. A range
            |( … |) becomes one locator OPEN–CLOSE (makeindex's "1–3")
            when it ends in another chapter/section, else just OPEN; the
-           plain entries inside it are absorbed. An unclosed range keeps
-           its opening locator; a close without an open adds nothing. */ -}}
+           plain entries inside it are absorbed. As makeindex does, a
+           malformed range warns (tufte-bad-option; the index is never
+           rendered in summary mode): an unclosed range keeps its opening
+           locator and what it absorbed, a close without an open is a
+           plain locator, and a second open inside a range is absorbed
+           like a plain entry. */ -}}
     {{- $seen := newScratch -}}
     {{- $locs := slice -}}
     {{- $open := false -}}
@@ -77,8 +85,20 @@
       {{- else if $it.seealso -}}
         {{- $seealsos = $seealsos | append $it.seealso -}}
       {{- else if eq $it.rng "open" -}}
-        {{- if not $open }}{{ $open = $it }}{{ end -}}
+        {{- if $open -}}
+          {{- warnidf "tufte-bad-option" "printindex: %q in %s opens a range |( while the one opened by %q in %s is still open (makeindex: \"Extra range opening operator\"); it is part of that range" $it.raw $it.at $open.raw $open.at -}}
+          {{- $pend = $pend | append $it -}}
+        {{- else -}}
+          {{- $open = $it -}}
+        {{- end -}}
       {{- else if eq $it.rng "close" -}}
+        {{- if not $open -}}
+          {{- warnidf "tufte-bad-option" "printindex: %q in %s closes a range |) that was never opened (makeindex: \"Extra range closing operator\"); it is listed as a plain locator. Open the range with the same entry and |(" $it.raw $it.at -}}
+          {{- if not ($seen.Get $it.lk) -}}
+            {{- $seen.Set $it.lk true -}}
+            {{- $locs = $locs | append (dict "lk" $it.lk "html" $it.link) -}}
+          {{- end -}}
+        {{- end -}}
         {{- with $open -}}
           {{- $h := .link -}}
           {{- if ne .lk $it.lk -}}
@@ -103,6 +123,7 @@
     {{- end -}}
     {{- with $open -}}
       {{- /* unclosed: its opening locator, then what it absorbed */ -}}
+      {{- warnidf "tufte-bad-option" "printindex: %q in %s opens a range |( that is never closed (makeindex: \"Unmatched range opening operator\"); it is listed from its opening locator. Close it with the same entry and |)" .raw .at -}}
       {{- $u := slice . -}}
       {{- range $pend }}{{ $u = $u | append . }}{{ end -}}
       {{- range $it := $u -}}
@@ -178,13 +199,15 @@
     {{- if and $ch $ch.Numbered $ch.Display -}}
       {{- $chapLoc = htmlEscape (printf "%v" $ch.Display) -}}
     {{- else -}}
-      {{- $chapLoc = partial "tufte/plain-title.html" (dict "page" $c) | htmlEscape -}}
+      {{- $chapLoc = partial "tufte/name-title.html" (dict "page" $c) -}}
     {{- end -}}
   {{- end -}}
-  {{- $where := partial "tufte/plain-title.html" (dict "page" $c) | htmlEscape -}}
+  {{- $where := partial "tufte/name-title.html" (dict "page" $c) -}}
   {{- /* the locator key: pages that are never rendered have no
          RelPermalink */ -}}
   {{- $cKey := or $c.RelPermalink $c.Path -}}
+  {{- /* the page named by malformed-range warnings */ -}}
+  {{- $at := or (and $c.File $c.File.Path) $c.RelPermalink $c.Path -}}
   {{- range $m := findRE `(?s)<h2[\s>].*?</h2>|<span class="index-anchor"[^>]*></span>` $raw -}}
     {{- /* an h2 match updates the handout locator and may itself hold
            index anchors (an index shortcode in a "##" heading): collect
@@ -207,6 +230,12 @@
         {{- if strings.Contains $t `class="xref"` -}}
           {{- $t = partial "tufte/resolve-refs.html" (dict "page" $c "html" $t "quiet" true) -}}
         {{- end -}}
+        {{- /* plainnat's year letters of the heading's author-year
+               citations (1999a), before plain-math drops their empty
+               markers (tufte/bib/fill-extra.html) */ -}}
+        {{- if strings.Contains $t "bib-extra" -}}
+          {{- $t = partial "tufte/bib/fill-extra.html" (dict "page" $c "html" $t) -}}
+        {{- end -}}
         {{- with partial "tufte/plain-math.html" (dict "html" $t) }}{{ $where = . }}{{ end -}}
       {{- end -}}
       {{- $anchors = findRE `<span class="index-anchor"[^>]*></span>` $m -}}
@@ -224,6 +253,7 @@
       "s1" (index $lv 0).sort "d1" (index $lv 0).display
       "s2" "" "d2" "" "s3" "" "d3" ""
       "see" $parsed.see "seealso" $parsed.seealso "rng" (index $parsed "range")
+      "raw" $rawIdx "at" $at
       "link" (partial "tufte/page-link.html" (dict "page" $c "anchor" $id "html" (cond (ne $chapLoc "") $chapLoc $where) "book" $root))
       "lk" (cond (ne $chapLoc "") $cKey (printf "%s|%s" $cKey $where)) -}}
     {{- if ge (len $lv) 2 }}{{ $it = merge $it (dict "s2" (index $lv 1).sort "d2" (index $lv 1).display) }}{{ end -}}

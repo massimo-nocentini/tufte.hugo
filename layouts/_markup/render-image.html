@@ -74,7 +74,12 @@
     {{- $alt = printf "TUFTEATTR%sEND" $altKey -}}
   {{- end -}}
 {{- end -}}
-{{- if .IsBlock -}}
+{{- /* Inside the subfigures shortcode (tufteRawImgTitles, below) every
+       image is a grid cell, never a figure of its own: a linked image
+       ([![alt](src "Title")](url)) and an image alone on its lines reach
+       this hook with .IsBlock = true, and as a figure its title would be a
+       caption printed after the link instead of the cell's subcaption. */ -}}
+{{- if and .IsBlock (not (.Page.Store.Get "tufteRawImgTitles")) -}}
   {{- $type := "main" -}}
   {{- $rest := slice -}}
   {{- range $classes -}}

@@ -24,12 +24,22 @@
   span, e.g. a note) the paragraph is left as it is and the block is
   reported in `kept`.
 
+  A list item, definition term or description, or table cell holds its
+  text without a <p> (a tight list, a table): there a block written inside
+  emphasis or a link (`- Text *em {{< figure >}} end*`) is invalid too. It
+  is handled the same way, except that the container stays whole: the
+  open text-level elements are closed before the block and opened again
+  after it, and the block is reported in `inline`. A block that is a
+  direct child of the container (a nested list, a <p>) is left alone.
+
   Takes a dict:
     html  the HTML (string)
   Returns: dict
     html    the HTML (string)
     blocks  slice of the opening tags of the moved blocks (for a warning)
     kept    slice of the opening tags of the blocks left in a paragraph
+    inline  slice of the opening tags of the blocks moved out of text-level
+            elements in a list item, definition or table cell
 */ -}}
 {{- /* Comments and script/style/textarea contents are text, not tags
        (raw HTML, unsafe = true): hidden from the scan (func/raw-mask.html). */ -}}
@@ -38,20 +48,28 @@
 {{- $done := "" -}}
 {{- $moved := slice -}}
 {{- $kept := slice -}}
+{{- $inline := slice -}}
 {{- $void := slice "area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr" -}}
 {{- /* Text-level elements that may be closed before a block and opened
        again after it (HTML's formatting elements and their kin). */ -}}
 {{- $fmt := slice "a" "abbr" "b" "bdi" "bdo" "big" "cite" "code" "del" "dfn" "em" "font" "i" "ins" "kbd" "mark" "nobr" "q" "s" "samp" "small" "strike" "strong" "sub" "sup" "time" "tt" "u" "var" -}}
 {{- $blockRE := `address|article|aside|blockquote|details|dialog|div|dl|fieldset|figcaption|figure|footer|form|h[1-6]|header|hgroup|hr|main|menu|nav|ol|p|pre|section|table|ul` -}}
-{{- /* A <p …> followed, before any </p> or other <p…>, by a block tag. */ -}}
-{{- $findRE := printf `(?s)<p(?:\s[^>]*)?>(?:[^<]|<[^/p]|</[^p]|</p[^>]|<p[^\s>])*?<(?:%s)[\s>/]` $blockRE -}}
+{{- /* A <p …> followed, before any </p> or other <p…>, by a block tag;
+       or a li/dd/dt/td/th followed by text and inline tags only (text-level
+       elements, void elements, spans and labels of notes, KaTeX's MathML
+       and SVG), among them an opening text-level element, then a block
+       tag. RE2 has no look-ahead: the inline tags are listed. */ -}}
+{{- $inTag := printf `</?(?:%s|%s|span|label|math|semantics|annotation|m(?:row|i|o|n|s|text|space|sup|sub|subsup|frac|sqrt|root|over|under|underover|table|tr|td|style|padded|phantom|enclose|multiscripts|prescripts)|svg|path|line|rect|g|use|defs)(?:\s[^>]*)?/?>` (delimit $fmt "|") (delimit $void "|") -}}
+{{- $cellRE := printf `<(?:li|dd|dt|td|th)(?:\s[^>]*)?>(?:[^<]|%s)*?<(?:%s)(?:\s[^>]*)?>(?:[^<]|%s)*?` $inTag (delimit $fmt "|") $inTag -}}
+{{- $findRE := printf `(?s)(?:<p(?:\s[^>]*)?>(?:[^<]|<[^/p]|</[^p]|</p[^>]|<p[^\s>])*?|%s)<(?:%s)[\s>/]` $cellRE $blockRE -}}
 {{- $nameRE := `(?s)^</?([a-zA-Z][a-zA-Z0-9-]*).*$` -}}
 {{- if findRE $findRE $rest 1 -}}
   {{- range seq 400 -}}
     {{- $m := index (findRE $findRE $rest 1) 0 | default "" -}}
     {{- if not $m }}{{ break }}{{ end -}}
     {{- $pre := index (split $rest $m) 0 -}}
-    {{- $pOpen := replaceRE `(?s)^(<p(?:\s[^>]*)?>).*$` "$1" $m -}}
+    {{- $pOpen := replaceRE `(?s)^(<[a-zA-Z]+(?:\s[^>]*)?>).*$` "$1" $m -}}
+    {{- $isP := strings.HasPrefix $m "<p" -}}
     {{- $inl := replaceRE `(?s)<[a-zA-Z0-9]+[\s>/]$` "" (strings.TrimPrefix $pOpen $m) -}}
     {{- /* A margin toggle right before the block goes with it. */ -}}
     {{- $toggle := "" -}}
@@ -73,6 +91,14 @@
     {{- end -}}
     {{- $inFmt := true -}}
     {{- range $stack }}{{ if not (in $fmt (replaceRE $nameRE "$1" . | lower)) }}{{ $inFmt = false }}{{ end }}{{ end -}}
+    {{- if and (not $isP) (not $stack) -}}
+      {{- /* A block that is a child of the list item or cell (a nested
+             list after emphasis that was closed): valid, left alone. */ -}}
+      {{- $keep := printf "%s%s%s%s" $pre $pOpen $inl $toggle -}}
+      {{- $done = printf "%s%s" $done $keep -}}
+      {{- $rest = strings.TrimPrefix $keep $rest -}}
+      {{- continue -}}
+    {{- end -}}
     {{- if not $inFmt -}}
       {{- /* Inside a span (a note…): leave this paragraph alone, keep it
              up to the block's tag, and report the block. */ -}}
@@ -129,6 +155,15 @@
     {{- end -}}
     {{- $reopen := "" -}}
     {{- range $left }}{{ $reopen = printf "%s%s" $reopen (replaceRE `\s+id="[^"]*"` "" .) }}{{ end -}}
+    {{- if not $isP -}}
+      {{- /* List item, definition or cell: it stays whole; only the
+             text-level elements are split around the block. */ -}}
+      {{- if or $close $reopen }}{{ $inline = $inline | append (replaceRE `(?s)^(<[^>]*>).*$` "$1" $block) }}{{ end -}}
+      {{- $done = printf "%s%s%s%s%s" $done $pre $pOpen $hin $close -}}
+      {{- $done = printf "%s%s" $done $toggle -}}
+      {{- $rest = printf "%s\n%s%s" $block $reopen $after -}}
+      {{- continue -}}
+    {{- end -}}
     {{- $head := "" -}}
     {{- $fmtTagRE := printf `(?i)</?(?:%s)(?:\s[^>]*)?>` (delimit $fmt "|") -}}
     {{- with strings.TrimSpace (replaceRE $fmtTagRE "" $inl) -}}
@@ -136,11 +171,18 @@
     {{- end -}}
     {{- $tail := strings.TrimLeft " \t\n" $after -}}
     {{- /* A block alone in its paragraph (<p>BLOCK</p>) is unwrapped
-           silently; any text around it is an authoring slip, reported. */ -}}
-    {{- if or $head (not (strings.HasPrefix $tail "</p>")) -}}
+           silently; any text around it is an authoring slip, reported.
+           So is a block that ends a real footnote (a listing or table as
+           the last block of a [^fn-…] definition): tufte/postprocess.html
+           put the back-references in its last paragraph, after the block;
+           they get a paragraph of their own (p.footnote-backrefs). */ -}}
+    {{- $backsOnly := findRE `^(?:<a [^>]*class="footnote-backref"[^>]*>[^<]*</a>\s*)+</p>` $tail 1 -}}
+    {{- if or $head (not (or $backsOnly (strings.HasPrefix $tail "</p>"))) -}}
       {{- $moved = $moved | append (replaceRE `(?s)^(<[^>]*>).*$` "$1" $block) -}}
     {{- end -}}
-    {{- if strings.HasPrefix $tail "</p>" -}}
+    {{- if and $backsOnly (not $head) (not $reopen) -}}
+      {{- $tail = printf `<p class="footnote-backrefs">%s` $tail -}}
+    {{- else if strings.HasPrefix $tail "</p>" -}}
       {{- $tail = strings.TrimPrefix "</p>" $tail -}}
     {{- else -}}
       {{- $tail = printf "<p>%s%s" $reopen $tail -}}
@@ -153,4 +195,4 @@
 {{- end -}}
 {{- $out := printf "%s%s" $done $rest -}}
 {{- with $mask.raw }}{{ $out = (partial "func/raw-mask.html" (dict "html" $out "raw" .)).html }}{{ end -}}
-{{- return (dict "html" $out "blocks" $moved "kept" $kept) -}}
+{{- return (dict "html" $out "blocks" $moved "kept" $kept "inline" $inline) -}}

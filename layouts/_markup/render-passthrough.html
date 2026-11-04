@@ -16,7 +16,8 @@
   and {{< eqref "eq:x" >}} / {{< xref "eq:x" >}} refer to it:
     $$ e^{i\pi} + 1 = 0 \label{eq:euler} $$
     → <span class="math-display numbered" id="eq-euler">KATEX<span class="eq-number">(<span class="tufte-num" data-kind="eq" data-key="eq-euler" data-labeled="1"></span>)</span></span>
-  (the \label is removed before KaTeX sees it). Numbers run through the
+  (the \label is removed before KaTeX sees it; TeX % comments are removed
+  first, so a \label in a comment is ignored). Numbers run through the
   page, or the book with continuous numbering.
 
   The rendering itself is done by the partial tufte/math-render.html.
@@ -55,8 +56,35 @@
 */ -}}
 {{- $block := eq .Type "block" -}}
 {{- $inner := .Inner -}}
+{{- /* Math inside a block quote or an alert: Goldmark's passthrough keeps
+       the quote markers of the continuation lines in .Inner ("\n> x\n> "
+       for $$ … $$ written as "> $$ / > x / > $$"), and KaTeX would print
+       them as ">" relations. When every line after the first starts with
+       ">" (optionally indented; "> >" in nested quotes), that prefix is
+       removed. Inside a list item or a footnote the prefix is only
+       indentation, which TeX ignores. */ -}}
+{{- if strings.Contains $inner "\n" -}}
+  {{- $lines := split $inner "\n" -}}
+  {{- $rest := after 1 $lines -}}
+  {{- $quoted := true -}}
+  {{- range $rest -}}
+    {{- if not (findRE `^[ \t]*>` . 1) }}{{ $quoted = false }}{{ end -}}
+  {{- end -}}
+  {{- if $quoted -}}
+    {{- $out := slice (index $lines 0) -}}
+    {{- range $rest }}{{ $out = $out | append (replaceRE `^[ \t]*(?:>[ \t]?)+` "" .) }}{{ end -}}
+    {{- $inner = delimit $out "\n" -}}
+  {{- end -}}
+{{- end -}}
 {{- $label := "" -}}
 {{- if $block -}}
+  {{- /* TeX comments (an unescaped % to the end of the line; \% is a
+         percent sign, \\% a line break then a comment) are removed first,
+         so a \label in a comment is no label, as in LaTeX. KaTeX ignores
+         comments, so the formula is the same. */ -}}
+  {{- if strings.Contains $inner "%" -}}
+    {{- $inner = replaceRE `(?m)((?:^|[^\\])(?:\\\\)*)%.*$` "$1" $inner -}}
+  {{- end -}}
   {{- with findRESubmatch `\\label\{([^}]+)\}` $inner -}}
     {{- $label = index . 0 1 -}}
     {{- $inner = replaceRE `\\label\{[^}]+\}` "" $inner -}}

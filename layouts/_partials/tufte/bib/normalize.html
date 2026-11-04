@@ -300,23 +300,74 @@
 
 {{- $authors := $N.Get "author" -}}
 {{- $editors := $N.Get "editor" -}}
-{{- $first := "" -}}
-{{- $fams := slice -}}
-{{- range (cond (gt (len $authors) 0) $authors $editors) -}}
-  {{- $fams = $fams | append (or .family .literal) -}}
-{{- end -}}
-{{- if $N.Get (cond (gt (len $authors) 0) "authorEtal" "editorEtal") }}{{ $fams = $fams | append "et al" }}{{ end -}}
-{{- $first = delimit $fams " " -}}
 {{- $title := $F.Get "title" -}}
-{{- $sortkey := lower (replaceRE `[\x11-\x19\x1b]` "" (printf "%s|%s|%s" (or $first $title) $year $title)) -}}
+{{- $authorsEtal := and (gt (len $authors) 0) ($N.Get "authorEtal") -}}
+{{- $editorsEtal := and (gt (len $editors) 0) ($N.Get "editorEtal") -}}
+
+{{- /* plainnat's sort key (sort.label of plainnat.bst's presort, the key
+       of its final SORT), so that the sorted list (tufte/bib/list.html,
+       numbers.html) and the extra letters (tufte/bib/extra.html) follow
+       BibTeX with plainnat.bst:
+         names  each "von Last  First  Jr" (sort.format.names), joined by
+                three spaces; with three or more names "zz" YEAR comes
+                before the second one, and "and others" gives "zzzzz";
+                the authors, else (book, inbook) the editors; for
+                proceedings the editors, else the organization; for
+                manual the authors, else the organization (without a
+                leading "The "); else the BibTeX `key` field, else "";
+         year, then the cite key (lowercased here: keys are
+                case-insensitive),
+       the names and year sortified (purify$: hyphens, ties and spaces
+       become spaces, other non-alphanumerics are dropped; lowercased) and
+       joined by four spaces; no title. plainnat's first SORT (the one its
+       extra letters follow) puts the citation label before this key: equal
+       within an extra-letter group, so the letters follow this key too. */ -}}
+{{- $sortify := `[^\p{L}\p{N} ]` -}}
+{{- $sn := slice -}}
+{{- $snEtal := false -}}
+{{- $org := "" -}}
+{{- if eq $type "proceedings" -}}
+  {{- $sn = $editors }}{{ $snEtal = $editorsEtal }}{{ $org = $F.Get "organization" -}}
+{{- else if gt (len $authors) 0 -}}
+  {{- $sn = $authors }}{{ $snEtal = $authorsEtal -}}
+{{- else if in (slice "book" "inbook") $type -}}
+  {{- $sn = $editors }}{{ $snEtal = $editorsEtal -}}
+{{- else if eq $type "manual" -}}
+  {{- $org = $F.Get "organization" -}}
+{{- end -}}
+{{- $names := "" -}}
+{{- if gt (len $sn) 0 -}}
+  {{- $count := add (len $sn) (cond $snEtal 1 0) -}}
+  {{- range $i, $n := $sn -}}
+    {{- $t := $n.literal -}}
+    {{- if not $t -}}
+      {{- $t = $n.family -}}
+      {{- with $n.given }}{{ $t = printf "%s  %s" $t . }}{{ end -}}
+      {{- with $n.suffix }}{{ $t = printf "%s  %s" $t . }}{{ end -}}
+    {{- end -}}
+    {{- $t = lower (replaceRE $sortify "" (replaceRE `[\s~-]` " " $t)) -}}
+    {{- if eq $i 0 -}}
+      {{- $names = $t -}}
+    {{- else -}}
+      {{- if and (gt $count 2) (eq $i 1) }}{{ $t = printf "zz%s   %s" $year $t }}{{ end -}}
+      {{- $names = printf "%s   %s" $names $t -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $snEtal }}{{ $names = printf "%s   zzzzz" $names }}{{ end -}}
+{{- else if $org -}}
+  {{- $names = lower (replaceRE $sortify "" (replaceRE `[\s~-]` " " (replaceRE `^The ` "" $org))) -}}
+{{- else if and (not $isCSL) (index $e "key") -}}
+  {{- $names = lower (replaceRE $sortify "" (replaceRE `[\s~-]` " " (printf "%v" (index $e "key")))) -}}
+{{- end -}}
+{{- $sortkey := printf "%s    %s    %s" $names (lower (replaceRE $sortify "" $year)) $key -}}
 
 {{- return (dict
   "key" $key
   "type" $type
   "authors" $authors
   "editors" $editors
-  "authorsEtal" (and (gt (len $authors) 0) ($N.Get "authorEtal"))
-  "editorsEtal" (and (gt (len $editors) 0) ($N.Get "editorEtal"))
+  "authorsEtal" $authorsEtal
+  "editorsEtal" $editorsEtal
   "title" $title
   "container" ($F.Get "container")
   "publisher" ($F.Get "publisher")

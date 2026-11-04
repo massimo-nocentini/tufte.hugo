@@ -1,6 +1,7 @@
 {{ define "main" }}
 {{- /* Home page: optional title (only when content/_index.md sets one that
-       differs from the site title, which the header already shows), the _index.md content as an
+       differs from the site title, which the header already shows; else a
+       visually hidden h1 with the site title), the _index.md content as an
        introduction (Params.homeIntro, default true), then paginated summaries
        of the posts in the main sections.
        When content/_index.md sets `book: true` the whole site is one book
@@ -13,10 +14,14 @@
 <article>
   {{- /* .Title is the front matter title, or the site title when there is
          none (.Params.title is deprecated since Hugo 0.169). */}}
-  {{- with .Title }}
-  {{- if ne . site.Title }}
-  <h1>{{ partial "tufte/title-html.html" (dict "page" $ "title" . "heading" true) }}</h1>
-  {{- end }}
+  {{- /* A title equal to the site title is not shown twice, but the page
+         still gets its level-1 heading: the site title, visually hidden
+         (the header shows it as a link), so that the outline does not
+         start at the summary titles' h2. */}}
+  {{- if and .Title (ne .Title site.Title) }}
+  <h1>{{ partial "tufte/title-html.html" (dict "page" $ "title" .Title "heading" true) }}</h1>
+  {{- else if site.Title }}
+  <h1 class="visually-hidden">{{ site.Title }}</h1>
   {{- end }}
   {{- with .Params.subtitle }}
   <p class="subtitle">{{ . }}</p>

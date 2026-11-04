@@ -32,5 +32,5 @@
   Output (SPEC-LATEX §3.4):
     <figure class="tufte-table" id="K"><label …>&#8853;</label><input …/><span class="marginnote caption">LABEL+CAPTION</span><div class="table-wrapper"><table>…</table></div></figure>
 */ -}}
-{{- $out := partial "tufte/float-body.html" (dict "ctx" . "inner" .Inner "kind" "table") -}}
+{{- $out := partial "tufte/float-body.html" (dict "ctx" . "inner" .InnerDeindent "kind" "table") -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

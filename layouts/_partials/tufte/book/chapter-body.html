@@ -15,8 +15,9 @@
     - the output is wrapped in
       <article class="chapter matter-MATTER" id="tufte-cN" style="page: cN">,
       cN being the CSS named page that carries the chapter's running head.
-  The ids are in the theme's tufte- namespace, so ids of the landing body
-  (headings, labels), which keep their names, cannot collide with them.
+  The ids are in the theme's tufte- namespace; an id of the landing body
+  in it (a heading "## Tufte c1") gets the tufte-l- prefix in
+  list.print.html, so the two cannot collide.
 
   A chapter whose front matter sets `dedication` (Markdown) is a dedication
   page placed among the chapters (sample-book.tex puts it after the lists

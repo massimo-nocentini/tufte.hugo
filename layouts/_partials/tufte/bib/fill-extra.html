@@ -1,0 +1,61 @@
+{{- /*
+  Fills plainnat's extra labels (1999a, 1999b) into a piece of HTML: every
+  marker
+    <span class="bib-extra" data-key="KEY"></span>
+  (the cite shortcode, tufte/bib/format.html) becomes the letter of KEY
+  (tufte/bib/extra.html), or goes. Its HTML-escaped copy (in an attribute:
+  a figure's alt text, a data-name, tufte/plain-caption.html keeps the
+  marker) gets the letter as well.
+
+  A key gets its letter only when the page resolves it to the entry of the
+  same author-year group as the one that earned it (one lookup per key and
+  page, memoized in the page's Store as tufteMemoBibGroups, shared by the
+  full content, the summary and the texts copied out of phase 1).
+
+  Callers: tufte/postprocess.html (step 7b, the body), and the texts taken
+  from phase 1 that never pass through it: tufte/labels.html (the names of
+  headings and captions: xref "name", the lists, the description),
+  tufte/toc-text.html (page TOC, book contents), tufte/index/render.html
+  (a handout's section locators).
+
+  Takes: a dict with
+    page  the page whose citations these are
+    html  the HTML (string or template.HTML)
+  Returns: string.
+*/ -}}
+{{- $p := .page -}}
+{{- $html := string .html -}}
+{{- $esc := `&lt;span class=&#34;bib-extra&#34; data-key=&#34;` -}}
+{{- if or (strings.Contains $html `<span class="bib-extra" data-key="`) (strings.Contains $html $esc) -}}
+  {{- $xl := partialCached "tufte/bib/extra.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- $toks := findRE `<span class="bib-extra" data-key="[^"]*"></span>` $html -}}
+  {{- range findRE `&lt;span class=&#34;bib-extra&#34; data-key=&#34;.*?&#34;&gt;&lt;/span&gt;` $html -}}
+    {{- $toks = $toks | append (htmlUnescape .) -}}
+  {{- end -}}
+  {{- $toks = uniq $toks -}}
+  {{- $grp := dict -}}
+  {{- with partial "tufte/memo.html" (dict "page" $p "key" "tufteMemoBibGroups") }}{{ $grp = .v }}{{ end -}}
+  {{- $grpNew := false -}}
+  {{- range $tok := $toks -}}
+    {{- $k := htmlUnescape (replaceRE `^.*data-key="([^"]*)".*$` "$1" $tok) -}}
+    {{- if and (isset $xl $k) (not (isset $grp $k)) -}}
+      {{- $g := "" -}}
+      {{- with partial "tufte/bib/author-year.html" (dict "page" $p "key" $k) }}{{ $g = .group }}{{ end -}}
+      {{- $grp = merge $grp (dict $k $g) -}}
+      {{- $grpNew = true -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $grpNew -}}
+    {{- $p.Store.Set "tufteMemoBibGroups" (dict "v" $grp "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
+  {{- end -}}
+  {{- range $tok := $toks -}}
+    {{- $k := htmlUnescape (replaceRE `^.*data-key="([^"]*)".*$` "$1" $tok) -}}
+    {{- $l := "" -}}
+    {{- with index $xl $k -}}
+      {{- if eq (index $grp $k) .group }}{{ $l = .letter }}{{ end -}}
+    {{- end -}}
+    {{- $html = replace $html $tok $l -}}
+    {{- $html = replace $html (htmlEscape $tok) $l -}}
+  {{- end -}}
+{{- end -}}
+{{- return $html -}}

@@ -1,0 +1,38 @@
+{{- /*
+  The references of a numbered citation (bibliography.margin = false,
+  class option nobib), without the brackets, joined ", ": cite.html writes
+  "[REFS]", tufte/cite-gather.html " [REFS]" after a note or caption.
+
+  A key of the database (tufte/bib/db.html) gets its number, filled in by
+  tufte/postprocess.html, and a link to its entry in the list:
+    <a class="citation-ref" href="#ref-KEY" data-cite="KEY"><span class="cite-num" data-key="KEY"></span></a>
+  An unknown key prints "key?" ("[key?]", natbib's "[?]") and is warned
+  (tufte-unknown-cite):
+    <span class="citation-ref bib-missing" data-cite="KEY">KEY?</span>
+  It takes no number and no entry in the list (tufte/bib/numbers.html
+  leaves unknown keys out in this mode, as BibTeX leaves them out of the
+  .bbl), so the known entries keep consecutive numbers.
+
+  Takes: dict
+    page   the citing page (its database)                     required
+    keys   slice of lowercased keys
+    where  optional string for the warning (a shortcode position)
+  Returns: string.
+*/ -}}
+{{- $p := .page -}}
+{{- $db := partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $where := .where | default "" -}}
+{{- if not $where -}}
+  {{- with $p.File }}{{ $where = .Path }}{{ else }}{{ $where = $p.RelPermalink }}{{ end -}}
+{{- end -}}
+{{- $refs := slice -}}
+{{- range .keys -}}
+  {{- $k := htmlEscape . -}}
+  {{- if index $db . -}}
+    {{- $refs = $refs | append (printf `<a class="citation-ref" href="#ref-%s" data-cite="%s"><span class="cite-num" data-key="%s"></span></a>` $k $k $k) -}}
+  {{- else -}}
+    {{- warnidf "tufte-unknown-cite" "tufte.hugo: unknown citation key %q (not in the bibliography database) (%s)" . $where -}}
+    {{- $refs = $refs | append (printf `<span class="citation-ref bib-missing" data-cite="%s">%s?</span>` $k $k) -}}
+  {{- end -}}
+{{- end -}}
+{{- return (delimit $refs ", ") -}}

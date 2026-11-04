@@ -4,6 +4,9 @@
   1. Regular pages of the root, plus the regular pages of each part (a
      sub-section of the root; one level: pages of deeper sections are
      flattened into their part, with a tufte-book-structure warning).
+     Pages under an unlisted section (`build: {list: never}`) are left
+     out, as tufte/book/root.html leaves them out of the book, with a
+     tufte-book-structure warning.
   2. Sorted by group: a chapter at the root is a group of its own, a part
      is one group (its chapters stay together, as after \part in LaTeX).
      Groups sort by matter (front, main, appendix, back; a part's is that
@@ -45,9 +48,46 @@
        own pages of equal weight (their file name sorts under the
        sub-section's directory), and tufte-book-structure is warned. */ -}}
 {{- $deep := slice -}}
+{{- /* A page under an unlisted section (`build: {list: never}`) is not in
+       this book (tufte/book/root.html: the unlisted section cuts the
+       tree), so it is not a chapter either: the same test as there, so
+       that its layout, navigation, labels and this reading order agree.
+       Such a part is not in $root.Sections at all; a section inside a
+       part still lists its pages in the part's RegularPagesRecursive. */ -}}
+{{- $cutAt := slice -}}
+{{- range $root.RegularPagesRecursive -}}
+  {{- /* Reported only when the page is in no book: an unlisted section
+         with `book: true` is a book of its own (its pages are its
+         chapters), not a hole in this one. */ -}}
+  {{- if not (partialCached "tufte/book/root.html" . (or .RelPermalink .Path)) -}}
+    {{- /* The outermost unlisted section between the page and the root
+           (Ancestors run upwards: the last match). */ -}}
+    {{- $at := "" -}}
+    {{- range .Ancestors -}}
+      {{- if and .IsSection ($root.IsAncestor .) -}}
+        {{- $sec := . -}}
+        {{- with .Parent -}}
+          {{- if not (in .Sections $sec) -}}
+            {{- $at = $sec.RelPermalink -}}
+            {{- with $sec.File }}{{ $at = .Path }}{{ end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if and $at (not (in $cutAt $at)) }}{{ $cutAt = $cutAt | append $at }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- with $cutAt -}}
+  {{- $at := $root.RelPermalink -}}
+  {{- with $root.File }}{{ $at = .Path }}{{ end -}}
+  {{- warnidf "tufte-book-structure" "tufte.hugo: book %s: build.list = never on %s leaves that section and the pages under it out of the book (no contents entry, numbers, navigation or print.html: they render as ordinary pages), though those pages are listed; remove build.list from the section, or set it on those pages too" $at (delimit . ", ") -}}
+{{- end -}}
 {{- range $root.Sections -}}
   {{- $part := . -}}
   {{- range $part.RegularPagesRecursive -}}
+    {{- $in := false -}}
+    {{- with partialCached "tufte/book/root.html" . (or .RelPermalink .Path) }}{{ if eq . $root }}{{ $in = true }}{{ end }}{{ end -}}
+    {{- if not $in }}{{ continue }}{{ end -}}
     {{- $sub := "" -}}
     {{- if ne .Parent $part -}}
       {{- with .Parent -}}
@@ -68,7 +108,11 @@
 {{- $nested := slice -}}
 {{- range $root.Sections -}}
   {{- $secs := slice . -}}
-  {{- range .RegularPagesRecursive }}{{ with .Parent }}{{ if not (in $secs .) }}{{ $secs = $secs | append . }}{{ end }}{{ end }}{{ end -}}
+  {{- range .RegularPagesRecursive -}}
+    {{- $in := false -}}
+    {{- with partialCached "tufte/book/root.html" . (or .RelPermalink .Path) }}{{ if eq . $root }}{{ $in = true }}{{ end }}{{ end -}}
+    {{- if $in }}{{ with .Parent }}{{ if not (in $secs .) }}{{ $secs = $secs | append . }}{{ end }}{{ end }}{{ end -}}
+  {{- end -}}
   {{- range $secs -}}
     {{- if partial "tufte/truthy.html" (index .Params "book") -}}
       {{- $at := .RelPermalink -}}

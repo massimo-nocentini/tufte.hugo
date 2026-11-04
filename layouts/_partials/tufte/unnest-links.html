@@ -18,10 +18,17 @@
     footnotes turned sidenotes), and a lone footnotemark <label>;
   - real footnote references <sup class="footnote-ref">…</sup>;
   - nobib citations [<a class="citation-ref" …>n</a>, …] (they link to
-    the bibliography);
+    the bibliography; an unknown key is <span class="citation-ref
+    bib-missing" …>key?</span> in the brackets);
   - whitespace just before the first moved mark goes with it;
   - a margin figure moves with its <p class="margin-figure-anchor">
     (a block: tufte/unnest-blocks.html then splits the paragraph).
+  Marks inside any other block in the link text (a figure with its
+  caption, a margin block, a placeholder…: a block shortcode written in
+  link text) stay where they are, and so does the margin toggle right
+  before such a block: tufte/unnest-blocks.html, which runs next, moves
+  the block out of the paragraph whole (closing the link before it and
+  opening it again after it), with its caption and its toggle.
   Any other <a> still nested in the link (an xref, a link in link text)
   is unlinked: it becomes a <span> with its class, so the page has no <a>
   inside an <a>.
@@ -38,7 +45,7 @@
   {{- $out := index $segs 0 -}}
   {{- $depth := 0 -}}
   {{- $cur := "" -}}
-  {{- $markRE := `(?s)<label for="[^"]*" class="margin-toggle[^"]*"[^>]*>[^<]*</label>(?:<input type="checkbox" id="[^"]*" class="margin-toggle"/>)?|<sup class="footnote-ref"[^>]*>.*?</sup>|\[<a class="citation-ref"[^>]*><span class="cite-num"[^>]*>[^<]*</span></a>(?:, <a class="citation-ref"[^>]*><span class="cite-num"[^>]*>[^<]*</span></a>)*(?:, [^\]<]*)?\]` -}}
+  {{- $markRE := `(?s)<label for="[^"]*" class="margin-toggle[^"]*"[^>]*>[^<]*</label>(?:<input type="checkbox" id="[^"]*" class="margin-toggle"/>)?|<sup class="footnote-ref"[^>]*>.*?</sup>|\[(?:<a class="citation-ref"[^>]*><span class="cite-num"[^>]*>[^<]*</span></a>|<span class="citation-ref bib-missing"[^>]*>[^<]*</span>)(?:, (?:<a class="citation-ref"[^>]*><span class="cite-num"[^>]*>[^<]*</span></a>|<span class="citation-ref bib-missing"[^>]*>[^<]*</span>))*(?:, [^\]<]*)?\]` -}}
   {{- range $s := after 1 $segs -}}
     {{- if strings.HasPrefix $s "</a" -}}
       {{- if eq $depth 0 -}}
@@ -55,6 +62,48 @@
           {{- $open := replaceRE `^(<a(?:\s[^>]*)?>)(?s:.*)$` "$1" $cur -}}
           {{- $inner := strings.TrimPrefix $open $cur -}}
           {{- $moved := "" -}}
+          {{- /* Blocks (outermost, balanced), each with the margin toggle
+                 just before it, are masked as TUFTEULBLK<n>E tokens while
+                 the marks are collected; a margin figure's anchor <p> is
+                 not masked (it moves, see above). Unbalanced: no mask. */ -}}
+          {{- $blks := slice -}}
+          {{- $bnames := `address|article|aside|blockquote|details|dialog|div|dl|fieldset|figcaption|figure|footer|form|h[1-6]|header|hgroup|main|menu|nav|ol|p|pre|section|table|ul` -}}
+          {{- if findRE (printf `<(?:%s)[\s>]` $bnames) $inner 1 -}}
+            {{- $openRE := printf `^<(?:%s)(?:\s[^>]*)?>$` $bnames -}}
+            {{- $closeRE := printf `^</(?:%s)\s*>$` $bnames -}}
+            {{- $togRE := `(?s)<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label><input [^>]*class="margin-toggle"[^>]*/?>\s*$` -}}
+            {{- $mk := "" }}{{ $bc := "" }}{{ $bd := 0 }}{{ $bad := false -}}
+            {{- range $t := findRE `(?s)<[^>]*>|[^<]+` $inner -}}
+              {{- if gt $bd 0 -}}
+                {{- $bc = printf "%s%s" $bc $t -}}
+                {{- if findRE $openRE $t 1 -}}
+                  {{- $bd = add $bd 1 -}}
+                {{- else if findRE $closeRE $t 1 -}}
+                  {{- $bd = sub $bd 1 -}}
+                  {{- if eq $bd 0 -}}
+                    {{- $mk = printf "%sTUFTEULBLK%dE" $mk (len $blks) -}}
+                    {{- $blks = $blks | append $bc -}}
+                    {{- $bc = "" -}}
+                  {{- end -}}
+                {{- end -}}
+              {{- else if and (findRE $openRE $t 1) (not (strings.HasPrefix $t `<p class="margin-figure-anchor`)) -}}
+                {{- $bc = $t -}}
+                {{- with findRE $togRE $mk 1 -}}
+                  {{- $bc = printf "%s%s" (index . 0) $bc -}}
+                  {{- $mk = strings.TrimSuffix (index . 0) $mk -}}
+                {{- end -}}
+                {{- $bd = 1 -}}
+              {{- else -}}
+                {{- if findRE $closeRE $t 1 }}{{ if not (eq $t "</p>") }}{{ $bad = true }}{{ end }}{{ end -}}
+                {{- $mk = printf "%s%s" $mk $t -}}
+              {{- end -}}
+            {{- end -}}
+            {{- if or $bad (gt $bd 0) -}}
+              {{- $blks = slice -}}
+            {{- else if $blks -}}
+              {{- $inner = $mk -}}
+            {{- end -}}
+          {{- end -}}
           {{- if findRE `<(?:label\s|sup class="footnote-ref"|a[\s>])` $inner 1 -}}
             {{- range findRE $markRE $inner -}}
               {{- with findRE $markRE $inner 1 -}}
@@ -110,13 +159,17 @@
                 {{- $inner = printf "%s%s" $before $after -}}
               {{- end -}}
             {{- end -}}
-            {{- /* Links still nested (xref, link in link text) lose
-                   their link. */ -}}
-            {{- if findRE `<a[\s>]` $inner 1 -}}
-              {{- $inner = replaceRE `<a\s(?:[^>]*\s)?class="([^"]*)"[^>]*>` `<span class="$1">` $inner -}}
-              {{- $inner = replaceRE `<a(?:\s[^>]*)?>` "<span>" $inner -}}
-              {{- $inner = replaceRE `</a\s*>` "</span>" $inner -}}
-            {{- end -}}
+          {{- end -}}
+          {{- /* The masked blocks back in place. */ -}}
+          {{- range $i, $b := $blks -}}
+            {{- $inner = replace $inner (printf "TUFTEULBLK%dE" $i) $b -}}
+          {{- end -}}
+          {{- /* Links still nested (xref, link in link text, a link in a
+                 block written in the link text) lose their link. */ -}}
+          {{- if findRE `<a[\s>]` $inner 1 -}}
+            {{- $inner = replaceRE `<a\s(?:[^>]*\s)?class="([^"]*)"[^>]*>` `<span class="$1">` $inner -}}
+            {{- $inner = replaceRE `<a(?:\s[^>]*)?>` "<span>" $inner -}}
+            {{- $inner = replaceRE `</a\s*>` "</span>" $inner -}}
           {{- end -}}
           {{- $out = printf "%s%s%s%s%s%s" $out $open $inner $close $moved $rest -}}
           {{- $cur = "" -}}

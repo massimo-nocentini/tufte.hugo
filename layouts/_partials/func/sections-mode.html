@@ -1,0 +1,28 @@
+{{- /*
+  func/sections-mode.html: the "sections" parameter of a page (front
+  matter, else params.sections), normalised.
+
+  Context: the page.
+  Returns: string. "h2" when unset or empty (as func/flag.html); the YAML/TOML booleans false and true
+  read as "none" and "h2", and so do their string forms (tufte/truthy.html
+  words: "false", "no", "off", "0" and "true", "yes", "on", "1", any
+  case), which is how a HUGO_PARAMS_SECTIONS environment variable reaches
+  the templates; any other value lowercased and trimmed, so that the
+  caller (func/content.html) can reject it with tufte-bad-option. `with`
+  would skip false and "", so the value is compared with nil instead.
+*/ -}}
+{{- $v := .Param "sections" -}}
+{{- $mode := "h2" -}}
+{{- if eq $v false -}}
+  {{- $mode = "none" -}}
+{{- else if eq $v true -}}
+  {{- $mode = "h2" -}}
+{{- else if ne $v nil -}}
+  {{- $mode = lower (strings.TrimSpace (printf "%v" $v)) -}}
+  {{- if in (slice "false" "no" "off" "0") $mode -}}
+    {{- $mode = "none" -}}
+  {{- else if in (slice "true" "yes" "on" "1" "") $mode -}}
+    {{- $mode = "h2" -}}
+  {{- end -}}
+{{- end -}}
+{{- return $mode -}}

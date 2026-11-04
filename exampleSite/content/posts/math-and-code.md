@@ -56,13 +56,13 @@ $$
 \Var(X) = \E\left[(X - \E[X])^2\right] = \E\left[X^2\right] - \E[X]^2 \label{eq:variance}
 $$
 
-The theme numbers every labelled display in order, with one counter for the page (for the whole book in a book), sets the number at the right edge of the text column, and `{{</* eqref "eq:variance" */>}}` prints it, {{< eqref "eq:variance" >}}, wherever the text refers to it, as `\eqref` does. The `equation` shortcode does the same for a formula written between `{{</* equation label="eq:x" */>}}` and `{{</* /equation */>}}`; the [Equations section of the LaTeX cheat sheet](/posts/latex-to-hugo/#sec:equations) shows both. KaTeX's own environments (`equation`, `align`) number their lines too, but KaTeX counts each formula on its own, so each one starts again from (1): use `\label` or the shortcode for numbers that run through the page. Write `\tag{…}` only for a fixed tag, which no counter changes:
+The theme numbers every labelled display in order, with one counter for the page (for the whole book in a book), sets the number at the right edge of the text column (at the left edge with `params.math.leqno = true`), and `{{</* eqref "eq:variance" */>}}` prints it, {{< eqref "eq:variance" >}}, wherever the text refers to it, as `\eqref` does. The `equation` shortcode does the same for a formula written between `{{</* equation label="eq:x" */>}}` and `{{</* /equation */>}}`; the [Equations section of the LaTeX cheat sheet](/posts/latex-to-hugo/#sec:equations) shows both. KaTeX's own environments (`equation`, `align`, `gather`) number their rows too, but with a counter of KaTeX's that runs through the web page and knows nothing of the theme's, so the same number could appear twice: use `\label` or the shortcode for numbered equations, and `align*`, `aligned` or `gathered` for the others (in a display with a `\label`, the theme hides KaTeX's row numbers). Write `\tag{…}` only for a fixed tag, which no counter changes:
 
 $$
-e^{i\pi} + 1 = 0 \tag{A.1}
+e^{i\pi} + 1 = 0 \tag{A.1} \label{eq:euler-tag}
 $$
 
-KaTeX sets such a tag at the right edge as well; `params.math.leqno = true` moves tags to the left, and `params.math.fleqn = true` sets display math flush left.
+With a `\label`, as in amsmath, the tag is the equation's number: `{{</* eqref "eq:euler-tag" */>}}` prints {{< eqref "eq:euler-tag" >}}, and the counter does not step. KaTeX sets such a tag at the right edge as well; `params.math.leqno = true` moves all equation numbers, the theme's `\label` numbers and KaTeX's tags alike, to the left, and `params.math.fleqn = true` sets display math flush left.
 
 ## Math in captions
 

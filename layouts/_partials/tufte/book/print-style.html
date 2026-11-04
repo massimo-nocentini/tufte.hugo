@@ -7,9 +7,10 @@
     restart of the sidenote counter. It is not print-only: print.html is
     also read on screen before it is printed, and its xref numbers are the
     per-chapter ones.
-  - In print only: the part pages on a page of their own (\part), and,
+  - In print only: the part pages on a recto of their own (\part), and,
     with tufte.print.runningheads, the named pages that carry the running
-    heads of the front matter and of each chapter.
+    heads of the front matter and of each chapter, and the empty blank
+    pages that the openright breaks insert (tufte-latex.css §12).
 
   Takes: the book root page.
 */ -}}
@@ -28,7 +29,10 @@
 <style>article.chapter,article.part{counter-reset:sidenote-counter}</style>
 {{- end }}
 <style media="print">
-article.part{break-before:page;break-after:page}
+{{- /* \part opens with \cleardoublepage (openright) and leaves the verso
+       after it blank: the next chapter opens on a recto anyway
+       (article.chapter, break-before: right). */}}
+article.part{break-before:right;break-after:page}
 {{- if $heads }}
 {{- /* Front matter (tufte-book.cls \frontmatter: \fancyhf{} and
        \fancyhead[LE,RO]{\thepage}): the landing's pages carry the folio
@@ -41,6 +45,13 @@ article.book-landing :is(.half-title,.open-epigraphs,.frontispiece,.title-page,.
 @page tufte-front:left{@top-left{content:counter(page);{{ $box | safeCSS }}}}
 @page tufte-front:right{@top-right{content:counter(page);{{ $box | safeCSS }}}}
 @page tufte-empty{@top-left{content:none}@top-right{content:none}}
+{{- /* The blank page that a forced left/right break inserts carries
+       nothing, as tufte-common.def's \cleardoublepage
+       (\thispagestyle{empty}). A named page's :blank rule (1,1,0)
+       outranks its :left/:right rules (1,0,1); each name has one, since
+       a blank page may take the name of the page before or after it. */}}
+@page :blank{@top-left{content:none}@top-right{content:none}}
+@page tufte-front:blank{@top-left{content:none}@top-right{content:none}}
 {{- /* A part page has no head and no folio: \part sets
        \thispagestyle{plain}, which tufte-common.def makes empty
        (\fancyhf{}). Without a name it would take the generic :left rule
@@ -66,6 +77,7 @@ article.part{page:tufte-empty}
 {{- if eq .Matter "front" }}{{ $left = "" }}{{ $right = "" }}{{ end }}
 @page {{ $name | safeCSS }}:left{@top-left{content:counter(page) "\00200B{{ $left }}";{{ $box | safeCSS }}}}
 @page {{ $name | safeCSS }}:right{@top-right{content:"\00200B{{ $right }}" counter(page);{{ $box | safeCSS }}}}
+@page {{ $name | safeCSS }}:blank{@top-left{content:none}@top-right{content:none}}
 {{- end }}
 {{- end }}
 </style>

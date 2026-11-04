@@ -84,7 +84,8 @@
        equation's number. KaTeX prints the tag; the theme adds no number
        of its own and does not step the counter, and the label's display
        (eqref "(X)", xref "X") is X, carried by a hidden token's
-       data-number (read by tufte/labels.html). Plain text stays text;
+       data-number (read by tufte/labels.html from phase 1; removed by
+       tufte/postprocess.html). Plain text stays text;
        anything with TeX in it is typeset as KaTeX's tag is, \text{X}. */ -}}
 {{- $tag := "" -}}
 {{- $tagged := false -}}

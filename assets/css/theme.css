@@ -80,6 +80,18 @@ body {
     color: var(--tufte-fg);
 }
 
+/* tufte.css scopes the sidenote counter with body { counter-reset:
+   sidenote-counter }. katex.min.css, linked after this bundle, has
+   body { counter-reset: katexEqnNo mmlEqnNo } with the same specificity:
+   counter-reset is not additive, so on a page with math the later rule
+   wins, the sidenote counter loses its page-wide scope and every paragraph
+   starts again at 1. html body (0,0,2) outranks both whatever the load
+   order and resets all three counters (KaTeX's row numbers keep their
+   page-wide scope too). Chapters and summaries reset it again inside. */
+html body {
+    counter-reset: sidenote-counter katexEqnNo mmlEqnNo;
+}
+
 hr {
     border-top-color: var(--tufte-rule);
 }
@@ -821,6 +833,15 @@ blockquote.alert {
     border-left: 2px solid var(--alert-color);
 }
 
+/* An alert in a list item, a definition (dd) or the details shortcode,
+   all already in the text column or part of it, fills its container, as
+   nested tables and code do (55% of an item would be a narrow strip,
+   about 27% of the section). tufte-latex.css (§9b, §12) puts its notes
+   in the margin column. */
+:is(li, dd, details) > blockquote.alert {
+    width: auto;
+}
+
 blockquote.alert-note { --alert-color: var(--tufte-alert-note); }
 blockquote.alert-tip { --alert-color: var(--tufte-alert-tip); }
 blockquote.alert-important { --alert-color: var(--tufte-alert-important); }
@@ -906,10 +927,13 @@ blockquote:not(.alert) > div.highlight > div {
     margin-left: 2.5%;
 }
 
-/* Plain fences (tufte's pre > code) nested in a list item, an alert or
-   the details shortcode, all already in the text column. In a plain
+/* Plain fences (tufte's pre > code) nested in a list item, a definition
+   (dd), an alert or the details shortcode, all already in the text column,
+   fill it as highlighted code does (div.highlight > pre). At (0,0,3) this
+   also beats the print pre > code of tufte-latex.css. In a plain
    blockquote tufte's 52.5% stays (print: tufte-latex.css §12). */
 li pre > code,
+dd pre > code,
 blockquote.alert pre > code,
 section > details pre > code {
     width: auto;

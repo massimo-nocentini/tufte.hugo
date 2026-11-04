@@ -5,22 +5,36 @@
   a, b, … after the year, in the citations ("Adams (1999a)",
   "(Adams 1999a; Adams 1999b)") and in their references ("…, 1999a."),
   as plainnat's calc.label / extra.label do. Within a group the letters
-  follow plainnat's sort order (author names, year, title: the sortkey of
-  tufte/bib/normalize.html).
+  follow plainnat's sort order (full author names, year, cite key: the
+  sortkey of tufte/bib/normalize.html).
 
   The entries are the cited keys of the bibliography scope (the book or
-  the page: tufte/bib/numbers.html, nocite included), looked up like
-  tufte/bib/list.html does. The year of a formatted entry or an
-  author-year citation is followed by the inert marker
+  the page: tufte/bib/numbers.html, nocite included), plus every entry of
+  the database of a scope page that shows {{< bibliography all=true >}}
+  (that list's \nocite{*}), looked up like
+  tufte/bib/list.html does (tufte/bib/author-year.html). The year of a
+  formatted entry or an author-year citation is followed by the inert
+  marker
     <span class="bib-extra" data-key="KEY"></span>
-  (tufte/bib/format.html, the cite shortcode), which tufte/postprocess.html
-  replaces with the letter, or removes.
+  (tufte/bib/format.html, the cite shortcode), which tufte/bib/fill-extra.html
+  (called by tufte/postprocess.html, and for the heading and caption texts
+  that leave phase 1: labels, contents) replaces with the letter, or removes. It gives the letter only when the
+  page resolves KEY to an entry of the same group (author label and year),
+  so an entry a page resolves differently never takes another's letter.
 
   Takes: a page.
-  Returns: a map  lowercased key → letter, for the keys that get one.
+  Returns: a map  lowercased key → dict letter, group (the author-year
+  group of the entry that earned it), for the keys that get one.
   Callers cache it: partialCached "tufte/bib/extra.html" $p (or $p.RelPermalink $p.Path)
   (inside a book every chapter delegates to the book root).
 */ -}}
+{{- /* Memoized in the page's Store for the current build
+       (tufte/memo.html): partialCached's bounded cache evicts it on
+       large books, and every chapter reads it. */ -}}
+{{- $memoRes := false -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoBibExtra") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
 {{- $p := . -}}
 {{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
 {{- $res := dict -}}
@@ -28,27 +42,33 @@
   {{- $res = partialCached "tufte/bib/extra.html" $root (or $root.RelPermalink $root.Path) -}}
 {{- else -}}
   {{- $nums := partialCached "tufte/bib/numbers.html" $p (or $p.RelPermalink $p.Path) -}}
-  {{- if gt (len $nums) 1 -}}
-    {{- $db := partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path) -}}
-    {{- $scope := partial "tufte/scope.html" $p -}}
-    {{- $G := newScratch -}}
-    {{- range $k, $_ := $nums -}}
-      {{- $raw := index $db $k -}}
-      {{- $from := $p -}}
-      {{- if not $raw -}}
-        {{- range $scope -}}
-          {{- if not $raw -}}
-            {{- with index (partialCached "tufte/bib/db.html" . (or .RelPermalink .Path)) $k }}{{ $raw = . }}{{ end -}}
-            {{- if $raw }}{{ $from = . }}{{ end -}}
-          {{- end -}}
+  {{- /* A {{< bibliography all=true >}} list prints every entry of its
+         page's database (tufte/bib/list.html), which is \nocite{*} for
+         that list: plainnat then labels over the whole .bbl, so its
+         entries join the scope as nocite "*" would bring them. */ -}}
+  {{- $keys := $nums -}}
+  {{- range $c := partial "tufte/scope.html" $p -}}
+    {{- $raw := printf "%s" (partialCached "func/content-raw.html" (dict "page" $c "summary" false) (or $c.RelPermalink $c.Path) false) -}}
+    {{- if not (strings.Contains $raw `data-what="bibliography" data-opts="`) }}{{ continue }}{{ end -}}
+    {{- $all := false -}}
+    {{- range findRESubmatch `class="tufte-placeholder"[^>]*?data-what="bibliography" data-opts="([^"]*)"` $raw -}}
+      {{- range split (htmlUnescape (index . 1)) ";" -}}
+        {{- if and (eq (lower (strings.TrimSpace (replaceRE `(?s)=.*$` "" .))) "all") (or (not (strings.Contains . "=")) (partial "tufte/truthy.html" (replaceRE `(?s)^[^=]*=` "" .))) -}}
+          {{- $all = true -}}
         {{- end -}}
       {{- end -}}
-      {{- with $raw -}}
-        {{- $e := partialCached "tufte/bib/normalize.html" (dict "entry" . "key" $k) (or $from.RelPermalink $from.Path) $k -}}
-        {{- with printf "%v" ($e.year | default "") | strings.TrimSpace -}}
-          {{- $who := partial "tufte/bib/cite-label.html" (dict "n" $e "key" $k) -}}
-          {{- $G.Add (printf "%s|%s" (lower $who) .) (slice (dict "key" $k "sort" (printf "%s|%s" $e.sortkey $k))) -}}
-        {{- end -}}
+    {{- end -}}
+    {{- if $all -}}
+      {{- range $k, $_ := partialCached "tufte/bib/db.html" $c (or $c.RelPermalink $c.Path) -}}
+        {{- if not (isset $keys $k) }}{{ $keys = merge $keys (dict $k true) }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if gt (len $keys) 1 -}}
+    {{- $G := newScratch -}}
+    {{- range $k, $_ := $keys -}}
+      {{- with partial "tufte/bib/author-year.html" (dict "page" $p "key" $k) -}}
+        {{- $G.Add .group (slice (dict "key" $k "sort" .sort "group" .group)) -}}
       {{- end -}}
     {{- end -}}
     {{- $letters := split "abcdefghijklmnopqrstuvwxyz" "" -}}
@@ -57,10 +77,13 @@
         {{- range $i, $it := sort $items "sort" -}}
           {{- $l := index $letters (mod $i 26) -}}
           {{- if ge $i 26 }}{{ $l = printf "%s%d" $l (div $i 26) }}{{ end -}}
-          {{- $res = merge $res (dict $it.key $l) -}}
+          {{- $res = merge $res (dict $it.key (dict "letter" $l "group" $it.group)) -}}
         {{- end -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
-{{- return $res -}}
+{{- $memoRes = $res -}}
+{{- .Store.Set "tufteMemoBibExtra" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
+{{- end -}}
+{{- return $memoRes -}}

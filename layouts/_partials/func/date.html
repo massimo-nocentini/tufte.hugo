@@ -22,7 +22,21 @@
 {{- $out := "" -}}
 {{- with $date -}}
   {{- if not .IsZero -}}
-    {{- $out = time.Format $format . -}}
+    {{- /* Some locales have no abbreviated month or weekday name in the
+           CLDR data of recent Hugo (0.169: "Jan" is "" in Japanese,
+           Korean and Arabic, "Mon" in Arabic and Persian), which would
+           leave " 5" for "Jan 2": the full name is used instead. Hugo's
+           own ":date_*" tokens are left alone. */ -}}
+    {{- $f := $format -}}
+    {{- if not (hasPrefix $f ":") -}}
+      {{- if and (findRE `Jan` (replace $f "January" "") 1) (not (strings.TrimSpace (time.Format "Jan" .))) -}}
+        {{- $f = replaceRE `January|Jan` "January" $f -}}
+      {{- end -}}
+      {{- if and (findRE `Mon` (replace $f "Monday" "") 1) (not (strings.TrimSpace (time.Format "Mon" .))) -}}
+        {{- $f = replaceRE `Monday|Mon` "Monday" $f -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $out = time.Format $f . -}}
   {{- end -}}
 {{- end -}}
 {{- return $out -}}

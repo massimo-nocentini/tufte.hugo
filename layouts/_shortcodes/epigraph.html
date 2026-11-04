@@ -33,7 +33,7 @@
     <div class="epigraph"><blockquote><p>…</p><footer>Author, <cite>Work</cite></footer></blockquote></div>
 */ -}}
 {{- $p := .Page -}}
-{{- $text := strings.TrimSpace .Inner -}}
+{{- $text := strings.TrimSpace .InnerDeindent -}}
 {{- /* Block Markdown; nested shortcodes are kept (nest tokens). */ -}}
 {{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
 {{- $author := "" -}}{{- $cite := "" -}}{{- $url := "" -}}{{- $footerRaw := "" -}}{{- $class := "" -}}{{- $style := "" -}}

@@ -6,6 +6,9 @@
   Takes: a page.
   Returns: a map  lowercased cite key → int (1, 2, …), in order of first
   appearance. This is also the order of the "tufte" bibliography style.
+  Exception: with bibliography.margin = false (nobib) and
+  bibliography.style "plainnat", the numbers follow plainnat's sorted
+  order (author names, year, key), as natbib numbers a sorted list.
   Callers cache it: partialCached "tufte/bib/numbers.html" $p (or $p.RelPermalink $p.Path)
   (inside a book every chapter delegates to the book root, so the numbers
   are computed once per book).
@@ -22,6 +25,13 @@
   Reads only phase-1 content (func/content-raw.html), never postprocessed
   HTML.
 */ -}}
+{{- /* Memoized in the page's Store for the current build
+       (tufte/memo.html): partialCached's bounded cache evicts it on
+       large books, and every chapter reads it. */ -}}
+{{- $memoRes := false -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoBibNumbers") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
 {{- $p := . -}}
 {{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
 {{- $S := newScratch -}}
@@ -38,6 +48,13 @@
 
 {{- $S.Set "c" 0 -}}
 {{- $S.Set "all" false -}}
+{{- $S.Set "unknown" slice -}}
+{{- /* nobib (bibliography.margin = false, scope root's option): a key
+       missing from the databases gets no number (the citation prints
+       "[key?]": tufte/bib/nobib-refs.html), as BibTeX leaves it out of the
+       .bbl, so the known entries keep consecutive numbers. */ -}}
+{{- $nobib := in (slice "false" "no" "0" "off") (lower (printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.margin" "default" true) (or $p.RelPermalink $p.Path) "bibliography.margin"))) -}}
+{{- $db := partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path) -}}
 
 {{- range $c := $pages -}}
   {{- $keys := slice -}}
@@ -56,10 +73,39 @@
     {{- $k := lower (trim . " \t\n") -}}
     {{- if not $k }}{{ continue }}{{ end -}}
     {{- if eq $k "*" }}{{ $S.Set "all" true }}{{ continue }}{{ end -}}
+    {{- if and $nobib (not (isset ($S.Get "n") $k)) (not (index $db $k)) -}}
+      {{- $known := false -}}
+      {{- range $pages -}}
+        {{- if and (not $known) (index (partialCached "tufte/bib/db.html" . (or .RelPermalink .Path)) $k) }}{{ $known = true }}{{ end -}}
+      {{- end -}}
+      {{- if not $known -}}
+        {{- if not (in ($S.Get "unknown") $k) }}{{ $S.Add "unknown" (slice $k) }}{{ end -}}
+        {{- continue -}}
+      {{- end -}}
+    {{- end -}}
     {{- if not (isset ($S.Get "n") $k) -}}
       {{- $S.Add "c" 1 -}}
       {{- $S.SetInMap "n" $k ($S.Get "c") -}}
     {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* The unknown keys left out above never reach the list
+       (tufte/bib/list.html), which warns about the others: warn here
+       about those no citation reported (a nocite in the front matter or
+       the shortcode; a cite marks its own "bib-missing" and warns). */ -}}
+{{- range $k := $S.Get "unknown" -}}
+  {{- $cited := false -}}
+  {{- $mark := printf `bib-missing" data-cite="%s"` (htmlEscape $k) -}}
+  {{- range $pages -}}
+    {{- if not $cited -}}
+      {{- $cited = strings.Contains (printf "%s" (partialCached "func/content-raw.html" (dict "page" . "summary" false) (or .RelPermalink .Path) false)) $mark -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $cited -}}
+    {{- $where := "" -}}
+    {{- with $p.File }}{{ $where = .Path }}{{ else }}{{ $where = $p.RelPermalink }}{{ end -}}
+    {{- warnidf "tufte-unknown-cite" "tufte.hugo: %s: unknown citation key %q in the bibliography (not in the database)" $where $k -}}
   {{- end -}}
 {{- end -}}
 
@@ -71,5 +117,39 @@
     {{- end -}}
   {{- end -}}
 {{- end -}}
+
+{{- /* Numbered citations (bibliography.margin = false, class option nobib)
+       with bibliography.style "plainnat": natbib numbers the entries in
+       the order of the sorted list (author names, year, key: the sortkey of
+       tufte/bib/normalize.html; keys missing from the databases last), so
+       the [n] of the text and of the list follow that order. Options of
+       the scope root (the book root, or the page). */ -}}
+{{- $style := lower (printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.style" "default" "tufte") (or $p.RelPermalink $p.Path) "bibliography.style" | default "tufte")) -}}
+{{- $marginOpt := partialCached "tufte/opt.html" (dict "page" $p "key" "bibliography.margin" "default" true) (or $p.RelPermalink $p.Path) "bibliography.margin" -}}
+{{- if and (eq $style "plainnat") (in (slice "false" "no" "0" "off") (lower (printf "%v" $marginOpt))) (gt (len ($S.Get "n")) 1) -}}
+  {{- $items := slice -}}
+  {{- range $k, $_ := $S.Get "n" -}}
+    {{- $raw := false -}}
+    {{- $from := $p -}}
+    {{- range $pages -}}
+      {{- if not $raw -}}
+        {{- with index (partialCached "tufte/bib/db.html" . (or .RelPermalink .Path)) $k }}{{ $raw = . }}{{ end -}}
+        {{- if $raw }}{{ $from = . }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $sk := printf "~%s" $k -}}
+    {{- with $raw -}}
+      {{- $sk = printf "%s|%s" (partialCached "tufte/bib/normalize.html" (dict "entry" . "key" $k) (or $from.RelPermalink $from.Path) $k).sortkey $k -}}
+    {{- end -}}
+    {{- $items = $items | append (dict "key" $k "sort" $sk) -}}
+  {{- end -}}
+  {{- $S.Set "n" dict -}}
+  {{- range $i, $it := sort $items "sort" -}}
+    {{- $S.SetInMap "n" $it.key (add $i 1) -}}
+  {{- end -}}
+{{- end -}}
 {{- end -}}{{- /* chapter or scope root */ -}}
-{{- return ($S.Get "n") -}}
+{{- $memoRes = ($S.Get "n") -}}
+{{- .Store.Set "tufteMemoBibNumbers" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
+{{- end -}}
+{{- return $memoRes -}}

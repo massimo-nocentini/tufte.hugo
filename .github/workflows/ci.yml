@@ -78,6 +78,13 @@ jobs:
           else
             grep -q 'katex@0\.16\.[0-9]*/dist/katex\.min\.css' "$M" || fail "KaTeX 0.16 HTML without katex@0.16 CSS in $M"
           fi
+          # katex.min.css, linked after the theme bundle, has
+          # body{counter-reset:katexEqnNo mmlEqnNo}, which would replace
+          # tufte.css's body sidenote-counter reset (notes would restart at 1
+          # in every paragraph): the bundle resets all three on html body.
+          B=public$(grep -oE '/css/tufte-hugo[^" >]*\.css' "$M" | head -1)
+          need "$B"
+          tr -d '\n' < "$B" | grep -qE 'html body ?\{ *counter-reset: ?sidenote-counter katexEqnNo mmlEqnNo' || fail "no html body counter reset (sidenote-counter katexEqnNo mmlEqnNo) in $B"
 
           # Embeds nested in a block shortcode keep their HTML (tufte/nest.html).
           T=public/posts/figures-and-tables/index.html
@@ -225,7 +232,8 @@ jobs:
 
           # 5. Book: landing, print view, continuous numbering, cross-chapter xrefs, index.
           BK=books/sample-book
-          for f in index.html print.html tufte-design/index.html tufte-book/index.html introduction/index.html troubleshooting/index.html general-index/index.html bibliography/index.html figures/index.html tables/index.html; do need "$BK/$f"; done
+          for f in index.html index.xml print.html tufte-design/index.html tufte-book/index.html introduction/index.html troubleshooting/index.html general-index/index.html bibliography/index.html figures/index.html tables/index.html; do need "$BK/$f"; done
+          need books/parts-demo/index.xml
           grep -q 'class="book-toc"' "$BK/index.html" || fail "$BK: no table of contents on the landing page"
           grep -q 'class="title-page"' "$BK/index.html" || fail "$BK: no title page"
           grep -q 'tufte-book' "$BK/tufte-book/index.html" || fail "$BK: body class tufte-book missing"
@@ -334,12 +342,40 @@ jobs:
         shell: bash
         run: '"$RUNNER_TEMP/tufte-latex-check.sh" public-a4 markers'
 
-      # Scale regression: a generated 150-chapter book (html + print), each
+      # uglyURLs: Hugo 0.146 names a section's page books/b.html; without
+      # noUgly on the print format, the book's print output went to that same
+      # file and replaced the landing, with no warning.
+      - name: Build (uglyURLs)
+        env:
+          HUGO_UGLYURLS: "true"
+        run: hugo --gc --panicOnWarning --destination public-ugly
+
+      - name: Check the book landing and print.html (uglyURLs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          for b in sample-book parts-demo; do
+            P=public-ugly/books/$b/print.html
+            [ -f "$P" ] || fail "missing $P"
+            grep -q '<body class="[^"]*tufte-print-book' "$P" || fail "$P is not the print document"
+            L=public-ugly/books/$b.html; [ -f "$L" ] || L=public-ugly/books/$b/index.html
+            [ -f "$L" ] || fail "no landing for books/$b"
+            grep -q '<body class="tufte-book' "$L" || fail "$L is not the book landing"
+            ! grep -q '<body class="[^"]*tufte-print-book' "$L" || fail "$L is the print document, not the landing"
+          done
+
+      # Scale regression: a generated 200-chapter book (html + print), each
       # chapter with sidenotes, cross-chapter xrefs, labelled figures, cites
       # and index entries. The theme memoizes its cross-page results in
       # .Store; when they sat only in partialCached's bounded cache, such a
-      # book took minutes instead of seconds.
-      - name: Build a 150-chapter book within the time limit
+      # book took minutes instead of seconds. From about 160 chapters up,
+      # partialCached also evicts its own entries during the build: the
+      # memos must stay valid then (tufte/build-stamp.html), which the
+      # execution count of func/content-raw.html checks (about 16 per
+      # chapter when they do, more than 35 when every eviction recomputes
+      # them).
+      - name: Build a 200-chapter book within the time limit
         shell: bash
         run: |
           set -euo pipefail
@@ -361,11 +397,27 @@ jobs:
               inline = [['\$', '\$']]
               block = [['\$\$', '\$\$']]
           EOF
+          N=200
           printf -- '---\ntitle: Big\nbook: true\noutputs: [html, print]\n---\n' > "$B/content/books/big/_index.md"
-          for i in $(seq 1 150); do
+          for i in $(seq 1 "$N"); do
             p=$(( i > 1 ? i - 1 : 1 ))
             f="$B/content/books/big/ch$(printf %03d "$i").md"
-            printf -- '---\ntitle: Chapter %d\nweight: %d\n---\n' "$i" "$i" > "$f"
+            # Each chapter brings its own `references` (the book-wide pool,
+            # tufte/bib/book-pool.html) and cites them all, some author-year
+            # and some from the previous chapter; the same authors and years
+            # recur in every chapter, so plainnat's extra labels (2000a,
+            # 2000b…, tufte/bib/extra.html) group 1200 entries across the
+            # book. With the book's bibliography results only in
+            # partialCached (not memoised in .Store), this takes minutes.
+            {
+              printf -- '---\ntitle: Chapter %d\nweight: %d\nreferences:\n' "$i" "$i"
+              for r in 0 1 2 3 4 5; do
+                printf '  k%d_%d: {type: book, author: "Author%d, A", title: "T%d", year: %d, publisher: P}\n' "$i" "$r" $(( r % 3 )) "$i" $(( 2000 + r ))
+              done
+              printf -- '---\n'
+              for r in 3 4 5; do printf 'Also {{< cite "k%d_%d" >}}.\n\n' "$i" "$r"; done
+              printf 'As {{< cite keys="k%d_0" mode="text" >}} and {{< cite keys="k%d_1" mode="paren" >}} show {{< cite "k%d_2" >}}, after {{< cite keys="k%d_0" mode="text" >}} {{< cite "k%d_1" >}}.\n\n' "$i" "$i" "$i" "$p" "$p"
+            } > "$f"
             for s in 0 1 2 3; do
               printf '## Section %d {#sec:c%d-s%d}\n\n' "$s" "$i" "$s" >> "$f"
               for n in 0 1 2; do
@@ -378,15 +430,30 @@ jobs:
           printf -- '---\ntitle: Bibliography\nmatter: back\nweight: 2\n---\n{{< bibliography heading="" >}}\n' > "$B/content/books/big/zz-bib.md"
           printf -- '---\ntitle: Index\nmatter: back\nweight: 3\n---\n{{< printindex >}}\n' > "$B/content/books/big/zz-index.md"
           start=$(date +%s)
-          timeout 240 hugo --source "$B" --destination "$B/public" --panicOnWarning
+          timeout 240 hugo --source "$B" --destination "$B/public" --panicOnWarning --templateMetrics > "$RUNNER_TEMP/bigbook-build.log" 2>&1 || { cat "$RUNNER_TEMP/bigbook-build.log"; echo "::error::the big book did not build"; exit 1; }
           echo "built in $(( $(date +%s) - start ))s"
-          # Chapter 150 refers to the first figure of chapter 149: 148 × 4 + 1.
-          grep -q '>Figure&nbsp;593</a>' "$B/public/books/big/ch150/index.html" || { echo "::error::cross-chapter xref not resolved"; exit 1; }
-          grep -q -- '-fig-c150-f3"' "$B/public/books/big/print.html" || { echo "::error::print document incomplete"; exit 1; }
+          runs=$(awk '$NF == "_partials/func/content-raw.html" { print $(NF-1) }' "$RUNNER_TEMP/bigbook-build.log")
+          echo "func/content-raw.html ran $runs times"
+          [ -n "$runs" ] && [ "$runs" -lt $(( 24 * N )) ] || { echo "::error::func/content-raw.html ran $runs times for $N chapters: the .Store memos are recomputed within one build"; exit 1; }
+          L=$(printf %03d "$N")
+          # Chapter N refers to the first figure of chapter N-1: (N-2) × 4 + 1.
+          fig=$(( (N - 2) * 4 + 1 ))
+          grep -q ">Figure&nbsp;$fig</a>" "$B/public/books/big/ch$L/index.html" || { echo "::error::cross-chapter xref not resolved"; exit 1; }
+          grep -q -- "-fig-c$N-f3\"" "$B/public/books/big/print.html" || { echo "::error::print document incomplete"; exit 1; }
+          # The extra labels of a chapter's own entry and of an earlier
+          # chapter's, cited author-year in the last chapter, are the ones
+          # their bibliography items show.
+          for c in "$N" $(( N - 1 )); do
+            lab=$(grep -o "id=\"ref-k${c}_0\" class=\"bib-entry\">A Author0. <cite>T$c</cite>. P, 2000[a-z][0-9]*\." "$B/public/books/big/zz-bib/index.html" | sed 's/.*2000\([a-z][0-9]*\)\.$/\1/')
+            [ -n "$lab" ] || { echo "::error::no extra label on the reference k${c}_0 in the bibliography"; exit 1; }
+            grep -q "data-cite=\"k${c}_0\">Author0 (2000$lab)</span>" "$B/public/books/big/ch$L/index.html" || { echo "::error::author-year citation of k${c}_0 without the extra label 2000$lab"; exit 1; }
+          done
           # The same book under `hugo server`, the live-editing mode: the
           # .Store memos (tufte/memo.html) must keep it as fast as a one-shot
           # build, and must not survive a rebuild: a figure added to chapter 1
-          # renumbers the reference in chapter 150.
+          # renumbers the reference in the last chapter, and removing it
+          # again (a second rebuild: the build stamp changes at the end of
+          # every build) restores the number.
           log="$RUNNER_TEMP/bigbook-server.log"
           hugo server --source "$B" --bind 127.0.0.1 --port 1414 --renderToMemory > "$log" 2>&1 &
           srv=$!
@@ -397,14 +464,22 @@ jobs:
             sleep 1
           done
           grep -q 'Web Server is available' "$log" || { cat "$log"; echo "::error::hugo server not ready within 90s"; exit 1; }
-          curl -fsS http://127.0.0.1:1414/books/big/ch150/ | grep -q '>Figure&nbsp;593</a>' || { echo "::error::hugo server: cross-chapter xref not resolved"; exit 1; }
+          curl -fsS "http://127.0.0.1:1414/books/big/ch$L/" | grep -q ">Figure&nbsp;$fig</a>" || { echo "::error::hugo server: cross-chapter xref not resolved"; exit 1; }
+          cp "$B/content/books/big/ch001.md" "$RUNNER_TEMP/ch001.md.orig"
           sed -i 's/^## Section 0 {#sec:c1-s0}$/{{< figure src="\/x.png" caption="New" label="fig:new" >}}\n\n&/' "$B/content/books/big/ch001.md"
           ok=0
           for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:1414/books/big/ch150/ | grep -q '>Figure&nbsp;594</a>'; then ok=1; break; fi
+            if curl -fsS "http://127.0.0.1:1414/books/big/ch$L/" | grep -q ">Figure&nbsp;$(( fig + 1 ))</a>"; then ok=1; break; fi
             sleep 1
           done
-          [ "$ok" = 1 ] || { cat "$log"; echo "::error::hugo server: an edit of chapter 1 did not renumber chapter 150"; exit 1; }
+          [ "$ok" = 1 ] || { cat "$log"; echo "::error::hugo server: an edit of chapter 1 did not renumber chapter $N"; exit 1; }
+          cp "$RUNNER_TEMP/ch001.md.orig" "$B/content/books/big/ch001.md"
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:1414/books/big/ch$L/" | grep -q ">Figure&nbsp;$fig</a>"; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || { cat "$log"; echo "::error::hugo server: a second edit of chapter 1 did not renumber chapter $N"; exit 1; }
 
       # Footnotes inside footnotes and other edge cases of the Markdown
       # footnote engine (func/footnotes.html, tufte/fn-split.html): the
@@ -430,6 +505,10 @@ jobs:
             [markup.goldmark.parser.attribute]
               block = true
               title = true
+          [markup.goldmark.extensions.passthrough]
+            enable = true
+            [markup.goldmark.extensions.passthrough.delimiters]
+              inline = [['\$', '\$']]
           EOF
           cd "$N/content/posts"
           printf -- '---\ntitle: A\ndate: 2024-01-01\n---\n\nCase A {{< footnote >}}inner with [^f]{{< /footnote >}} end.\n\nCase D {{< sidenote >}}side with {{< footnote >}}fn with [^g]{{< /footnote >}} inside{{< /sidenote >}} end.\n\n{{< fig src="/h.svg" >}}Caption {{< footnote >}}fn with [^h]{{< /footnote >}} end{{< /fig >}}\n\n[^f]: F def.\n[^g]: G def.\n[^h]: H def.\n' > a.md
@@ -437,6 +516,11 @@ jobs:
           printf -- '---\ntitle: T\ndate: 2024-01-03\n---\n\nA proof.[^fn-proof] An aside.[^why]\n\n![A curve](/h.svg "Hilbert curves.[^fn-src]")\n\n| a | b |\n|---|---|\n| 1 | 2 |\n{#tab:t caption="A table.[^fn-tsrc]"}\n\n[^fn-proof]: The proof.\n[^why]: An aside.\n[^fn-src]: Source of the figure.\n[^fn-tsrc]: Source of the table.\n' > t.md
           printf -- '---\ntitle: R\ndate: 2024-01-04\nfootnotes: endnotes\n---\n\nTwice[^1] and again[^1] and[^1-2].\n\nBody[^fn-x] text.\n\n{{< table caption="T" >}}\n| a | b |\n|---|---|\n| c[^fn-x] | d |\n{{< /table >}}\n\n[^1]: One.\n[^1-2]: One-two.\n[^fn-x]: Shared.\n' > r.md
           printf -- '---\ntitle: M\ndate: 2024-01-05\n---\n\nThree.[^fn-a][^fn-b][^fn-c] Mixed.[^s][^fn-d][^t]\n\n[^fn-a]: A.\n[^fn-b]: B.\n[^fn-c]: C.\n[^fn-d]: D.\n[^s]: S.\n[^t]: T.\n' > m.md
+          printf -- '---\ntitle: D\ndate: 2024-01-06\n---\n\n{{< details summary="D" >}}\nOnly a real footnote here[^fn-y].\n{{< /details >}}\n\nAfter{{< sidenote label="sn:e" >}}E{{< /sidenote >}} is note {{< xref "sn:e" >}}.\n\n[^fn-y]: Real Y with{{< sidenote label="sn:f" >}}F{{< /sidenote >}}.\n' > d.md
+          printf -- '---\ntitle: E\ndate: 2024-01-07\n---\n\n{{< details summary="D" >}}\nA side{{< sidenote >}}D{{< /sidenote >}}, a real one[^fn-y] and {{< footnote >}}fn {{< sidenote >}}X{{< /sidenote >}} text{{< /footnote >}} then{{< sidenote >}}Y{{< /sidenote >}} end.\n{{< /details >}}\n\nAfter{{< sidenote label="sn:e" >}}E{{< /sidenote >}} is note {{< xref "sn:e" >}}.\n\n[^fn-y]: Real Y with{{< sidenote label="sn:f" >}}F{{< /sidenote >}}.\n' > e.md
+          # KaTeX writes <span></span> in every subscript; a footnote nested
+          # in a real footnote must still unnest (tufte/fn-unnest.html).
+          printf -- '---\ntitle: K\ndate: 2024-01-08\n---\n\nBody with real[^fn-cap] end.\n\n{{< figure src="/h.svg" caption="Cap with real[^fn-cap] end." >}}\n\n{{< listoffigures >}}\n\n[^fn-cap]: Cap real $c_0$.[^fn-deep]\n[^fn-deep]: Deep $d_0$.\n' > k.md
           hugo --source "$N" --destination "$N/public" --panicOnWarning
           cd "$N/public"
           fail() { echo "::error::$1"; exit 1; }
@@ -464,6 +548,20 @@ jobs:
           # \multfootsep: adjacent marks are separated by a superscript comma.
           [ "$(grep -o '<sup class="footnote-sep">,</sup><sup class="footnote-ref"' posts/m/index.html | wc -l)" -eq 3 ] || fail "posts/m: adjacent footnote marks without a comma"
           grep -q '</sup><label for="[^"]*" class="margin-toggle sidenote-number sidenote-number--multi"' posts/m/index.html || fail "posts/m: sidenote mark after a footnote mark without a comma"
+          # A closed <details> steps the sidenote counter by the marks it
+          # hides (sn-skip-details), not by those in the text of a real
+          # footnote referenced inside it (that text goes to the footnote list).
+          ! grep -q 'sn-skip-details' posts/d/index.html || fail "posts/d: sn-skip-details for marks inside a real footnote"
+          grep -q 'class="xref" href="#sn-e">1<' posts/d/index.html || fail "posts/d: xref to sn:e is not 1"
+          [ "$(grep -o 'class="sn-skip-details"[^>]*>' posts/e/index.html)" = 'class="sn-skip-details" aria-hidden="true" style="--sn-skip: 2">' ] || fail "posts/e: expected one sn-skip-details of 2"
+          grep -q 'class="xref" href="#sn-e">3<' posts/e/index.html || fail "posts/e: xref to sn:e is not 3"
+          # Subscript math in nested real footnotes (posts/k).
+          ! grep -q 'tufte-p' posts/k/index.html || fail "posts/k: leaked tufte-p marker"
+          grep -q '<p>Body with real<sup class="footnote-ref"[^>]*><a [^>]*>1</a></sup><sup class="footnote-sep">,</sup><sup class="footnote-ref"[^>]*><a [^>]*>2</a></sup> end\.</p>' posts/k/index.html || fail "posts/k: body paragraph broken"
+          grep -q '<span class="caption-text">Cap with real<sup class="footnote-ref"[^>]*><a [^>]*>1</a></sup> end\.</span>' posts/k/index.html || fail "posts/k: caption text broken"
+          grep -q '<span class="lof-num">1</span> Cap with real end\.</a>' posts/k/index.html || fail "posts/k: list-of-figures entry broken"
+          ! grep -q '<p></li>' posts/k/index.html || fail "posts/k: unclosed <p> in the footnote list"
+          grep -q '<li id="fn-[^"]*-fn-deep" class="footnote-item"[^>]*><p>Deep ' posts/k/index.html || fail "posts/k: [^fn-deep] item missing"
           # Automatic summaries are closed before "Read more".
           for f in index.html posts/index.html; do
             [ "$(grep -o '<span[ >]' "$f" | wc -l)" -eq "$(grep -o '</span>' "$f" | wc -l)" ] || fail "unbalanced <span> in $f"

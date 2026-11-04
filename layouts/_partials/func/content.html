@@ -38,8 +38,7 @@
   {{- $summary = eq .summary true -}}
   {{- $print = eq .print true -}}
 {{- end -}}
-{{- $sections := "h2" -}}
-{{- with $page.Param "sections" }}{{ $sections = lower (strings.TrimSpace (printf "%v" .)) }}{{ end -}}
+{{- $sections := partial "func/sections-mode.html" $page -}}
 {{- if not (in (slice "h2" "none") $sections) -}}
   {{- if not $summary -}}
     {{- /* Reported where it is set: the page, or once for the site. */ -}}

@@ -39,11 +39,13 @@
   {{- $title := .AlertTitle -}}
   {{- if not $title -}}
     {{- /* i18n keys alertNote, alertTip, alertImportant, alertWarning,
-           alertCaution; other alert types use their capitalised name. */ -}}
-    {{- if in (slice "note" "tip" "important" "warning" "caution") $type -}}
-      {{- $title = partial "func/t.html" (printf "alert%s" (title $type)) -}}
+           alertCaution; other alert types use their capitalised name. The
+           key comes from a fixed map, not from `title`, which follows the
+           site's titleCaseStyle ("none" would give "alertnote"). */ -}}
+    {{- with index (dict "note" "alertNote" "tip" "alertTip" "important" "alertImportant" "warning" "alertWarning" "caution" "alertCaution") $type -}}
+      {{- $title = partial "func/t.html" . -}}
     {{- end -}}
-    {{- $title = $title | default (title $type) -}}
+    {{- $title = $title | default (printf "%s%s" (upper (substr $type 0 1)) (substr $type 1)) -}}
   {{- end -}}
 <blockquote class="alert alert-{{ $type }}{{ with $class }} {{ . }}{{ end }}"{{ $extra | safeHTMLAttr }}>
 <p class="alert-title">{{ $title }}</p>

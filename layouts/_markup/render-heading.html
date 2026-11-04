@@ -43,9 +43,20 @@
   {{- end -}}
 {{- end -}}
 {{- /* The id without Hugo's shortcode placeholders (tufte/heading-id.html):
-       stable across Hugo versions; the TOCs clean their links the same way. */ -}}
+       stable across Hugo versions, and made unique again when another
+       heading of the page has the cleaned id (tufte/heading-ids.html:
+       "-1", "-2"…, as Goldmark does); the TOCs clean their links the same
+       way (tufte/heading-anchor.html). */ -}}
 {{- $anchor := "" -}}
-{{- with .Anchor }}{{ $anchor = partial "tufte/heading-id.html" . }}{{ end -}}
+{{- with .Anchor }}{{ $anchor = partial "tufte/heading-anchor.html" (dict "page" $p "id" .) }}{{ end -}}
+{{- /* No id: Goldmark gives every heading one unless the site sets
+       markup.goldmark.parser.autoHeadingID = false. Section numbers, the
+       names xref gives to labels, the TOCs and the duplicate-id checks
+       follow headings by their ids, so an h2/h3 without one is left out of
+       them (README, "Required site configuration"). Warned once per page. */ -}}
+{{- if and (not $anchor) (in (slice 2 3) .Level) -}}
+  {{- warnidf "tufte-heading-id" "tufte.hugo: %s has a heading without an id (markup.goldmark.parser.autoHeadingID = false?): section numbers, cross-reference names and the table of contents skip it; keep autoHeadingID = true or give the heading an id ({#sec:x})" $where -}}
+{{- end -}}
 {{- $num := "" -}}
 {{- if and (in (slice 2 3) .Level) $anchor (not (in $classes "unnumbered")) -}}
   {{- /* A whole number (0 none, 1 h2, 2 h2+h3); anything else is warned

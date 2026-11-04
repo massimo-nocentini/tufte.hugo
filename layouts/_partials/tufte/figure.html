@@ -121,7 +121,15 @@
 {{- /* Caption: inline Markdown, never block elements (it sits in a span). */ -}}
 {{- $caption := "" -}}
 {{- if .CaptionHTML -}}
-  {{- $caption = string .CaptionHTML | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- $caption = string .CaptionHTML -}}
+  {{- /* A note in the caption first loses its toggle (tufte/note-in-note.html):
+         that also turns a margin figure's or footnotetext's wrapper
+         <p class="…-anchor"> into a span, so that stripping the bare
+         paragraph tags below leaves no unmatched <p …> or </p>. */ -}}
+  {{- if strings.Contains $caption `class="margin-toggle` -}}
+    {{- $caption = partial "tufte/note-in-note.html" (dict "page" $page "html" $caption "holder" (printf "%s caption" $kind)) -}}
+  {{- end -}}
+  {{- $caption = partial "func/flatten-p.html" $caption | strings.TrimSpace -}}
 {{- end -}}
 {{- $raw := "" -}}
 {{- with .Title -}}
@@ -141,7 +149,7 @@
 {{- end -}}
 {{- with $raw -}}
   {{- $html := partial "tufte/render-inner.html" (dict "page" $page "inner" . "text" . "display" "inline" "shortcodes" "run") | string -}}
-  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- $html = partial "func/flatten-p.html" $html | strings.TrimSpace -}}
   {{- /* A cite written in a caption= parameter runs without a parent, so it
          made a citation sidenote: turn it into a nested citation, gathered
          under the caption below like the cites of a fig caption. */ -}}
@@ -161,12 +169,27 @@
   {{- $caption = partial "tufte/note-in-note.html" (dict "page" $page "html" $caption "holder" (printf "%s caption" $kind)) -}}
 {{- end -}}
 
+{{- /* A shortcode written in a Markdown image title or a table caption=
+       attribute runs without a parent, after this hook: the caption holds
+       Hugo's placeholder for its output (see the tufte-capsc marks below).
+       The texts derived from the caption (the alt text, the name of an
+       unnumbered float) are then deferred: they hold the token
+       TUFTECAP<key>END, and phase 1 (func/content-raw.html, step 5) fills
+       them from the caption once the shortcode's HTML is in place. */ -}}
+{{- $capKey := "" -}}
+{{- if strings.Contains $caption "HAHAHUGOSHORTCODE" -}}
+  {{- $capKey = substr (md5 (printf "%s|%s|%s" $page.RelPermalink $src $caption)) 0 12 -}}
+{{- end -}}
 {{- $alt := .Alt | default "" -}}
 {{- if and (not $alt) $caption -}}
   {{- /* Plain caption text, without notes, toggles, citation blocks and
          KaTeX's MathML copy; cross-reference markers kept for postprocess
          (the img printf escapes them). See tufte/plain-caption.html. */ -}}
-  {{- $alt = partial "tufte/plain-caption.html" $caption -}}
+  {{- if $capKey -}}
+    {{- $alt = printf "TUFTECAP%sEND" $capKey -}}
+  {{- else -}}
+    {{- $alt = partial "tufte/plain-caption.html" $caption -}}
+  {{- end -}}
 {{- end -}}
 
 {{- /* Extra img attributes, sanitised. */ -}}
@@ -257,17 +280,22 @@
 {{- if and $label (not $key) (ne $type "inline") -}}
   {{- $shortAttr := "" -}}
   {{- with .Short }}{{ $shortAttr = printf ` data-short="%s"` (htmlEscape (printf "%v" .)) }}{{ end -}}
-  {{- $mark = printf `<i class="tufte-float" data-kind="%s" data-key="%s"%s data-name="%s" hidden></i>` (htmlEscape $kind) (htmlEscape $label) $shortAttr (htmlEscape ($caption | default (htmlEscape $alt) | replaceRE `HAHAHUGOSHORTCODE\w*?HBHB` "")) -}}
+  {{- /* The name: the caption (deferred when it holds a shortcode, see
+         $capKey), else the alt text. */ -}}
+  {{- $name := htmlEscape ($caption | default (htmlEscape $alt)) -}}
+  {{- if and $caption $capKey }}{{ $name = printf "TUFTECAP%sEND" $capKey }}{{ end -}}
+  {{- $mark = printf `<i class="tufte-float" data-kind="%s" data-key="%s"%s data-name="%s" hidden></i>` (htmlEscape $kind) (htmlEscape $label) $shortAttr $name -}}
 {{- end -}}
-{{- if and $caption (strings.Contains $caption "HAHAHUGOSHORTCODE") -}}
+{{- if and $caption (or $capKey (strings.Contains $caption "HAHAHUGOSHORTCODE")) -}}
   {{- /* A shortcode written in a Markdown image title or a table caption=
          attribute runs without a parent, after this hook: the caption holds
          Hugo's placeholder for its output, so its notes cannot be cleaned
          here. The caption and its citation block are marked; phase 1
          (func/content-raw.html) then gathers its cites into the block and
          turns its sidenotes and margin notes into inline text
-         (tufte/note-in-note.html), as for the caption= of a shortcode. */ -}}
-  {{- $caption = printf `<i class="tufte-capsc" hidden></i>%s<i class="tufte-capsc-mid" hidden></i>%s<i class="tufte-capsc-end" hidden></i>` $caption $citeHTML -}}
+         (tufte/note-in-note.html), as for the caption= of a shortcode, and
+         fills the deferred alt text and name (data-key: $capKey). */ -}}
+  {{- $caption = printf `<i class="tufte-capsc" data-key="%s" hidden></i>%s<i class="tufte-capsc-mid" hidden></i>%s<i class="tufte-capsc-end" hidden></i>` $capKey $caption $citeHTML -}}
 {{- else -}}
   {{- $caption = printf "%s%s" $caption $citeHTML -}}
 {{- end -}}

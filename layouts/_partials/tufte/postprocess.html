@@ -31,8 +31,8 @@
   7. Handouts: the automatic bibliography is appended when
      bibliography.list is on, the page cites something and has no
      bibliography placeholder.
-  8. \multfootsep: a sidenote mark strictly after another mark (sidenote
-     or footnote) gets sidenote-number--multi; a footnote mark strictly
+  8. \multfootsep: a sidenote mark strictly after another mark (sidenote,
+     footnotemark or footnote) gets sidenote-number--multi; a footnote mark strictly
      after another mark gets <sup class="footnote-sep">,</sup> before it.
      The sn-end, cap-end and tufte-float markers are removed.
   9. debug: orphan footnotemarks and unlabelled numbered floats are
@@ -73,6 +73,43 @@
       {{- end -}}
     {{- end -}}
   {{- end -}}
+{{- end -}}
+{{- /* 1b'. An explicit heading id written twice ({#sec:x} on two
+       headings, also in a shortcode's inner text; tufte-duplicate-label
+       was warned, the first one wins), or an automatic id that an
+       explicit one repeats: the headings
+       labels.html renamed take the ids it gave them (ID-2…, by position
+       among the headings with the id), with their anchor link and number
+       token. */ -}}
+{{- with $L.hrenames -}}
+  {{- range $old, $news := . -}}
+    {{- $q := replaceRE `([.+*?()|\[\]{}^$\\])` `\$1` $old -}}
+    {{- $hs := findRE (printf `(?s)<h[2-6][^>]*\sid="%s"[^>]*>.*?</h[2-6]>` $q) $html -}}
+    {{- $put := slice -}}
+    {{- range $i, $h := $hs -}}
+      {{- $new := $h -}}
+      {{- if and (lt $i (len $news)) (index $news $i) -}}
+        {{- $nid := index $news $i -}}
+        {{- $open := replaceRE `(?s)^(<h[2-6][^>]*>).*$` "$1" $h -}}
+        {{- $body := strings.TrimPrefix $open $h -}}
+        {{- /* The new id is the old one plus "-N": the anchor link's
+               href (URL-escaped by the render hook) takes the same suffix. */ -}}
+        {{- $body = replaceRE `^((?s:.*?)<a class="heading-anchor" href="#[^"]*)"` (printf `${1}%s"` (strings.TrimPrefix $old $nid)) $body -}}
+        {{- $body = replace $body (printf `data-kind="sec" data-key="%s"` (partial "tufte/key.html" $old)) (printf `data-kind="sec" data-key="%s"` (partial "tufte/key.html" $nid)) -}}
+        {{- $new = printf "%s%s" (replace $open (printf ` id="%s"` $old) (printf ` id="%s"` $nid)) $body -}}
+      {{- end -}}
+      {{- $html = replace $html $h (printf "TUFTEHID%dEND" $i) 1 -}}
+      {{- $put = $put | append $new -}}
+    {{- end -}}
+    {{- range $i, $t := $put -}}
+      {{- $html = replace $html (printf "TUFTEHID%dEND" $i) $t 1 -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* The mark of the inner-text headings with an explicit id
+       (tufte/render-inner.html), counted with the page's by 1b'. */ -}}
+{{- if strings.Contains $html ` data-tufte-xinner id="` -}}
+  {{- $html = replace $html ` data-tufte-xinner id="` ` id="` -}}
 {{- end -}}
 {{- /* 1c. Two non-heading elements with one id (two \label anchors or
        floats with the same normalised key: tufte-duplicate-label was
@@ -133,6 +170,12 @@
        shared with the generated lists, whose captions carry their own). */ -}}
 {{- if or (strings.Contains $html `class="tufte-num"`) (strings.Contains $html `<a class="xref"`) (strings.Contains $html `&lt;a class=&#34;xref&#34;`) -}}
   {{- $html = partial "tufte/resolve-refs.html" (dict "page" $p "html" $html "summary" $summary) -}}
+{{- end -}}
+{{- /* The hidden token of an equation with \tag{X} and a \label
+       (tufte/math-render.html) only carried X to tufte/labels.html, which
+       reads phase 1; it stays empty, so it goes. */ -}}
+{{- if strings.Contains $html `" data-number="` -}}
+  {{- $html = replaceRE `<span class="tufte-num" data-kind="eq"[^>]* data-number="[^"]*" hidden></span>` "" $html -}}
 {{- end -}}
 
 {{- /* 5. Citation numbers (class option nobib). */ -}}
@@ -304,8 +347,10 @@
   {{- $ub := . -}}
   {{- if not $summary -}}
     {{- /* .blocks: moved out of their paragraph; .kept: left in it (inside
-           an unclosed span, e.g. a note written with raw HTML). */ -}}
-    {{- range $key, $how := dict "blocks" "the paragraph was split around it" "kept" "it was left in the paragraph, inside an unclosed element (the HTML is invalid)" -}}
+           an unclosed span, e.g. a note written with raw HTML); .inline:
+           moved out of emphasis or a link in a list item, definition or
+           table cell (no <p> there). */ -}}
+    {{- range $key, $how := dict "blocks" "the paragraph was split around it" "kept" "it was left in the paragraph, inside an unclosed element (the HTML is invalid)" "inline" "it was inside emphasis or a link in a list item, definition or table cell, which were closed before it and opened again after it" -}}
       {{- with index $ub $key -}}
         {{- $what := slice -}}
         {{- range . -}}
@@ -523,18 +568,23 @@
 {{- $html = partial "tufte/canon-poster.html" $html -}}
 
 {{- /* 7b. plainnat's extra labels (1999a, 1999b) after the years of
-       references and author-year citations (tufte/bib/extra.html); the
-       markers of the other years go. */ -}}
-{{- if strings.Contains $html `<span class="bib-extra" data-key="` -}}
-  {{- $xl := partialCached "tufte/bib/extra.html" $p (or $p.RelPermalink $p.Path) -}}
-  {{- range $tok := findRE `<span class="bib-extra" data-key="[^"]*"></span>` $html | uniq -}}
-    {{- $k := htmlUnescape (replaceRE `^.*data-key="([^"]*)".*$` "$1" $tok) -}}
-    {{- $html = replace $html $tok (index $xl $k | default "") -}}
-  {{- end -}}
+       references and author-year citations, also in their escaped copies
+       (alt text): tufte/bib/fill-extra.html. */ -}}
+{{- if or (strings.Contains $html `<span class="bib-extra" data-key="`) (strings.Contains $html `&lt;span class=&#34;bib-extra&#34;`) -}}
+  {{- $html = partial "tufte/bib/fill-extra.html" (dict "page" $p "html" $html) -}}
 {{- end -}}
 
 {{- /* 8. Adjacent marks, then strip the markers. */ -}}
 {{- $html = replaceRE `</span><i class="sn-end" hidden></i>(<label for="[^"]*" class="margin-toggle sidenote-number)` "</span>${1} sidenote-number--multi" $html -}}
+{{- /* A footnotemark (a bare label with data-ft, no sn-end) counts as a
+       mark too: unlike tufte-latex, whose \multfootsep needs the kern
+       that only \sidenote leaves, the mark after it is separated as well
+       ("3,4", not "34"). The match starts at the data-ft attribute, so a
+       run of footnotemarks is handled in one pass. */ -}}
+{{- if strings.Contains $html `" data-ft="` -}}
+  {{- $html = replaceRE `( data-ft="[^"]*"></label>)(<label for="[^"]*" class="margin-toggle sidenote-number)` "${1}${2} sidenote-number--multi" $html -}}
+  {{- $html = replaceRE `( data-ft="[^"]*"></label>)(<sup class="footnote-ref")` `${1}<sup class="footnote-sep">,</sup>${2}` $html -}}
+{{- end -}}
 {{- /* \multfootsep for real footnotes too: a superscript comma between a
        footnote mark and a strictly adjacent footnote or sidenote mark
        (otherwise [^a][^b] reads "12", like footnote 12). The match ends

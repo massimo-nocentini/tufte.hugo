@@ -11,7 +11,7 @@
   <p class="footer-copyright">
     {{- with site.Params.copyright -}}
       {{- /* Several paragraphs become lines of this one. */ -}}
-      {{ . | markdownify | string | strings.TrimSpace | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | safeHTML }}
+      {{ partial "func/flatten-p.html" (. | markdownify | string | strings.TrimSpace) | safeHTML }}
     {{- else -}}
       &copy; {{ now.Format "2006" }}
       {{- with $author }} {{ if $authorURL }}<a href="{{ $authorURL }}">{{ . }}</a>{{ else }}{{ . }}{{ end }}{{ end -}}

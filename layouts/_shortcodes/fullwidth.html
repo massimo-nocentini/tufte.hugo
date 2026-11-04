@@ -13,7 +13,7 @@
 
   Output (Tufte CSS): <div class="fullwidth">…</div>
 */ -}}
-{{- $text := strings.TrimSpace .Inner -}}
+{{- $text := strings.TrimSpace .InnerDeindent -}}
 {{- /* Block Markdown; nested shortcodes are kept (nest tokens). */ -}}
 {{- $html := partial "tufte/render-inner.html" (dict "page" .Page "inner" $text "text" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
 {{- $class := "" -}}

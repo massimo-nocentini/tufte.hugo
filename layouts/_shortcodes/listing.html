@@ -20,5 +20,5 @@
   {{- warnidf "tufte-bad-option" "listing shortcode: style must be plain, ruled or boxed, not %q (%s)" $style .Position -}}
   {{- $style = "" -}}
 {{- end -}}
-{{- $out := partial "tufte/float-body.html" (dict "ctx" . "inner" .Inner "kind" "listing" "class" $style) -}}
+{{- $out := partial "tufte/float-body.html" (dict "ctx" . "inner" .InnerDeindent "kind" "listing" "class" $style) -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

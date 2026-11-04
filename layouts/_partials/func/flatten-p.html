@@ -1,0 +1,38 @@
+{{- /*
+  Flattens the paragraphs of HTML that must sit in a <span> (a sidenote,
+  margin note, caption, footnote turned sidenote, an inline shortcode's
+  text): a <p> start tag in a span would close the paragraph around the
+  note in the browser, and the rest of the note would spill into the body.
+
+    <p ATTRS>…</p>  → <span data-sn="p" ATTRS>…</span>   (a paragraph with
+                       attributes: an alert title, {.class}, {#id}; it
+                       keeps them, and tufte-latex.css lays the span out as
+                       a block, as tufte/inline-blocks.html does for other
+                       blocks)
+    </p> <p>        → SEP (default <br>)
+    <p>, </p>       → removed
+
+  Text in the hidden marker of a real footnote uses <tufte-p> (see
+  tufte/render-inner.html) and is left alone.
+
+  Takes: the HTML (string or template.HTML), or dict { html, sep }.
+  Returns: the HTML string (not trimmed).
+*/ -}}
+{{- $html := "" -}}
+{{- $sep := "<br>" -}}
+{{- if reflect.IsMap . -}}
+  {{- $html = string .html -}}
+  {{- with .sep }}{{ $sep = . }}{{ end -}}
+{{- else -}}
+  {{- $html = string . -}}
+{{- end -}}
+{{- if or (strings.Contains $html "<p") (strings.Contains $html "</p>") -}}
+  {{- if findRE `<p\s` $html 1 -}}
+    {{- /* Up to its </p>, or to the end: Hugo's inline RenderString drops
+           the first <p> and the last </p> of a text with one bare <p>
+           ("One\n\nTwo\n{.x}" → "One</p>\n<p class="x">Two"). */ -}}
+    {{- $html = replaceRE `(?s)<p(\s[^>]*)>(.*?)(?:</p>|$)` `<span data-sn="p"$1>$2</span>` $html -}}
+  {{- end -}}
+  {{- $html = $html | replaceRE `</p>\s*<p>` $sep | replaceRE `</?p>` "" -}}
+{{- end -}}
+{{- return $html -}}

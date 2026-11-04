@@ -1,0 +1,40 @@
+{{- /*
+  The order of index entries at one level (tufte/index/render.html), as
+  makeindex orders them: symbols, then numbers, then letters.
+
+  Takes: a slice of strings, the distinct lowercased sort keys of one level.
+  Returns: the same keys, ordered:
+    - symbols: keys whose first rune is an ASCII character that is neither a
+      letter nor the start of a pure number ("+ (plus)", "#hash",
+      "1984. orwell"), by that character's ASCII code, then by the
+      language collation of the whole key;
+    - numbers: keys made only of ASCII digits ("42", "1984"), in numeric
+      order (zero-padded, so that the collation of `sort`, which differs
+      between Hugo versions, cannot reorder them);
+    - letters: every other key, with the site language's collation (`sort`).
+  tufte/index/initial.html gives the matching groups ("symbols",
+  "numbers", or the initial letter).
+*/ -}}
+{{- $ascii := " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~" -}}
+{{- $sym := slice -}}
+{{- $num := slice -}}
+{{- $alpha := slice -}}
+{{- range . -}}
+  {{- $k := printf "%v" . -}}
+  {{- if findRE `^[0-9]+$` $k -}}
+    {{- $d := $k -}}
+    {{- if lt (len $d) 24 }}{{ $d = printf "%s%s" (strings.Repeat (sub 24 (len $d)) "0") $d }}{{ end -}}
+    {{- $num = $num | append (dict "k" $k "s" (printf "%s %s" $d $k)) -}}
+  {{- else if findRE `^[\x00-\x40\x5b-\x60\x7b-\x7f]` $k -}}
+    {{- $c := substr $k 0 1 -}}
+    {{- $ord := add 32 (len (index (split $ascii $c) 0)) -}}
+    {{- $sym = $sym | append (dict "k" $k "s" (printf "%03d%s" $ord $k)) -}}
+  {{- else -}}
+    {{- $alpha = $alpha | append $k -}}
+  {{- end -}}
+{{- end -}}
+{{- $out := slice -}}
+{{- range sort $sym "s" }}{{ $out = $out | append .k }}{{ end -}}
+{{- range sort $num "s" }}{{ $out = $out | append .k }}{{ end -}}
+{{- range sort $alpha }}{{ $out = $out | append . }}{{ end -}}
+{{- return $out -}}

@@ -11,6 +11,9 @@
   spans, as tufte/resolve-refs.html and tufte/lists/render.html do: note
   spans are renamed <tufnote>, then innermost elements are resolved
   repeatedly (finished spans become <xspan>, finished notes are removed).
+  The element class $C stops only at <span>, </span> and <tufnote>: the
+  theme's other <tu…> tags pass, such as the <tufte-p> paragraphs of a
+  Markdown footnote inside a note or caption (tufte/render-inner.html).
 
   Takes: the HTML (string).
   Returns: the HTML without margin material (string).
@@ -20,7 +23,7 @@
 {{- /* a lone toggle: footnotemark (its input is in the footnotetext) */ -}}
 {{- $h = replaceRE `<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label>` "" $h -}}
 {{- if findRE `<span class="(?:sidenote|marginnote|citation-block|tufte-fn)` $h 1 -}}
-  {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<s[^p]|</[^s]|</s[^p])*` -}}
+  {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<tu[^f]|<tuf[^n]|<s[^p]|</[^s]|</s[^p])*` -}}
   {{- $h = replaceRE `<span class="(sidenote|marginnote|citation-block|tufte-fn)` `<tufnote class="$1` $h -}}
   {{- range seq 60 -}}
     {{- if not (strings.Contains $h "<tufnote") }}{{ break }}{{ end -}}

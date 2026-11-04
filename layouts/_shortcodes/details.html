@@ -38,7 +38,7 @@
 {{- $summary := printf "%v" (index $get "summary" | default (partial "func/t.html" "details") | default "Details") -}}
 {{- $open := partial "tufte/truthy.html" (index $get "open") -}}
 {{- $sum := partial "tufte/render-inner.html" (dict "page" $p "inner" $summary "display" "inline" "shortcodes" "run" "where" $where) | string -}}
-{{- $text := strings.TrimSpace .Inner -}}
+{{- $text := strings.TrimSpace .InnerDeindent -}}
 {{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" $text "display" "block" "where" $where) | string -}}
 {{- $attrs := "" -}}
 {{- with $class }}{{ $attrs = printf "%s class=\"%s\"" $attrs (htmlEscape .) }}{{ end -}}

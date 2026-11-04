@@ -26,12 +26,19 @@
 
   Takes: a dict with
     page     the page whose RenderString is used
-    title    optional: the text (default: the page's LinkTitle)
+    title    optional: the text (default: the page's LinkTitle; when both
+             are empty, tufte/page-title.html's fallback)
     heading  optional bool: heading mode
   Returns: template.HTML.
 */ -}}
 {{- $p := .page -}}
 {{- $t := printf "%v" (.title | default $p.LinkTitle) -}}
+{{- /* An untitled page, section, book, part or term: the fallback of
+       tufte/page-title.html (linkTitle, the term, the directory name or
+       i18n "untitled"), never an empty heading or link. A caller that
+       names another page's title with a different page as `page` (the
+       book contents) passes that page's tufte/page-title.html itself. */ -}}
+{{- if not (strings.TrimSpace $t) }}{{ $t = printf "%v" (partial "tufte/page-title.html" $p) }}{{ end -}}
 {{- $heading := eq .heading true -}}
 {{- $out := htmlEscape $t -}}
 {{- if findRE "[`*_~$\\\\\\['\"]|--|\\.\\.\\." $t 1 -}}

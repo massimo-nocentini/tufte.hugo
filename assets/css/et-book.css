@@ -44,8 +44,9 @@
    tufte-latex.css), the web counterpart of mathpazo's osf option: a family
    that only covers the digits 0-9, listed before et-book, so letters keep
    coming from et-book and only the figures change. The italic face of
-   et-book already has old-style figures; bold has no old-style face, so
-   bold figures stay lining (last face below). */
+   et-book already has old-style figures; bold takes them from the ET Book
+   semi-bold old-style face (last face below), as mathpazo's bold series
+   (pplbj) keeps old-style figures. */
 @font-face {
     font-family: "et-book-osf-digits";
     src: url("../et-book/et-book-roman-old-style-figures/et-book-roman-old-style-figures.eot");
@@ -66,12 +67,15 @@
     unicode-range: U+0030-0039;
 }
 
-/* Bold: the lining figures of et-book bold (without this face the browser
-   would embolden the regular old-style digits). */
+/* Bold: the old-style figures of ET Book semi-bold ("ETBembo SemiBoldOSF",
+   weight 600, the only heavy old-style face ET Book has), matched for bold
+   (700) text; without this face the browser would embolden the regular
+   old-style digits. They are a little lighter than the bold letters
+   around them. */
 @font-face {
     font-family: "et-book-osf-digits";
-    src: url("../et-book/et-book-bold-line-figures/et-book-bold-line-figures.eot");
-    src: url("../et-book/et-book-bold-line-figures/et-book-bold-line-figures.eot?#iefix") format("embedded-opentype"), url("../et-book/et-book-bold-line-figures/et-book-bold-line-figures.woff") format("woff"), url("../et-book/et-book-bold-line-figures/et-book-bold-line-figures.ttf") format("truetype");
+    src: url("../et-book/et-book-semi-bold-old-style-figures/et-book-semi-bold-old-style-figures.eot");
+    src: url("../et-book/et-book-semi-bold-old-style-figures/et-book-semi-bold-old-style-figures.eot?#iefix") format("embedded-opentype"), url("../et-book/et-book-semi-bold-old-style-figures/et-book-semi-bold-old-style-figures.woff") format("woff"), url("../et-book/et-book-semi-bold-old-style-figures/et-book-semi-bold-old-style-figures.ttf") format("truetype");
     font-weight: bold;
     font-style: normal;
     font-display: swap;

@@ -13,7 +13,7 @@
        fullwidthfigure, the image hook) becomes the plain image with its
        caption as text, unnumbered (in LaTeX a float in a note is
        "Float(s) lost");
-    2. paragraphs: <p ATTRS>…</p> → <span data-sn="p" ATTRS>…</span>,
+    2. func/flatten-p.html: <p ATTRS>…</p> → <span data-sn="p" ATTRS>…</span>,
        </p><p> → <br>, other <p> tags removed;
     3. tufte/inline-blocks.html: every other block element (a table's or
        listing's figure, an iframe wrapper, a div, pre, table…) becomes a
@@ -31,7 +31,7 @@
 */ -}}
 {{- $html := string . -}}
 {{- $changed := false -}}
-{{- $blockRE := `(?i)<(?:figure|figcaption|div|table|pre|ul|ol|dl|blockquote|section|header|footer|aside|nav|address|article|details|h[1-6]|hr)[\s/>]|<p>` -}}
+{{- $blockRE := `(?i)<(?:figure|figcaption|div|table|pre|ul|ol|dl|blockquote|section|header|footer|aside|nav|address|article|details|h[1-6]|hr)[\s/>]|<p[\s>]` -}}
 {{- if findRE $blockRE $html 1 -}}
   {{- $head := $html -}}
   {{- $items := slice -}}
@@ -47,9 +47,18 @@
     {{- $t := . -}}
     {{- if findRE $blockRE $t 1 -}}
       {{- $t = partial "func/inline-figures.html" $t -}}
-      {{- $t = replaceRE `(?s)<p(\s[^>]*)>(.*?)</p>` `<span data-sn="p"$1>$2</span>` $t -}}
-      {{- $t = $t | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" -}}
+      {{- $t = partial "func/flatten-p.html" $t -}}
       {{- $t = partial "tufte/inline-blocks.html" $t -}}
+      {{- /* The caption of a flattened float (table, listing, video,
+             subfigures…) was a margin note with its toggle: it stays the
+             float's caption, as an inline block (span[data-sn="figcaption"])
+             without the toggle, like a figure's caption becomes text, and
+             not a nested note (tufte/note-in-note.html would warn
+             tufte-note-in-note for a note the author did not write). */ -}}
+      {{- if strings.Contains $t `<span data-sn="figure"` -}}
+        {{- $t = replaceRE `(<span data-sn="figure"[^>]*>(?:<span id="[^"]*" class="tufte-anchor"></span>)?)<label for="[^"]*" class="margin-toggle">&#8853;</label><input type="checkbox" id="[^"]*" class="margin-toggle"/><span class="marginnote(?: ([^"]*))?"` `$1<span data-sn="figcaption" class="$2"` $t -}}
+        {{- $t = replace $t `<span data-sn="figcaption" class=""` `<span data-sn="figcaption"` -}}
+      {{- end -}}
       {{- if ne $t . }}{{ $changed = true }}{{ end -}}
     {{- end -}}
     {{- $flat = $flat | append $t -}}

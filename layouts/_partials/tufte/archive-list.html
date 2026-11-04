@@ -12,9 +12,11 @@
   DATE is in params.archiveDateFormat, else the i18n archiveDateFormat
   ("Jan 2" in English, "2 Jan" in Italian). Dated pages are grouped by year, newest first. Pages without a date
   (book chapters, SPEC R13) have no year: they come last, under the
-  i18n "undated" heading, with no <time>, in the collection's order (for
-  a book, weight = reading order), as post-meta.html shows no date for
-  them either.
+  i18n "undated" heading, with no <time>, as post-meta.html shows no date
+  for them either, in reading order, as in the RSS feed
+  (tufte/undated-order.html): the chapters of each book in its contents'
+  order (matter, parts, weight, file name), then the other undated pages
+  in the collection's order.
 
   Takes: the pages (page.Pages), or a dict with
     pages  the pages
@@ -26,7 +28,9 @@
 {{- if reflect.IsMap . }}{{ $pages = .pages }}{{ $label = .label | default "" }}{{ end }}
 {{- /* The short date: params.archiveDateFormat, else the language's
        i18n archiveDateFormat ("Jan 2"; "2 Jan" in Italian; a language
-       without the key gets the English one, func/t.html). */ -}}
+       without the key gets the English one, func/t.html). func/date.html
+       writes the full month name where the locale has no abbreviated
+       one (Japanese, Korean, Arabic on Hugo 0.169). */ -}}
 {{- $fmt := site.Params.archiveDateFormat | default (partial "func/t.html" "archiveDateFormat") | default "Jan 2" }}
 <div class="archive"{{ with $label }} role="region" aria-label="{{ . }}"{{ end }}>
   {{- range (where $pages "Date.IsZero" false).GroupByDate "2006" }}
@@ -39,7 +43,7 @@
     </ul>
   </section>
   {{- end }}
-  {{- with where $pages "Date.IsZero" true }}
+  {{- with partial "tufte/undated-order.html" (where $pages "Date.IsZero" true) }}
   <section>
     <h2 class="archive-year">{{ partial "func/t.html" "undated" }}</h2>
     <ul class="archive-list">

@@ -11,7 +11,13 @@
   2. Any other note (sidenote, margin note, margin figure, footnotetext)
      loses its toggle (label and checkbox) and its text stays inline, as
      <span class="note-in-note">…</span>; tufte-note-in-note is warned.
-     The inner note's mark is gone, so it steps no counter.
+     The inner note's mark is gone, so it steps no counter. A margin
+     figure loses its float too, as an image in running text does
+     (func/inline-figures.html): its "Figure N:" label and number token
+     go and its caption stays plain text after the image, so it takes no
+     number, is not listed in a list of figures and its label is lost,
+     and the holder's caption (when the holder is a figure) keeps the
+     only cap-end marker, which tufte/labels.html reads its caption to.
 
   Callers: the sidenote, marginnote, footnotetext and marginblock
   shortcodes (on their rendered inner text, before cite-gather) and
@@ -38,10 +44,19 @@
     {{- /* A margin figure's wrapper paragraph or footnotetext's cannot sit
            in a span either. */ -}}
     {{- $t = replaceRE `<p class="(?:margin-figure-anchor|footnotetext-anchor)[^"]*"([^>]*)>((?s:.*?))</p>` `<span class="note-in-note-anchor"$1>$2</span>` $t -}}
+    {{- /* A margin figure (image, then its caption label): the label right
+           after the image of a note-in-note span is that figure's own (the
+           holder's caption label, which the content-raw caller's HTML
+           holds, never follows one), and its caption text ends at the
+           first cap-end after it (a figure nested in that caption was
+           cleaned the same way when that caption was built). */ -}}
+    {{- if strings.Contains $t `<span class="caption-label">` -}}
+      {{- $t = replaceRE `(?s)(<span class="note-in-note"[^>]*>(?:<i class="tufte-float"[^>]*></i>)?(?:<a [^>]*>)?<img [^>]*/>(?:</a>)?)<span class="caption-label">[^<]*<span class="tufte-num"[^>]*></span>:</span> ?<span class="caption-text">(.*?)</span><i class="cap-end" hidden></i>` "$1 $2" $t -}}
+    {{- end -}}
     {{- $at := .page.RelPermalink -}}
     {{- with .page.File }}{{ $at = .Path }}{{ end -}}
     {{- with .where }}{{ $at = printf "%v" . }}{{ end -}}
-    {{- warnidf "tufte-note-in-note" "tufte.hugo: a %s in %s holds a sidenote or margin note, which cannot float inside it (in LaTeX: \"Float(s) lost\"): the inner note is shown inline in its text; use a cite (it becomes a citation block) or move the inner note out" (.holder | default "note") $at -}}
+    {{- warnidf "tufte-note-in-note" "tufte.hugo: a %s in %s holds a sidenote or margin note, which cannot float inside it (in LaTeX: \"Float(s) lost\"): the inner note is shown inline in its text (a margin figure as its plain image with its caption as text, unnumbered and without its label); use a cite (it becomes a citation block) or move the inner note out" (.holder | default "note") $at -}}
   {{- end -}}
 {{- end -}}
 {{- return $t -}}

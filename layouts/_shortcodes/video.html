@@ -10,7 +10,7 @@
               A data: URI is accepted for an image poster and a video or
               audio src; other non-http(s) schemes become "#ZgotmplZ".
     caption   caption, inline Markdown: a margin note (main) or a
-              figcaption (fullwidth)
+              figcaption.caption-margin (fullwidth)
     title     accessible label of the video (default: the caption as plain text)
     type      "main" (default, main text column) | "fullwidth"
     controls  default true; "false" hides the player controls
@@ -21,7 +21,9 @@
 
   Output (Tufte CSS):
     <figure class="video"><label for="mn-ID" class="margin-toggle">&#8853;</label><input type="checkbox" id="mn-ID" class="margin-toggle"/><span class="marginnote">CAPTION</span><video …></video></figure>
-    <figure class="video fullwidth"><video …></video><figcaption>CAPTION</figcaption></figure>
+    <figure class="video fullwidth"><video …></video><figcaption class="caption-margin">CAPTION</figcaption></figure>
+  (caption-margin, as a full-width image's: in the note column under the
+  video on wide screens, and in the margin column in print.)
 */ -}}
 {{- if not .IsNamedParams -}}
   {{- errorf "video shortcode: use named parameters, e.g. src=\"clip.mp4\" caption=\"…\" (%s)" .Position -}}
@@ -77,7 +79,7 @@
 {{- $caption := "" -}}
 {{- with .Get "caption" -}}
   {{- $html := partial "tufte/render-inner.html" (dict "page" $p "inner" (printf "%v" .) "display" "inline" "shortcodes" "run" "where" $where) | string -}}
-  {{- $html = $html | replaceRE `</p>\s*<p>` "<br>" | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- $html = partial "func/flatten-p.html" $html | strings.TrimSpace -}}
   {{- if strings.Contains $html `class="margin-toggle` -}}
     {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" "video caption" "where" $where) -}}
   {{- end -}}
@@ -156,7 +158,7 @@
 {{- $linkText := cond $dataSrc $mime (path.Base (index $urls "src")) -}}
 {{- $out = printf "%s<video preload=\"metadata\"%s>\n<source src=\"%s\"%s>\n<a class=\"video-fallback\" href=\"%s\">%s</a>\n</video>" $out $attrs $s $typeAttr $s (htmlEscape $linkText) -}}
 {{- if and (eq $type "fullwidth") $caption -}}
-  {{- $out = printf `%s<figcaption>%s</figcaption>` $out $caption -}}
+  {{- $out = printf `%s<figcaption class="caption-margin">%s</figcaption>` $out $caption -}}
 {{- end -}}
 {{- $out = printf `%s</figure>` $out -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

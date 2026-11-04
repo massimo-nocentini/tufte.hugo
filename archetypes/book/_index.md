@@ -26,7 +26,7 @@ copyrightPage:             # a Markdown string, or this map (all keys optional)
   # printing: ""           # default: "First printing, MONTH YEAR" from `date`; false removes it
 dedication: ""             # Markdown
 # frontispiece: {src: "", alt: "", caption: ""}
-outputs: ["html", "print"] # "print" adds print.html: the whole book as one document
+outputs: ["html", "rss", "print"] # "print" adds print.html (the whole book as one document); this list replaces the defaults, so keep "rss" for the book feed
 # The body below (optional) is shown on the landing page, after the title
 # page, the contents and the dedication.
 tufte:

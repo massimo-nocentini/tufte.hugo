@@ -14,11 +14,11 @@
   a block ("- said she", "1914. The war", "* * *", "> ") keeps its marker
   (tufte/render-inner.html, `literal`).
 
-  Output: <div class="verse"><p><span class="verse-line">…</span>…</p>…</div>
+  Output: <div class="verse"><p><span class="verse-line">…</span><br class="verse-br"><span class="verse-line">…</span>…</p>…</div>
 */ -}}
 {{- $p := .Page -}}
 {{- $where := printf "%s shortcode in %v" .Name .Position -}}
-{{- $text := replace (strings.TrimSpace .Inner) "\r\n" "\n" -}}
+{{- $text := replace (strings.TrimSpace .InnerDeindent) "\r\n" "\n" -}}
 {{- $stanzas := "" -}}
 {{- /* A blank line may hold spaces or tabs (an editor that keeps the
        indentation): it still separates stanzas. */ -}}
@@ -29,7 +29,11 @@
     {{- range split $st "\n" -}}
       {{- with strings.TrimSpace . -}}
         {{- $l := partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "literal" true "where" $where) | string -}}
-        {{- $lines = printf `%s<span class="verse-line">%s</span>` $lines $l -}}
+        {{- /* A <br> between lines (LaTeX's \\): the block spans break
+               the lines on screen and the CSS hides it (.verse-br), but
+               a feed reader or the plain-text description, which have
+               no stylesheet, keep the line breaks. */ -}}
+        {{- $lines = printf `%s%s<span class="verse-line">%s</span>` $lines (cond (ne $lines "") `<br class="verse-br">` "") $l -}}
       {{- end -}}
     {{- end -}}
     {{- $stanzas = printf "%s<p>%s</p>\n" $stanzas $lines -}}

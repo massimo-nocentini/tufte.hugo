@@ -1,0 +1,16 @@
+{{- /*
+  A page or chapter title as the text a cross-reference prints for it
+  (xref "name", "page", "auto" and "full" without a number, the "where" of
+  a label outside any section) and as an index locator: plain text (no
+  emphasis, links or code style), but the math stays typeset, as \nameref
+  prints a title and as tufte/labels.html prints a heading's name. The
+  heading-mode output of tufte/title-html.html (math typeset) read by
+  tufte/plain-math.html.
+
+  Takes: a dict with
+    page   the page whose RenderString is used
+    title  optional: the text (default: the page's LinkTitle)
+  Returns: string, HTML-escaped (with the KaTeX HTML of any math).
+*/ -}}
+{{- $html := partial "tufte/title-html.html" (dict "page" .page "title" .title "heading" true) -}}
+{{- return (partial "tufte/plain-math.html" (dict "html" (string $html))) -}}

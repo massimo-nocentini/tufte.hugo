@@ -31,5 +31,9 @@
 {{ partial "footer_custom.html" . }}
 {{ partial "js.html" . }}
 {{ partial "scripts_custom.html" . }}
+{{- /* End of the build: a new id for the next build's .Store memos
+       (tufte/build-stamp.html, tufte/memo.html). The fixed key runs it once
+       per build, after every page; it prints nothing. */}}
+{{- with (templates.Defer (dict "key" "tufte-build-end")) }}{{ hugo.Store.Set "tufteBuildStamp" now.UnixNano }}{{ end }}
 </body>
 </html>

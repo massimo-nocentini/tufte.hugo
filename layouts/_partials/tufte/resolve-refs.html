@@ -119,7 +119,7 @@
           {{- with index (partialCached "tufte/labels.html" . (or .RelPermalink .Path)).entries $k }}{{ $e = . }}{{ end -}}
         {{- else -}}
           {{- /* "path#" or "path": a link to the page itself. */ -}}
-          {{- $lt := partial "tufte/plain-title.html" (dict "page" .) | htmlEscape -}}
+          {{- $lt := partial "tufte/name-title.html" (dict "page" .) -}}
           {{- $e = dict "key" "" "kind" "page" "display" "" "name" $lt "short" "" "caption" "" "anchor" "" "where" $lt "level" 0 "page" . -}}
         {{- end -}}
       {{- end -}}
@@ -135,11 +135,15 @@
       {{- $tp := $e.page -}}
       {{- $samePage := eq $tp $p -}}
       {{- /* name: a float's short caption, else its first 80 plain chars.
-             References inside the caption are resolved first (against the
-             caption's page), else they would read as their raw keys. */ -}}
+             Both are rendered HTML (tufte/labels.html), so both are made
+             plain here: no emphasis, links, notes or citations (a sidenote
+             copied into the text would also shift the CSS numbers of the
+             later notes). References inside them are resolved first
+             (against the caption's page), else they would read as their
+             raw keys. */ -}}
       {{- $name := $e.name -}}
-      {{- if and (in (slice "figure" "table" "listing" "eq") $e.kind) (not $e.short) -}}
-        {{- $c := $e.caption | default $e.name -}}
+      {{- if in (slice "figure" "table" "listing" "eq") $e.kind -}}
+        {{- $c := $e.short | default $e.caption | default $e.name -}}
         {{- if and (lt $depth 2) (or (strings.Contains $c `<a class="xref"`) (strings.Contains $c `class="tufte-num"`)) -}}
           {{- $c = partial "tufte/resolve-refs.html" (dict "page" $tp "html" $c "summary" $summary "quiet" true "depth" (add $depth 1)) -}}
         {{- end -}}
@@ -156,7 +160,7 @@
                repeatedly (finished spans become <xspan>, finished notes
                are removed). */ -}}
         {{- if findRE `<span class="(?:sidenote|marginnote|citation-block|tufte-fn)` $c 1 -}}
-          {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<s[^p]|</[^s]|</s[^p])*` -}}
+          {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<tu[^f]|<tuf[^n]|<s[^p]|</[^s]|</s[^p])*` -}}
           {{- $c = replaceRE `<span class="(sidenote|marginnote|citation-block|tufte-fn)` `<tufnote class="$1` $c -}}
           {{- range seq 40 -}}
             {{- if not (or (strings.Contains $c "<span") (strings.Contains $c "<tufnote")) }}{{ break }}{{ end -}}
@@ -165,10 +169,11 @@
           {{- end -}}
           {{- $c = replace (replace $c "<xspan" "<span") "</xspan>" "</span>" -}}
         {{- end -}}
-        {{- /* Plain text, cut at 80 characters, with its math still
+        {{- /* Plain text (a caption cut at 80 characters, a short
+               caption whole), with its math still
                typeset (plainify would read KaTeX's visual HTML in layout
                order). */ -}}
-        {{- $name = partial "tufte/plain-math.html" (dict "html" $c "max" 80) -}}
+        {{- $name = partial "tufte/plain-math.html" (dict "html" $c "max" (cond (gt (len $e.short) 0) 0 80)) -}}
       {{- end -}}
       {{- $d := $e.display -}}
       {{- $text := "" -}}
@@ -184,7 +189,7 @@
         {{- $text = $name -}}
       {{- else if eq $fmt "page" -}}
         {{- if and $inBook (not $samePage) -}}
-          {{- $text = partial "tufte/plain-title.html" (dict "page" $tp) | htmlEscape -}}
+          {{- $text = partial "tufte/name-title.html" (dict "page" $tp) -}}
         {{- else -}}
           {{- $text = $e.where -}}
         {{- end -}}

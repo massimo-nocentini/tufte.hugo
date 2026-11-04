@@ -27,7 +27,7 @@
   fn-HASH6-KEY / fnref-HASH6-KEY), LABEL = the normalised label key.
 */ -}}
 {{- $p := .Page -}}
-{{- $text := strings.TrimSpace .Inner -}}
+{{- $text := strings.TrimSpace .InnerDeindent -}}
 {{- $label := "" -}}
 {{- if .IsNamedParams -}}
   {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
@@ -41,7 +41,7 @@
 {{- $html := "" -}}
 {{- with $text -}}
   {{- /* text= or positional text: its shortcodes run now (see sidenote). */ -}}
-  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "blocks" "keep" "shortcodes" (cond (eq (strings.TrimSpace $.Inner) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "blocks" "keep" "shortcodes" (cond (eq (strings.TrimSpace $.InnerDeindent) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
   {{- /* A cite run from that text has no parent: its citation sidenote
          becomes a nested block, gathered below. */ -}}
   {{- if strings.Contains $html `<span class="sidenote citation"` -}}

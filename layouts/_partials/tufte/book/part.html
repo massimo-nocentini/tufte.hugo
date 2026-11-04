@@ -22,7 +22,7 @@
     {{- $intoc := true -}}
     {{- if isset $c.Params "intoc" }}{{ $intoc = partial "tufte/truthy.html" $c.Params.intoc }}{{ end -}}
     {{- if $intoc -}}
-      {{- $t := $c.LinkTitle -}}
+      {{- $t := $c.LinkTitle | default (partial "tufte/page-title.html" $c) -}}
       {{- $tHTML := partial "tufte/title-html.html" (dict "page" $p "title" $t "heading" true) | string | replaceRE `</?a\b[^>]*>` "" -}}
       {{- $n := "" -}}
       {{- if .Numbered }}{{ $n = printf `<span class="toc-num">%s</span>` (htmlEscape (printf "%v" .Display)) }}{{ end -}}

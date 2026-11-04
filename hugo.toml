@@ -111,12 +111,16 @@
     style = "css"               # "css" (Tufte CSS look) | "latex" (tufte-handout / tufte-book look)
 
 # Single-document print view of a book: a book root with
-# `outputs: [html, print]` gets /…/print.html (layouts/list.print.html).
+# `outputs: [html, rss, print]` gets /…/print.html (layouts/list.print.html).
+# Front-matter `outputs` replaces the defaults: leaving out rss drops the feed.
+# noUgly: with `uglyURLs = true`, Hugo 0.146 would otherwise write a section
+# book's print output to the landing's own file (books/b.html), replacing it.
 [outputFormats]
   [outputFormats.print]
     mediaType = "text/html"
     baseName = "print"
     isHTML = true
+    noUgly = true
     permalinkable = false
     notAlternative = true
 

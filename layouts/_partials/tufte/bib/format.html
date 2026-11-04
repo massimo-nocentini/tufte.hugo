@@ -19,8 +19,10 @@
                Without it the math source is printed as written.
     "margin"   bool: true for entries in the margin (sidenotes, bibentry).
                Like \bibentry in tufte-latex, margin entries have no final
-               period, and "doi:" is set in small capitals. "ISBN" is in
-               ordinary capitals everywhere, as in the reference PDFs.
+               period. "doi:" is set in small capitals everywhere (the
+               class's \doi, \textsc{doi:}, is used by \bibentry and by the
+               printed bibliography alike); "ISBN" is in ordinary capitals
+               everywhere, as in the reference PDFs.
     "wrap"     bool, default true: wrap in <span class="bib-entry"
                data-cite="key">; false returns only the inner HTML (used by
                the bibliography list, whose <li> carries the class).
@@ -202,7 +204,16 @@
   {{- with $e.genre }}{{ $cw = partial "inline/tufte-bib-text.html" (dict "s" (lower .) "page" $page "key" $key) }}{{ end -}}
   {{- $chapPages = $chapPages | append (printf "%s %s" $cw (htmlEscape .)) -}}
 {{- end -}}
-{{- with $e.pages }}{{ $chapPages = $chapPages | append (printf "%s %s" (partial "func/t.html" "pages" | default "pages") (htmlEscape .)) }}{{ end -}}
+{{- /* plainnat's multi.page.check: a range or list ("-", ",", "+";
+       normalize.html has turned hyphens into an en dash) is "pages 3–4",
+       anything else "page 42" (i18n bibPage, the bibliography's own
+       lowercase singular: the key "page" is the paginator's "Page"). */ -}}
+{{- $pagesWord := "" -}}
+{{- with $e.pages -}}
+  {{- $pagesWord = partial "func/t.html" "bibPage" | default "page" -}}
+  {{- if findRE `[-‐‑–—,+]` (printf "%v" .) 1 }}{{ $pagesWord = partial "func/t.html" "pages" | default "pages" }}{{ end -}}
+{{- end -}}
+{{- with $e.pages }}{{ $chapPages = $chapPages | append (printf "%s %s" $pagesWord (htmlEscape .)) }}{{ end -}}
 {{- /* Appended to $blocks with the publication data below (a proceedings
        puts them in the title's block). */ -}}
 {{- $titleB := "" -}}
@@ -235,7 +246,7 @@
   {{- else if $vol -}}
     {{- $cont = $cont | append $vol -}}
   {{- else if $e.pages -}}
-    {{- $cont = $cont | append (printf "%s %s" (partial "func/t.html" "pages" | default "pages") (htmlEscape $e.pages)) -}}
+    {{- $cont = $cont | append (printf "%s %s" $pagesWord (htmlEscape $e.pages)) -}}
   {{- end -}}
 {{- else if in (slice "incollection" "inproceedings") $type -}}
   {{- $in := partial "func/t.html" "in" | default "In" -}}
@@ -313,22 +324,57 @@
 {{- /* edition and date, also kept apart for the address branch below */ -}}
 {{- $tail := slice -}}
 {{- with $e.edition -}}
-  {{- $ed := . -}}
-  {{- if findRE `^[0-9]+$` $ed 1 -}}
-    {{- $lang := (partial "func/lang.html" site.Language).name -}}
-    {{- if hasPrefix (lower $lang) "en" -}}
-      {{- $n := int $ed -}}
-      {{- $suf := "th" -}}
-      {{- if not (in (slice 11 12 13) (mod $n 100)) -}}
-        {{- $suf = index (dict "1" "st" "2" "nd" "3" "rd") (printf "%d" (mod $n 10)) | default "th" -}}
-      {{- end -}}
-      {{- $ed = printf "%d%s" $n $suf -}}
+  {{- $ed := trim (printf "%v" .) " \t\n" -}}
+  {{- /* The phrase is English (plainnat's "first edition", "2nd
+         edition") in an English language, or in a language whose own
+         strings have no edition key (func/t-own.html), so that
+         func/t.html falls back to the theme's English
+         "{{ .Edition }} edition". Another language's phrase takes a
+         plain number (de "2. Auflage", fr "2e édition"): a positive
+         integer edition, or an English ordinal ("Second", "2nd", the
+         usual BibTeX value), becomes one; any other value ("3.1",
+         "Revised", "0") keeps the English phrase as written, rather than
+         mixing it into the language's ("Auflage first"). Digits are read
+         in base 10 ("08" is 8: int alone reads a leading 0 as octal) and
+         only up to six of them (int would overflow on twenty). */ -}}
+  {{- $lang := (partial "func/lang.html" site.Language).name -}}
+  {{- $own := partialCached "func/t-own.html" $lang $lang -}}
+  {{- $enPhrase := or (hasPrefix (lower $lang) "en") (not (or $own.all (index $own.keys "edition"))) -}}
+  {{- if and (not $enPhrase) (not $own.all) (not (T "edition" (dict "Edition" "1"))) }}{{ $enPhrase = true }}{{ end -}}
+  {{- $num := 0 -}}
+  {{- if findRE `^[0-9]{1,6}$` $ed 1 -}}
+    {{- $num = int (strings.TrimLeft "0" $ed | default "0") -}}
+  {{- else if not $enPhrase -}}
+    {{- with findRESubmatch `^0*([1-9][0-9]{0,5})(?:st|nd|rd|th)$` (lower $ed) 1 -}}
+      {{- $num = int (index . 0 1) -}}
+    {{- else -}}
+      {{- $words := slice "first" "second" "third" "fourth" "fifth" "sixth" "seventh" "eighth" "ninth" "tenth" "eleventh" "twelfth" "thirteenth" "fourteenth" "fifteenth" "sixteenth" "seventeenth" "eighteenth" "nineteenth" "twentieth" -}}
+      {{- range $i, $word := $words }}{{ if eq (lower $ed) $word }}{{ $num = add $i 1 }}{{ end }}{{ end -}}
     {{- end -}}
-  {{- else if findRE `^[A-Za-z]+$` $ed 1 -}}
-    {{- $ed = lower $ed -}}
   {{- end -}}
-  {{- $w := partial "func/t.html" (dict "key" "edition" "data" (dict "Edition" $ed)) | default "edition" -}}
-  {{- if not (strings.Contains $w $ed) }}{{ $w = printf "%s %s" $ed $w }}{{ end -}}
+  {{- $w := "" -}}
+  {{- if gt $num 0 -}}
+    {{- $arg := printf "%d" $num -}}
+    {{- if $enPhrase -}}
+      {{- $suf := "th" -}}
+      {{- if not (in (slice 11 12 13) (mod $num 100)) -}}
+        {{- $suf = index (dict "1" "st" "2" "nd" "3" "rd") (printf "%d" (mod $num 10)) | default "th" -}}
+      {{- end -}}
+      {{- $arg = printf "%d%s" $num $suf -}}
+    {{- end -}}
+    {{- $w = partial "func/t.html" (dict "key" "edition" "data" (dict "Edition" $arg)) | default "edition" -}}
+    {{- if not (strings.Contains $w $arg) }}{{ $w = printf "%s %s" $arg $w }}{{ end -}}
+  {{- else -}}
+    {{- if findRE `^[A-Za-z]+$` $ed 1 }}{{ $ed = lower $ed }}{{ end -}}
+    {{- if $enPhrase -}}
+      {{- $w = partial "func/t.html" (dict "key" "edition" "data" (dict "Edition" $ed)) | default "edition" -}}
+    {{- else -}}
+      {{- /* the theme's English phrase, whatever the language says */ -}}
+      {{- $w = printf "%v" (index (partialCached "func/t-en.html" "en") "edition" | default "{{ .Edition }} edition") -}}
+      {{- $w = replaceRE `\{\{-?\s*\.Edition\s*-?\}\}` (replace $ed "$" "$$") $w -}}
+    {{- end -}}
+    {{- if not (strings.Contains $w $ed) }}{{ $w = printf "%s %s" $ed $w }}{{ end -}}
+  {{- end -}}
   {{- $tail = $tail | append (htmlEscape $w) -}}
 {{- end -}}
 {{- $date := "" -}}
@@ -404,7 +450,10 @@
   {{- with $e.issn }}{{ $blocks = $blocks | append (printf "ISSN %s" (htmlEscape .)) }}{{ end -}}
 {{- end -}}
 {{- with $e.doi -}}
-  {{- $w := cond $margin `<span class="smallcaps">doi:</span>` "doi:" -}}
+  {{- /* tufte-common.def's \providecommand{\doi}[1]{\textsc{doi:} #1}
+         is global and wins over the .bbl's own (local to bibentry's
+         group), so the printed bibliography uses it too. */ -}}
+  {{- $w := `<span class="smallcaps">doi:</span>` -}}
   {{- $href := printf "https://doi.org/%s" . -}}
   {{- $blocks = $blocks | append (printf `%s <a href="%s">%s</a>` $w (htmlEscape $href) (htmlEscape .)) -}}
 {{- end -}}

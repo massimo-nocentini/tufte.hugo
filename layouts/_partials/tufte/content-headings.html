@@ -1,0 +1,92 @@
+{{- /*
+  The headings of a page's content in document order, as the numbering
+  sees them (the phase-1 HTML, func/content-raw.html), with those that
+  Hugo's .TableOfContents and .Fragments never see marked `inner`: the
+  headings of a shortcode's inner text (fullwidth, epigraph, details…),
+  which tufte/render-inner.html renders in a Goldmark document of their
+  own (RenderString). render-heading.html and postprocess number them
+  like the others, so the page TOC (tufte/page-toc.html) and the book
+  contents (tufte/book/toc-headings.html) add them, so that the numbers
+  in the contents do not skip (in tufte-latex a \section inside the
+  fullwidth environment is listed too).
+
+  Only render-heading.html's headings count (an id and an anchor link);
+  the abstract (before tufte-abstract-end, shown in the title block) is
+  left out. A heading is inner when its id is not one of the page's
+  .Fragments ids (cleaned as tufte/heading-anchor.html cleans them):
+  func/content-raw.html gives inner headings ids that no other element of
+  the page uses.
+
+  Takes: the page. Call through partialCached (key: RelPermalink or Path).
+  Returns: a dict
+    inner     bool: some heading is inner
+    headings  slice of dicts {level (int), id (string, unescaped), inner (bool)};
+              a heading whose id is written in a shortcode's inner text
+              (data-tufte-xinner) is inner, its id the final one (after
+              tufte/labels.html "hrenames"), plus tid (the id in the
+              phase-1 HTML), tnth and xinner (true), for
+              tufte/toc-text.html
+*/ -}}
+{{- $p := . -}}
+{{- $hs := slice -}}
+{{- $any := false -}}
+{{- $raw := partialCached "func/content-raw.html" (dict "page" $p "summary" false) (or $p.RelPermalink $p.Path) false | string -}}
+{{- $end := `<i class="tufte-abstract-end" hidden></i>` -}}
+{{- /* Headings met so far by id, all of them ("a") and those marked
+       data-tufte-xinner ("x"), counting the abstract's: the position
+       tufte/labels.html "hrenames" is indexed by. */ -}}
+{{- $pos := newScratch -}}
+{{- $pos.Set "a" dict -}}
+{{- $pos.Set "x" dict -}}
+{{- if strings.Contains $raw $end -}}
+  {{- range findRE `<h[2-6][^>]*\sid="[^"]+"` (index (split $raw $end) 0) -}}
+    {{- $rid := replaceRE `^.*\sid="([^"]+)"$` "$1" . -}}
+    {{- $pos.SetInMap "a" $rid (add (int (index ($pos.Get "a") $rid | default 0)) 1) -}}
+    {{- if strings.Contains . ` data-tufte-xinner ` }}{{ $pos.SetInMap "x" $rid (add (int (index ($pos.Get "x") $rid | default 0)) 1) }}{{ end -}}
+  {{- end -}}
+  {{- $raw = index (split $raw $end) 1 -}}
+{{- end -}}
+{{- $hren := dict -}}
+{{- if strings.Contains $raw ` data-tufte-xinner id="` -}}
+  {{- $hren = (partialCached "tufte/labels.html" $p (or $p.RelPermalink $p.Path)).hrenames | default dict -}}
+{{- end -}}
+{{- if strings.Contains $raw `class="heading-anchor"` -}}
+  {{- $known := newScratch -}}
+  {{- $known.Set "k" dict -}}
+  {{- with $p.Fragments -}}
+    {{- with .Headings -}}
+      {{- range partial "tufte/heading-ids.html" (dict "hs" .) -}}
+        {{- $known.SetInMap "k" (partial "tufte/heading-anchor.html" (dict "page" $p "id" .)) true -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range findRESubmatch `(?s)<h([1-6])((?: data-tufte-xinner)?) id="([^"]*)"[^>]*>(.*?)</h[1-6]>` $raw -}}
+    {{- $lv := int (index . 1) -}}
+    {{- $rid := index . 3 -}}
+    {{- $xin := ne (index . 2) "" -}}
+    {{- $apos := int (index ($pos.Get "a") $rid | default 0) -}}
+    {{- $xpos := int (index ($pos.Get "x") $rid | default 0) -}}
+    {{- if ge $lv 2 -}}
+      {{- $pos.SetInMap "a" $rid (add $apos 1) -}}
+      {{- if $xin }}{{ $pos.SetInMap "x" $rid (add $xpos 1) }}{{ end -}}
+    {{- end -}}
+    {{- if strings.Contains (index . 4) `class="heading-anchor"` -}}
+      {{- $id := htmlUnescape $rid -}}
+      {{- if $xin -}}
+        {{- /* An id written in a shortcode's inner text
+               (tufte/render-inner.html): inner, with the id
+               tufte/labels.html may have renamed it to (ID-2…); "tid" and
+               "tnth" find it for tufte/toc-text.html ("xinner"). */ -}}
+        {{- $any = true -}}
+        {{- $final := $id -}}
+        {{- with index $hren $rid }}{{ if lt $apos (len .) }}{{ with index . $apos }}{{ $final = htmlUnescape . }}{{ end }}{{ end }}{{ end -}}
+        {{- $hs = $hs | append (dict "level" $lv "id" $final "inner" true "tid" $id "tnth" (add $xpos 1) "xinner" true) -}}
+      {{- else -}}
+        {{- $in := not (index ($known.Get "k") $id) -}}
+        {{- if $in }}{{ $any = true }}{{ end -}}
+        {{- $hs = $hs | append (dict "level" $lv "id" $id "inner" $in) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "inner" $any "headings" $hs) -}}

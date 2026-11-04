@@ -97,12 +97,15 @@ following Goldmark settings, so copy them into your **site** `hugo.toml`:
       # REQUIRED. A stand-alone image is then passed to the image render hook as a block
       # (.IsBlock) and rendered as a <figure>, not as <p><img></p>.
       wrapStandAloneImageWithinParagraph = false
+      autoHeadingID = true      # the default; KEEP IT: section numbers, xref names and the TOCs follow
+                                # headings by their ids (a heading without one: warning tufte-heading-id)
       [markup.goldmark.parser.attribute]
         block = true            # REQUIRED for {.fullwidth} on tables, {cite="…" author="…"} on blockquotes
                                 # and labels/captions on images, tables and equations ({#fig:x})
         title = true            # {#sec:x} labels on headings
     [markup.goldmark.extensions]
       # The footnote extension is on by default; the theme turns footnotes into sidenotes.
+      # With footnote = false, [^x] stays literal text everywhere, in shortcodes' text too.
       [markup.goldmark.extensions.passthrough]
         enable = true           # REQUIRED for math
         [markup.goldmark.extensions.passthrough.delimiters]
@@ -150,8 +153,8 @@ does not set (`HUGO_PARAMS_ETBOOK=false hugo`).
 | `subtitle` | `""` | Shown under the site title on the home page. |
 | `description` | `""` | Last fallback for `<meta name="description">`. The page's front matter `description` comes first, then its `subtitle`, then (regular pages, book landings and part pages) the first 160 characters of its plain-text summary; this value is used only when all of them are empty, so mostly on the home page and the other list pages. |
 | `dateFormat` | `""` | Go layout of the dates of the post metadata, summaries and title blocks (Hugo translates the month and day names). Empty: the language's i18n key `dateFormat`, which is `":date_long"` in all five theme languages: Hugo's localized long date (`March 5, 2024`, `5 marzo 2024`, `5. März 2024`, `5 de marzo de 2024`), so the order of day and month follows the language too. A language without the key (one the theme does not translate, such as `pt` or `ja`) gets the English value, `":date_long"` as well (`5 de março de 2024`, `2024年3月5日`). |
-| `archiveDateFormat` | `""` | Go layout of the month and day in the archive and term lists. Empty: the language's i18n key `archiveDateFormat` (`"Jan 2"` in English, `"2 Jan"` in Italian, French and Spanish, `"2. Jan"` in German). Hugo has no localized month-and-day token, so a language the theme does not translate gets the English layout (`"Jan 2"`, month first): set the key in your own `i18n/LANG.yaml`, or `archiveDateFormat` under `[languages.LANG.params]`. |
-| `sections` | `"h2"` | `"h2"`: wrap the article in a new `<section>` at each `<h2>` that is not nested in another element (a quote, a list, a `div`, or any element of raw HTML, such as a `form` or a block link). `"none"`: put the whole article in one `<section>`. Front matter `sections` overrides it. |
+| `archiveDateFormat` | `""` | Go layout of the month and day in the archive and term lists. Empty: the language's i18n key `archiveDateFormat` (`"Jan 2"` in English, `"2 Jan"` in Italian, French and Spanish, `"2. Jan"` in German). Hugo has no localized month-and-day token, so a language the theme does not translate gets the English layout (`"Jan 2"`, month first; where the locale data of the Hugo release has no abbreviated month name, as Japanese, Korean and Arabic on Hugo 0.169, the full name takes its place: `"3月 5"`, the same for `Mon` in any date layout): set the key in your own `i18n/LANG.yaml`, or `archiveDateFormat` under `[languages.LANG.params]`. |
+| `sections` | `"h2"` | `"h2"`: wrap the article in a new `<section>` at each `<h2>` that is not nested in another element (a quote, a list, a `div`, or any element of raw HTML, such as a `form` or a block link). `"none"`: put the whole article in one `<section>`. The booleans `false` and `true` read as `"none"` and `"h2"`, and so do the strings `"false"`/`"no"`/`"off"`/`"0"` and `"true"`/`"yes"`/`"on"`/`"1"` (a `HUGO_PARAMS_SECTIONS=false` environment variable reaches the theme as a string), and an empty value means `"h2"`; any other value warns (`tufte-bad-option`) and uses `"h2"`. Front matter `sections` overrides it. |
 | `footnotes` | `"sidenotes"` | `"sidenotes"`: Markdown footnotes `[^x]` become numbered sidenotes (labels starting with `fn-` stay real footnotes). `"endnotes"` (alias `"footnotes"`): they are real footnotes, listed by the theme in a `<section class="footnotes">` below the text (labels starting with `sn-` become sidenotes). Front matter `footnotes` overrides it. See [Footnotes and sidenotes](#footnotes-and-sidenotes) for `footnotestyle` and `footnoteplacement`. |
 | `etBook` | `true` | Load the bundled ET Book web fonts. With `false`, the fallback serif stack from Tufte CSS is used. |
 | `showReadingTime` | `true` | Show the reading time in the post metadata. |
@@ -178,7 +181,9 @@ counts as the `name`.
 
 ### `[params.social]`
 
-Links shown in the footer. Leave a key empty to hide it.
+Links shown in the footer. Leave a key empty to hide it. Besides the user name or handle, `github`, `gitlab`,
+`bluesky`, `twitter`, `linkedin` and `orcid` accept a full profile URL: a value is taken as a URL only when it
+starts with `http://` or `https://`, so a user name such as `httpie` still links to `https://github.com/httpie`.
 
 | Key | Value |
 |---|---|
@@ -223,6 +228,7 @@ for `params.math` prints the warning `tufte-bad-option` and uses the defaults.
 | `giscus.theme` | `"preferred_color_scheme"` | Giscus colour theme. |
 | `giscus.lang` | `""` | Giscus interface language (for example `"it"`). Empty: the site language. |
 | `comments.enable` | `true` | Allow comments on pages inside a section (posts). Front matter `comments` overrides it; a page outside any section (such as `/about/`) needs `comments: true` in its front matter. |
+| `comments` | — | Shorthand: `[params] comments = false` (or `true`, or `HUGO_PARAMS_COMMENTS=false`) is the same as `comments.enable`. Any other single value prints the warning `tufte-bad-option` and leaves comments on. |
 
 ### Hugo services
 
@@ -262,7 +268,7 @@ mainSections = ["posts"]
 
 | Key | Meaning |
 |---|---|
-| `title` | Page title, rendered as the article's `<h1>`, and the `<title>`, OpenGraph, Twitter, schema.org and RSS title. |
+| `title` | Page title, rendered as the article's `<h1>`, and the `<title>`, OpenGraph, Twitter, schema.org and RSS title. Hugo does not require one: a page, section, book, part or term without `title` (or with an empty one) is called by its `linkTitle`; else a term by the term, a section (book, part) by its directory name, humanized (`my-book` → “My Book”), and a regular page by the translated “Untitled” (i18n key `untitled`). That name is used in its h1, `<title>`, summaries, archive and term lists, navigation (and the book navigation's label), book contents and RSS item, so no heading or link is ever empty. The home page keeps Hugo's default, the site title. |
 | `linkTitle` | Short title for links (Hugo's link title): summary titles, the archive and term lists, the previous/next post navigation and book navigation. Default: `title`. |
 | `subtitle` | Rendered as `<p class="subtitle">` under the title. Also used as the meta description when `description` is empty. |
 | `date` | Publication date. |
@@ -273,14 +279,14 @@ mainSections = ["posts"]
 | `toc` | `true`/`false`. Overrides `params.toc`. |
 | `showReadingTime`, `showWordCount` | `true`/`false`. Override `params.showReadingTime` / `params.showWordCount` for this page. Both are part of the post metadata line, which `tufte.titleBlock = "latex"` and book chapters do not show. |
 | `showPostNav` | `true`/`false`. Overrides `params.showPostNav` for this page. |
-| `sections` | `"h2"`/`"none"`. Overrides `params.sections`. |
+| `sections` | `"h2"`/`"none"` (or `true`/`false`, also as strings: `"yes"`/`"no"`, `"on"`/`"off"`, `"1"`/`"0"`). Overrides `params.sections`. |
 | `footnotes` | `"sidenotes"`/`"endnotes"`. Overrides `params.footnotes`. |
-| `math` | `true` always loads the KaTeX assets on this page (with the client engine, this also makes KaTeX scan the article for `$…$`, `$$…$$`, `\(…\)`, `\[…\]` when the passthrough extension is off). `false` never loads them, even if the page contains math. |
+| `math` | `true` always loads the KaTeX assets on this page (with the client engine, this also makes KaTeX scan the article for `$…$`, `$$…$$`, `\(…\)`, `\[…\]` when the passthrough extension is off). `false` never loads them, even if the page contains math. The strings `"true"`/`"false"` (also `yes`/`no`, `on`/`off`, `1`/`0`) work the same; `"auto"` keeps the detection. |
 | `mathMacros` | KaTeX macros for this page, added to `params.math.macros` (same list-of-pairs form), e.g. `mathMacros: [["\\E", "\\mathbb{E}"]]` in YAML. |
 | `comments` | `true`/`false`. Overrides `params.comments.enable`. `true` is needed on pages outside any section (such as `content/about.md`), which have no comments otherwise. |
 | `draft` | Hugo's standard draft flag. |
 | `images` | Images for Open Graph and Twitter cards. |
-| `layout` | Set `layout: archive` on a page to render the archives (posts grouped by year; undated pages, such as book chapters, last under “Undated”). |
+| `layout` | Set `layout: archive` on a page to render the archives (posts grouped by year; undated pages, such as book chapters, last under “Undated”, in the order of the RSS feed: each book's chapters in its reading order, then the other undated pages). |
 
 Create a post with the bundled archetype:
 
@@ -303,8 +309,12 @@ Some Tufte CSS conventions are produced automatically:
   footnote turned into a sidenote gets a deterministic id built from Goldmark's reference id
   (`sn-<hash>-fnref-<n>`, e.g. `sn-1a2b3c-fnref-2`), and a real footnote gets `fn-<hash>-<key>` and
   `fnref-<hash>-<key>` (the key is the Markdown label, or `s<n>` for the `footnote` shortcode; a second
-  reference to the same footnote gets `fnref2-<hash>-<key>`, a third `fnref3-…`). The hash comes from the page URL, so ids do not collide on list pages that show
-  several summaries.
+  reference to the same footnote gets `fnref2-<hash>-<key>`, a third `fnref3-…`). A `footnotemark` and its
+  `footnotetext` share a name-based id, `sn-<hash>-ft-<name>` (e.g. `sn-1a2b3c-ft-fm`), so that the mark's
+  label points at the text's checkbox; a name with characters other than letters, digits, `-` and `_` has them
+  replaced by `-` and gets the first 6 hex digits of the name's md5 appended (`"x.y"` → `ft-x-y-b2d4cd`), and a
+  later `footnotetext` of the same name gets `.2`, `.3`… (`sn-1a2b3c-ft-fm.2`). The hash comes from the page URL,
+  so ids do not collide on list pages that show several summaries.
 
 Everything else is done with the shortcodes and Markdown features below.
 
@@ -324,7 +334,8 @@ There are two kinds of shortcodes:
   note (`figure`, `fig`, `fullwidthfigure`, `table`, `listing`, `subfigures`, `iframe`, `youtube`, `video`,
   or a block shortcode such as `epigraph`) cannot float there either (tufte-latex: “Float(s) lost”): a
   figure becomes its plain image followed by its caption as text, unnumbered (an `xref` to its label
-  finds nothing), and the others become inline blocks, with the same warning (a generated list too:
+  finds nothing), and the others become inline blocks whose caption is a plain line above them (not a margin
+  note, so no `tufte-note-in-note`), with the same warning (a generated list too:
   `listoffigures`, `bibliography`, `printindex` or `tableofcontents` in a note is shown there as inline blocks).
 - **Block** (`epigraph`, `blockquote`, `fullwidth`, `details`) are placed **on their own lines**. Their inner text is
   rendered as *block* Markdown, so it can contain several paragraphs.
@@ -334,7 +345,9 @@ inside `fullwidth`. The HTML of the nested shortcode is kept as is and the Markd
 rendered, also with `markup.goldmark.renderer.unsafe = false`. HTML tags written by hand in the inner text
 follow the site's Goldmark setting: with `unsafe = false` they are dropped (warning `tufte-raw-html`), as in
 the body. A third-party shortcode that prints HTML inside a theme shortcode needs `[params.tufte]
-innerHTML = true`, which keeps every balanced run of tags in inner texts (only for trusted content).
+innerHTML = true`, which keeps every balanced run of tags in inner texts (only for trusted content); in a
+sidenote, margin note or caption, block elements in such a run (the `<div>` and `<pre>` of `highlight`) become
+inline blocks, as Markdown blocks there do (warning `tufte-block-in-note`).
 Escaped shortcodes (written with Hugo's `/* … */` escape) in inner texts print as text, as in the body. A Markdown
 footnote referenced in a shortcode's inner text (a caption, a note, a table cell, a `subfigures` image title,
 a quote's `author`, `cite` or `footer`: `[^x]`) becomes a real footnote of the page, listed below the text,
@@ -345,12 +358,22 @@ block). A `[^x]` with no definition prints the warning `tufte-undefined-ref`. A 
 note or caption cannot hold a sidenote, so such a footnote stays a real footnote whatever the `footnotes`
 mode, and so do its references in the text: a footnote referenced both in the text and in a shortcode's inner
 text (or in the front-matter `abstract` or `thanks`) is one real footnote, with one mark and one item that has
-a backlink to each reference, never a sidenote plus a footnote with the same text.
+a backlink to each reference, never a sidenote plus a footnote with the same text. A footnote *defined* inside
+the `abstract`, or inside one `thanks` text (of the title or of an author), belongs to that field only, as in a
+book's dedication (see Books): `abstract: "Text[^1]\n\n[^1]: …"` next to a body `[^1]: …` gives two notes, and
+neither definition is lost; a `[^x]` that the field references without defining it is the body's `[^x]`.
 
 A shortcode may sit inside a Markdown blockquote, with every line of it, closing tag included, quoted
 (`> {{< marginblock >}}`, `> Text.`, `> {{< /marginblock >}}`): the quote markers belong to the enclosing
 quote and are removed from the inner text. A quote written *inside* a block shortcode (its closing tag on
 an unquoted line of its own) stays a quote.
+
+A block shortcode may also be indented where Markdown needs it: in the continuation of a list item, or in a
+`[^fn-…]` footnote with more than one paragraph (4 spaces). Every theme shortcode reads its inner text with
+Hugo's `.InnerDeindent`, so the indentation of the opening tag is removed from each of its lines: the
+paragraphs, lists, tables and fenced code inside it read as if they started at the left margin. Indent the
+opening tag, the inner lines and the closing tag alike. A listing or table that ends a real footnote is
+followed by the footnote's back-link in a paragraph of its own.
 
 Keep an inline shortcode on the same line as the word it annotates. A line break before it inserts a
 space before the note number.
@@ -614,7 +637,8 @@ positional or named. The other parameters need the named form.
 ### `video`
 
 A self-hosted video as a Tufte figure: in the text column with its caption as a margin note, or full width
-with a `<figcaption>`. `src` and `poster` resolve like figure sources (page resource, `assets/` resource,
+with a `<figcaption class="caption-margin">` (as a full-width image: in the margin column under the video on wide
+screens and in print). `src` and `poster` resolve like figure sources (page resource, `assets/` resource,
 `static/` path, URL); a resource also gives the `<source>` its MIME type. A `data:` URI is accepted for an
 image `poster` (`data:image/…`) and a video or audio `src` (`data:video/…`, `data:audio/…`, whose MIME type
 becomes the `<source>` type); any other scheme than `http`, `https` and `mailto` is replaced by `#ZgotmplZ`.
@@ -654,8 +678,9 @@ browser does not render the content of a closed `<details>`, so its sidenote mar
 counter. After a block whose content holds N numbered marks, the theme therefore emits
 `<span class="sn-skip-details" aria-hidden="true" style="--sn-skip: N"></span>`. This span steps the counter
 N times only while the block is closed (`details:not([open]) + .sn-skip-details`), so the marks after the
-block keep the numbers that `xref` prints. Marks in the `summary` are always visible and are not counted. The
-same applies to a `<details>` written as raw HTML.
+block keep the numbers that `xref` prints. Marks in the `summary` are always visible and are not counted, nor
+are marks in the text of a real footnote referenced inside the block (that text is listed after the section,
+outside the block). The same applies to a `<details>` written as raw HTML.
 
 | Parameter | Meaning |
 |---|---|
@@ -736,9 +761,12 @@ shortcode. Other classes go on the `<figure>`. The LaTeX-like float options work
 
 The shortcodes offer more options (`attr`, `link`, `inline`).
 
-Inside a sidenote, a margin note, a figure caption or a footnote, an image is always rendered as a plain
-inline `<img>`, even when it is alone (a `<figure>` cannot sit in the note's `<span>`); its title, if any,
-follows it as text. For an image in the margin, use the `marginfigure` shortcode, or put the image in a
+Inside a sidenote, a margin note, a figure caption, a `footnote` shortcode or a Markdown footnote turned
+sidenote, an image is always rendered as a plain inline `<img>`, even when it is alone (a `<figure>` cannot
+sit in the note's `<span>`); its title, if any, follows it as text. A Markdown footnote that stays a real
+footnote (`[^fn-…]`) is block content in the footnote list: an image alone in its own paragraph there is a
+figure, numbered with the others in the order the page shows it (see “Footnotes and sidenotes”).
+For an image in the margin, use the `marginfigure` shortcode, or put the image in a
 `marginnote`:
 
 ```markdown
@@ -809,8 +837,14 @@ contents, and an entry of those contents whose heading holds a shortcode takes i
 heading, so the words the shortcode prints are kept (`## The {{</* smallcaps */>}}NASA{{</* /smallcaps */>}} data`
 is listed in full) and margin material is left out: `## Notes {{</* sidenote */>}}…{{</* /sidenote */>}}` gets the id `notes` on
 every Hugo version. The same holds inside the inner text of a block shortcode (`details`, `fullwidth`…):
-the shortcode's output is left out of the id there too. Two headings that differ only by their shortcodes would then share an id, and an
-automatic id may later change if you edit the heading: give such headings an explicit id
+the shortcode's output is left out of the id there too. When another heading of the page already has the cleaned id
+(`## Results {{</* sidenote */>}}…{{</* /sidenote */>}}` and a plain `## Results`), the heading that holds the shortcode
+gets `results-1` (then `-2`…, the first suffix no other heading uses, as Goldmark does), so it keeps its own id,
+section number and contents link; headings without a shortcode never change id. This applies to the headings of
+the page content. Inside the inner text of a block shortcode, two headings that differ only by their shortcodes
+also get distinct ids, but there the later one in document order takes the `-1`, `-2`… suffix, even when it is
+the heading without a shortcode (`### Proof {{</* sidenote */>}}…{{</* /sidenote */>}}` then a plain `### Proof` in one
+`details` give `proof` and `proof-1`). An automatic id may also change when you edit the heading: give such headings an explicit id
 (`## Notes {{</* sidenote */>}}…{{</* /sidenote */>}} {#sec:notes}`).
 
 Goldmark makes heading ids unique within one Markdown document, but the inner text of a block shortcode
@@ -818,12 +852,16 @@ Goldmark makes heading ids unique within one Markdown document, but the inner te
 rendered on their own. A heading there whose id the page already uses (a heading of the text, a heading of
 an earlier inner text, any other element) gets the first free `-1`, `-2`… suffix, with its `#` anchor link:
 two `{{</* details */>}}### Proof …{{</* /details */>}}` blocks give `proof` and `proof-1`. The headings of
-the text keep their ids, so the table of contents and `[…](#id)` links still reach them.
+the text keep their ids, so the table of contents and `[…](#id)` links still reach them. An id written
+there (`### Proof {#sec:proof}`) is a label, not an automatic id: it follows the rules of
+[cross-references](#cross-references-and-labels) together with the headings of the text, in document order (written on
+two headings, the first one keeps it, the later one is renamed and `tufte-duplicate-label` is warned).
 
 ### Links (`render-link.html`)
 
 Resolves links to other pages and to page resources to their site-relative URL, so content works under a
-sub-path `baseURL`. External links are rendered unchanged. A link title (`[text](url "Title")`) is a plain-text
+sub-path `baseURL`. External links are rendered unchanged, and so are paths made only of dot segments
+(`./`, `../`), which the browser resolves against the page's URL (`[up](../)` on `/posts/a/` is `/posts/`). A link title (`[text](url "Title")`) is a plain-text
 tooltip; a shortcode in it (`sidenote`, `cite`) cannot sit in the attribute: its plain text stays in the
 tooltip and its note or citation follows the link.
 
@@ -888,7 +926,8 @@ reference stays literal text and does not change which footnote gets which label
 code (fenced, indented or a code span), in math (with the passthrough delimiters shown above) or in an HTML tag.
 
 Inside a sidenote the text is inline: paragraph breaks of a long Markdown footnote become line breaks, and
-a list, code block, quote or table becomes inline blocks (warning `tufte-block-in-note`: label such a note
+a list, code block, quote or table becomes inline blocks (a list keeps its own numbering, from its start, and
+never renumbers a list that holds the note; warning `tufte-block-in-note`: label such a note
 `[^fn-…]` to keep it a real footnote). A float cannot sit in a sidenote either (tufte-latex: “Float(s) lost”):
 a `figure`, `fig` or `fullwidthfigure` shortcode there is shown as its plain image with its caption as text,
 unnumbered and without its `label` (warning `tufte-block-in-note`), a `marginfigure` the same way (warning
@@ -896,7 +935,7 @@ unnumbered and without its `label` (warning `tufte-block-in-note`), a `marginfig
 lists and code blocks stay as they are.
 
 Marks written next to each other (`[^a][^b]`, two `footnote` shortcodes, a footnote mark right after a
-sidenote) are separated by a superscript comma, as tufte-latex's `\multfootsep`: footnotes 1 and 2 read “¹,²”,
+sidenote, two `footnotemark`s in a table cell) are separated by a superscript comma, as tufte-latex's `\multfootsep`: footnotes 1 and 2 read “¹,²”,
 never “¹²” (footnote 12), and roman or alphabetic marks never run together (“i,ii”, not “iii”). A footnote mark
 gets a `<sup class="footnote-sep">,</sup>` before it, a sidenote mark the class `sidenote-number--multi`.
 
@@ -911,6 +950,8 @@ The same holds for the shortcodes: a `sidenote` or `marginnote` (or a margin fig
 `marginnote`, `footnotetext` or `marginblock`, in a cell of a `margintable`, or in a figure or table caption
 (a `subfigures` image title too), would float out of the margin column (tufte-latex stops with “Float(s) lost”). Its toggle is dropped, its text
 stays inline as `<span class="note-in-note">…</span>`, it takes no number, and `tufte-note-in-note` is printed.
+A margin figure there loses its float too: it is shown as its plain image with its caption as text, without
+“Figure N:”, unnumbered, not in the list of figures, and its `label` is lost.
 A `cite` nested there is fine: its references become the holder's citation block.
 
 A note in the text of a link (`[see this[^1]](https://…)`, `[text {{< sidenote >}}…{{< /sidenote >}}](https://…)`,
@@ -929,7 +970,7 @@ wins). They are also accepted under `[params.tufte]` and the `tufte:` front matt
 | `footnotes` | `"sidenotes"`, `"endnotes"` (or `"footnotes"`) | `"sidenotes"` | What a Markdown footnote `[^label]` becomes (see the table above). |
 | `footnotestyle` | `"auto"`, `"arabic"`, `"alpha"`, `"roman"`, `"symbol"` | `"auto"` | Marks of the real footnotes. `auto` is arabic (1, 2, 3) on a page without numbered sidenotes and alphabetic (a, b, … z, aa) otherwise, so the two sequences never look alike. `symbol` follows LaTeX's `\fnsymbol`: `*` `†` `‡` `§` `¶` `‖` `**` `††` `‡‡`, then letters. |
 | `footnoteplacement` | `"page"`, `"section"` | `"page"` | `page`: one list at the end of the article, in `<section class="footnotes">`, before the References (the automatic list, or a `{{< bibliography >}}` written after the text). `section`: a list at the end of each `<section>` (each `##` heading, see `sections`) where the notes are referenced, the closest the web gets to the bottom of a printed page; the notes of the title block and of the front-matter `abstract` go to the first section's list. |
-| `citeas` | `"sidenote"`, `"footnote"` | `"sidenote"` | Where `{{< cite >}}` puts its reference; a single `cite` can override it with `as="footnote"`. |
+| `citeas` | `"sidenote"`, `"footnote"` | `"sidenote"` | Where `{{< cite >}}` puts its reference; a single `cite` can override it with `as="footnote"`. Any other value prints the warning `tufte-bad-option` once, naming the page or configuration that sets it, and uses `"sidenote"`. |
 
 ```yaml
 ---
@@ -948,17 +989,22 @@ from the shortcode, and their marks are written into the HTML, so they are the s
 and in cross-references. In a book, footnote numbering restarts in each chapter.
 
 ```html
-…text<sup class="footnote-ref" id="fnref-3f2a9c-proof"><a href="#fn-3f2a9c-proof" role="doc-noteref">a</a></sup>…
+…text<sup class="footnote-ref" id="fnref-3f2a9c-fn-proof"><a href="#fn-3f2a9c-fn-proof" role="doc-noteref">a</a></sup>…
 
-<section class="footnotes" role="doc-endnotes" aria-label="Footnotes">
+<section class="footnotes footnotes-alpha" role="doc-endnotes" aria-label="Footnotes">
   <hr class="footnotes-sep">
   <ol class="footnotes-list">
-    <li id="fn-3f2a9c-proof" class="footnote-item" data-mark="a"><p>Text <a href="#fnref-3f2a9c-proof" class="footnote-backref" role="doc-backlink" aria-label="Back to text">↩︎</a></p></li>
+    <li id="fn-3f2a9c-fn-proof" class="footnote-item" data-mark="a"><p>Text <a href="#fnref-3f2a9c-fn-proof" class="footnote-backref" role="doc-backlink" aria-label="Back to text">↩︎</a></p></li>
   </ol>
 </section>
 ```
 
-`3f2a9c` is a hash of the page URL, so ids stay unique on list pages that show several summaries. A footnote
+`3f2a9c` is a hash of the page URL, so ids stay unique on list pages that show several summaries. The rest
+of the id is the whole Markdown label, prefix included (`[^fn-proof]` → `fn-3f2a9c-fn-proof`), or `s<n>` for
+the `footnote` shortcode. The list carries the class `footnotes-<style>` (`footnotes-arabic`,
+`footnotes-alpha`, `footnotes-roman`, `footnotes-symbol`); an arabic item has `value="N"`, the other styles
+write the mark in `data-mark`. With `footnotePlacement = "section"` each list is a
+`<div class="footnotes footnotes-section footnotes-<style>">` at the end of its section. A footnote
 referenced twice gets one item with a backlink to each reference. On list pages, footnote references are
 removed from summaries (a summary has no footnote list to link to), while sidenotes in summaries are kept.
 
@@ -973,7 +1019,10 @@ by its own label: in a footnote turned sidenote, a real footnote keeps its mark 
 sidenote stays inline as `<span class="note-in-note">` (warning `tufte-note-in-note`). A sidenote or margin
 note inside a real footnote stays inside the footnote's list item, and is numbered there: a sidenote's number
 (also the one `xref` prints) follows the order in which the page shows the notes, the footnote list after the
-text (or after its section with `footnotePlacement = "section"`). Markdown footnote labels match by exact
+text (or after its section with `footnotePlacement = "section"`). So do the figures, tables, listings and
+labelled equations in a real footnote's text: they take their numbers (in the text, in `xref` and in the
+lists of figures, tables and listings) where the footnote list shows them, after those of the text before
+it, so the numbers on the page run in order. Markdown footnote labels match by exact
 text, as in Goldmark (`[^fn-Proof]` is not a reference to `[^fn-proof]:`).
 
 ## Math
@@ -1003,7 +1052,9 @@ Display equations are wrapped in an element with the `math-display` class, which
 column (full width inside `fullwidth`). Math also works inside sidenotes, margin notes, figure captions and
 footnotes turned into sidenotes, since their text goes through the same render hook. Inside a note, a margin
 block or a real footnote, display math and quotations take the note's smaller size, as `\footnotesize` does in
-LaTeX.
+LaTeX. Math in a block quote or an alert (a quoted theorem, `> $$ … $$` over several `>` lines, or inline math
+broken over two quoted lines) works too: Goldmark hands the hook the quote markers `>` of the continuation
+lines, and the hook removes them when every line after the first starts with `>`, so KaTeX never prints them.
 
 **Invalid TeX does not stop a normal build.** KaTeX runs with `throwOnError = false`; Hugo prints the
 warning `tufte-math-error` with the page, the line and the expression, and the page shows the source as
@@ -1028,8 +1079,11 @@ mathMacros:
 display equation as in LaTeX: one counter per page (per book when `continuous`), the number on the right (on
 the left with `leqno = true`), and
 `{{< eqref "eq:x" >}}` prints it (see [Equations](#equations)). KaTeX's own `equation`, `align` and `gather`
-environments number their lines, but KaTeX counts each formula separately, so each starts again from (1): use
-`\label` for numbers that run through the document. `\tag{…}` sets a fixed tag (on the right; `leqno = true`
+environments number their rows with a CSS counter of KaTeX's (`katexEqnNo`) that runs through the whole web page
+and knows nothing of the theme's counter, so the two would repeat each other's numbers: in a display with a
+`\label` the theme hides KaTeX's row numbers (the display has one number, the theme's), and elsewhere use
+`\label` (or the starred environments, `aligned`, `gathered`) rather than mix the two on one page.
+`\tag{…}` sets a fixed tag (on the right; `leqno = true`
 puts it on the left, with the `\label` numbers); with a `\label` too, `eqref` prints the tag.
 
 **Client engine.** With `params.math.engine = "client"` the render hook writes
@@ -1058,7 +1112,10 @@ the warning `tufte-katex-version` with the server engine.
 **CDN, hashes and self-hosting.** The files are loaded from jsDelivr with the SRI hashes listed per release
 in `data/tufte/vendor.toml` (one `[[katex]]` entry per release, with the first Hugo version that embeds it).
 With `params.selfHosted = true`, the files are downloaded at build time, checked against those hashes and
-published under `/katex/`. The stylesheet loads its fonts from `fonts/` next to itself, so a self-hosted site
+published under `/katex/`. Your own hashes (`katexIntegrity`, `katexJSIntegrity`, `katexAutoRenderIntegrity`)
+may take any form a browser accepts: `sha256-`, `sha384-` or `sha512-` (cdnjs publishes sha512), or several
+hashes separated by spaces; as in a browser, only the strongest algorithm listed counts, and the file must match
+one of its hashes, or the build stops. The stylesheet loads its fonts from `fonts/` next to itself, so a self-hosted site
 must copy the `dist/fonts/` directory of the **same** KaTeX release to `static/katex/fonts/`.
 
 ## tufte-latex parity
@@ -1091,7 +1148,10 @@ Hugo removes the `<p>` around a shortcode that stands alone on a line. So:
   A block written inside a paragraph (`Text {{< bibliography >}}`) would put block HTML in a `<p>`: the theme
   then splits the paragraph around it (the text before and after it stay paragraphs; emphasis or a link open
   around the block is closed before it and opened again after it; a block inside a block, such as a `details`
-  in an `epigraph`, is split the same way) and prints the warning `tufte-block-in-paragraph`.
+  in an `epigraph`, is split the same way) and prints the warning `tufte-block-in-paragraph`. In a tight list
+  item, a table cell or a definition, which hold their text without a `<p>`, a block written inside emphasis or
+  a link (`- Text *em {{< figure … >}} end*`) gets the same warning: the emphasis or link is closed before the
+  block and opened again after it, and the item stays whole.
 
 Shortcodes nest: a `cite`, `xref`, `smallcaps` or `index` inside a `sidenote`, a `fig` caption or a `table`
 works as expected. Never mix positional and named parameters in one call: each shortcode has a short
@@ -1104,7 +1164,9 @@ The inline formatting shortcodes also have a one-line form, `{{< smallcaps "PDF"
 The settings of [Required site configuration](#required-site-configuration) are enough. Two of them matter
 more here: `parser.attribute.block = true` gives ids and captions to Markdown images, tables and display
 equations (`{#fig:x}`), and `parser.attribute.title = true` gives headings their labels
-(`## Page Layout {#sec:page-layout}`).
+(`## Page Layout {#sec:page-layout}`). Keep Goldmark's default `parser.autoHeadingID = true`: section
+numbers, the names `xref` gives to labels and the tables of contents follow headings by their ids, and a `##`
+or `###` heading without one is left out of them (warning `tufte-heading-id`).
 
 ### Options: `[params.tufte]`
 
@@ -1113,18 +1175,20 @@ All keys are optional and case-insensitive. Each one can be set in the site conf
 part it belongs to, then the book root, then the site, then the defaults of the style preset. So a chapter can
 set `tufte: {justified: true}` and keep everything else from the book and the site. A chapter in a section
 inside a part takes the options of that part; the inner section's own `tufte:` is not read. (Do not use Hugo's
-`cascade` for `tufte`: it replaces the whole map.)
+`cascade` for `tufte`: it replaces the whole map.) `tufte` must be a map, and so must each group of dotted keys
+(`headings`, `book`, `print`…): `tufte: latex` or `headings: 2` is ignored with the warning `tufte-bad-option`;
+write `tufte: {style: latex}` and `headings: {number: 2}`.
 
 | Key | Default (`css` / `latex`) | LaTeX | Meaning |
 |---|---|---|---|
 | `style` | `"css"` | — | Preset of defaults: `"css"` (Tufte CSS look) or `"latex"` (tufte-handout / tufte-book look). |
 | `titleBlock` | `"css"` / `"latex"` | `\maketitle` | `"css"`: h1, subtitle and the post metadata line. `"latex"`: an italic `\LARGE` title, italic author and date lines (the `##`/`###` headings then take `\section`'s `\Large` and `\subsection`'s `\large`), followed by a line with only the categories and tags; the reading time, word count and “updated on” date of the metadata line are not shown. |
-| `justified` | `false` | `justified` | Justify the body text. |
-| `hyphenate` | `false` / `true` | — | Automatic hyphenation of the text column (needs `<html lang>`). |
+| `justified` | `false` | `justified` | Justify the body text: paragraphs, list items, quotes, epigraphs, alerts, `details` blocks and the `fullwidth` shortcode (notes, captions, tables, the open epigraphs and the index keep their own alignment). |
+| `hyphenate` | `false` / `true` | — | Automatic hyphenation of the same text blocks of the column (needs `<html lang>`). Inline code, code blocks, `kbd`, `samp`, autolinked URLs and bibliography links are never hyphenated, as `\texttt` and `\url` in TeX. |
 | `indent` | `false` / `true` | book `\parindent` | Paragraphs of running text indented instead of separated by space (the copyright page and the subtitle, meta line and "Read more" of a post summary keep their own spacing). |
 | `sfsidenotes` | `false` | `sfsidenotes` | Sans-serif margin material, title block and abstract (chapter titles stay italic serif, as in tufte-book). |
 | `letterspacing` | `true` | `ls` / `nols` | Letterspacing of `allcaps`, `smallcaps`, `sc`, `newthought`. |
-| `numerals` | `"lining"` / `"oldstyle"` | mathpazo `osf` | Old-style figures in the text (ET Book). |
+| `numerals` | `"lining"` / `"oldstyle"` | mathpazo `osf` | Old-style figures in the text (ET Book; bold text takes the figures of ET Book's semi-bold old-style face, as mathpazo's bold keeps old-style figures). |
 | `marginals` | `"auto"` | `marginals=` | Alignment of all margin material: `justified`, `raggedright`, `raggedleft`, `raggedouter`, `auto` (follows `justified`). |
 | `sidenote.align`, `marginnote.align`, `caption.align`, `citation.align` | `""` | `sidenote=` … | Override `marginals` for one kind of margin material. |
 | `sidenote.font`, `marginnote.font`, `caption.font`, `citation.font` | `""` | `\setsidenotefont` … | Words: `italic`, `upright`, `sans`, `serif`, `mono`, `small`, `smaller`, `normal`, and a `#hex` colour. `small` and `smaller` are 0.9 and 0.8 of the default note size (0.99rem and 0.88rem; 0.9rem and 0.8rem with `sfsidenotes`), in rem, so the size is the same wherever the note sits (paragraph, title heading, caption, citation inside a note). |
@@ -1132,14 +1196,14 @@ inside a part takes the options of that part; the inner section's own `tufte:` i
 | `headings.number` | `0` | `secnumdepth` | `1` numbers `##`, `2` numbers `##` and `###`. `{.unnumbered}` skips one heading. In a book with `numberChapters`, a numbered chapter's sections read 2.1, 2.2…; the landing, a part page and an unnumbered, front- or back-matter chapter continue the sections of the last numbered chapter (1.3 after 1.2, as `\section` after `\chapter*`), or 0.1, 0.2… before the first one. |
 | `headings.strict` | `false` | — | `#####`/`######` give a warning (`false`) or stop the build (`true`). |
 | `bibliography.data` | `"bibliography"` | `\bibliography{…}` | Key of `site.Data` holding the database (`data/bibliography.yaml`, `.json`, `.toml`, or a `data/bibliography/` directory). |
-| `bibliography.style` | `"tufte"` / `"plainnat"` | `\bibliographystyle` | List order: `tufte` (order of citation) or `plainnat` (sorted by author, year, title). |
+| `bibliography.style` | `"tufte"` / `"plainnat"` | `\bibliographystyle` | List order: `tufte` (order of citation) or `plainnat` (sorted as plainnat.bst does: by the full author names, last name first, then year, then cite key; no title). With `bibliography.margin = false` the `[n]` numbers follow that order too: `plainnat` numbers the sorted list, so the first citation may read `[3]`, as natbib does. |
 | `bibliography.list` | `true` (books: `false`) | `\nobibliography` | Append the list of references at the end of a handout. |
-| `bibliography.margin` | `true` | `nobib` | `false`: citations become `[n]`, linked to the list. With no list to link to (a book without a `{{< bibliography >}}` chapter, a handout with `bibliography.list = false` and no `{{< bibliography >}}`), the numbers are printed unlinked and `tufte-no-bibliography` is warned. |
+| `bibliography.margin` | `true` | `nobib` | `false`: citations become `[n]`, linked to the list, which is numbered `[n]` in the order of `bibliography.style` (order of first citation, or sorted with `plainnat`). With no list to link to (a book without a `{{< bibliography >}}` chapter, a handout with `bibliography.list = false` and no `{{< bibliography >}}`), the numbers are printed unlinked and `tufte-no-bibliography` is warned. |
 | `bibliography.heading` | `""` | — | Heading of the list; empty means the translated “References” (handouts) or “Bibliography” (books). |
 | `book.numberChapters` | `false` | `secnumdepth` | Number the chapters (tufte-book leaves them unnumbered). |
 | `book.continuous` | `true` | — | Sidenote, figure, table and equation numbers run through the whole book. |
 | `book.toc` | `true` | `\tableofcontents` | Contents on the book's landing page; `false` is like leaving out `\tableofcontents`. It is not `notoc`, which keeps the contents and only reverts them to LaTeX's standard design. |
-| `book.tocDepth` | `0` | `notoc` (closest) | `0`: chapters only; `1`: also their `##` sections, the closest to `notoc` (the contents keep the theme's design). |
+| `book.tocDepth` | `0` | `notoc` (closest) | `0`: chapters only; `1`: also their `##` sections, the closest to `notoc` (the contents keep the theme's design). A chapter written as an `.html` content file (which Goldmark does not render, so its headings are not the theme's) is listed without sections. |
 | `book.titlepage` | `true` | `titlepage` / `notitlepage` | Full title page on the landing page. |
 | `print.paper` | `"letter"` | `a4paper`, `b5paper` | Paper of the print stylesheet: `"letter"`, `"a4"`, `"b5"`. |
 | `print.runningHeads` | `false` / `true` | `fancyhdr` | Running heads when printing (Chromium 131 or later). |
@@ -1167,7 +1231,7 @@ tufte:
 | `author` | `\author` | A name, a list of names, or a list of `{name, thanks}`. Falls back to `params.author.name`. Each `thanks` is a sidenote after the name, in the author line (`titleBlock = "latex"`) or in the metadata line (`"css"`). With `"css"`, a page's own `author` is always shown (the metadata line then appears on an undated page too), while the `params.author.name` fallback appears only in a metadata line that the page already has (a date, `dateText`, categories or tags), so an undated About page gets no byline. |
 | `thanks` | `\thanks` | A string or a list: sidenotes attached to the title. Like an author's `thanks`, the text is inline Markdown in which shortcodes work (`cite`, `xref`, `smallcaps`…; escape the inner quotes in YAML): it is processed with the content, so the notes are numbered before the abstract's and the body's, a `cite` joins the note's citation block and the reference list, and an `xref` is resolved. A text that starts like a list item (`1984. A grant`) stays text; a `sidenote` inside stays inline (`tufte-note-in-note`). |
 | `dateText` | `\date{text}` | Free text shown instead of the date (`date` remains the sort key), in both title blocks and in the summaries' metadata line. It replaces the whole date statement, so no “updated on” `lastmod` date follows it. |
-| `showDate` | `\date{}` | `false` hides the date (both title blocks, summaries). |
+| `showDate` | `\date{}` | `false` (or `"false"`) hides the date (both title blocks, summaries). |
 | `abstract` | `abstract` environment | Markdown, rendered as `<section class="abstract">` after the title. Shortcodes work in it (`cite`, `xref`, `sidenote`…; escape the inner quotes in YAML): it is processed with the content, so its notes and citations are numbered and listed with the page's and its cross-references resolve. The `abstract` shortcode does the same inside the content. |
 | `nocite` | `\nocite` | A list of keys, or `"*"`, added to the bibliography without citing them. |
 | `bibliography` | `\bibliography{file}` | A page resource or an `assets/` path of a `.json`, `.yaml`, `.toml` or `.bib` database, merged with the site database. |
@@ -1179,9 +1243,10 @@ tufte:
 text of `title`. `linkTitle` (default: `title`), the `\title[plain]{…}` of LaTeX, is the short form used where the
 title is a link or a locator: summary titles, the archive and the term and taxonomy lists, the post navigation,
 the book contents and navigation, the running heads and the chapter title of an `xref` `page`. Every h1 (pages, sections, the home page, terms, taxonomies, the archive, book parts
-and chapters, `print.html`), summary titles, the archive and the term and taxonomy lists render it, so a title may contain inline Markdown such as `` `tufte-book` ``, `*emphasis*` or a
+and chapters, `print.html`), summary titles, the archive, the term and taxonomy lists, the tag and category links of a page and the term page's link back to its taxonomy render it, so a title may contain inline Markdown such as `` `tufte-book` ``, `*emphasis*` or a
 `[link](…)`. Math (`$…$`, `\(…\)`) is typeset in an h1 and in the generated contents that copy a title (the book
-contents, a `tableofcontents`, and a `name` cross-reference to the title), and left as written in `<title>`,
+contents, a `tableofcontents`, an `xref` `name`, `page` or `auto` that prints the title, and the index and
+list locators), and left as written in `<title>`,
 the metadata, summary titles, the archive and term lists, and the post and book navigation, while the
 Markdown around it is still rendered (`"*Fast* Euler $e^{i\pi}$"` gives `Fast Euler $e^{i\pi}$` in
 `<title>`). Links are kept in an h1 and unwrapped in lists; `<` is text, never raw HTML.
@@ -1255,14 +1320,14 @@ Common parameters of the float shortcodes (`figure`, `marginfigure`, `fullwidthf
 | `short` | `\caption[short]{…}` | Caption used in the lists of figures and tables and by `xref` `fmt="name"`: inline Markdown, and a text that starts like a list item (`1869. Minard's map`) prints as written. |
 | `offset` | `\caption[][offset]{…}`, `marginfigure[offset]` | Moves the caption (a margin float moves as a whole, image or table with its caption). |
 | `captionpos` | `\setfloatalignment{b}` | `"top"` (default) or `"bottom"`: align the caption with the bottom of the float. Text-column and full-width floats only: a margin float (`marginfigure`, `margintable`, `type="margin"`) has a fixed caption position (after the image in a margin figure, before the table in a `margintable`), and `captionpos="bottom"` on it prints the warning `tufte-bad-option`. |
-| `numbered` | — | `false`: no number for this float (and no entry in the lists of figures and tables, like `\caption*`). With a `label`, `xref` still finds it and prints its name: the short caption, else the caption, else the `alt` text. The same holds for a labelled float without a caption; one with no text at all (a table with only a label) gives, as `\ref` after a `\label` with no `\caption`, the number of the enclosing section (in a numbered chapter, the chapter number outside a numbered section), else its title. |
+| `numbered` | — | `false`: no number for this float (and no entry in the lists of figures and tables, like `\caption*`). With a `label`, `xref` still finds it and prints its name: the short caption, else the caption, else the `alt` text. The same holds for a labelled float without a caption; one with no text at all (a table with only a label) gives, as `\ref` after a `\label` with no `\caption`, the number of the enclosing section (in a numbered chapter or on a part page, the chapter or part number outside a numbered section), else its title. |
 | `cite` | `\cite` in `\caption` | Keys whose references are appended to the caption. |
 | `class` | — | Extra classes for the `<figure>` (for `margintable`, for the margin block). |
 | `type` | `figure*`, `table*` | `"main"` (default) or `"fullwidth"` (`table`, `listing`, `subfigures`; the figures and `subfigures` also take `"margin"`: a grid in the margin, with `cols` columns and its caption below it, like a `marginfigure`). |
 
 `figure`, `marginfigure` and `fullwidthfigure` keep their single-tag form (they never take inner content).
-`fig` is their block form and must be closed. In `subfigures`, put the images on **consecutive lines**: a blank
-line between them would turn each one into a figure of its own. In `table`, `fullwidthtable`, `margintable` and
+`fig` is their block form and must be closed. In `subfigures`, put the images on consecutive lines (a blank
+line between them works too: every image in it is a cell of the grid, never a figure of its own). In `table`, `fullwidthtable`, `margintable` and
 `listing`, a caption may also be given as a paragraph of the inner content, like `\caption` inside the
 environment: before the table or code, or after it (where tufte-latex writes `\caption`, after the `tabular`).
 Without a `caption` parameter, the first such paragraph is the caption. A Markdown footnote `[^1]`
@@ -1271,9 +1336,12 @@ table, as in LaTeX, use `footnotemark`/`footnotetext`. In `subfigures`, the titl
 subcaption under it, lettered in order: `![Alt](a.png "Handout")` gives “(a) Handout”. Like every caption,
 the title is inline Markdown (`"*Book*"`, `"$x^2$"`, a shortcode: a `cite` joins the float's citation block, a
 `sidenote` or `marginnote` stays inline text with the warning `tufte-note-in-note`); it is taken off the image, so no tooltip repeats it.
+A linked image, `[![Alt](thumb.png "Handout")](full.png)` (a thumbnail linking to the full-size image), keeps its
+link and gets its subcaption the same way; a title of the link itself (`(full.png "Tip")`) stays the link's tooltip.
 A shortcode in the caption of a Markdown image (its title) or table (`caption="…"`) behaves as in a
-`caption=` parameter: a `cite` joins the caption's citation block, and a `sidenote` or `marginnote` stays inline
-text with the warning `tufte-note-in-note`.
+`caption=` parameter: a `cite` joins the caption's citation block, a `sidenote` or `marginnote` stays inline
+text with the warning `tufte-note-in-note`, and the shortcode's text is part of the image's alt text and of the
+name an `xref` gives an unnumbered float (`numbered=false`).
 `cols` sets the number of columns of the `subfigures` grid (1–12, default 2; another value prints the
 warning `tufte-bad-option` and is ignored).
 
@@ -1283,13 +1351,13 @@ warning `tufte-bad-option` and is ignored).
 |---|---|---|
 | `{{< xref "fig:x" >}}` | `\ref` | the number, or the name of an unnumbered target |
 | `{{< xref "fig:x" "full" >}}` | `Figure~\ref{fig:x}` | “Figure 3”, with a non-breaking space |
-| `{{< xref "sec:x" "name" >}}` | `\nameref` | the section title, or the short caption |
-| `{{< xref "err:x" "page" >}}` | `\pageref` | the enclosing section title; in a book, the target chapter's title (`linkTitle`) when the target is in another chapter |
+| `{{< xref "sec:x" "name" >}}` | `\nameref` | the section title; for a float, its short caption, else its caption, else its `alt` text; for a `label`, a labelled sidenote, an equation, or a float with none of those texts (a table with only a label), the title of the innermost enclosing `##` or `###` heading |
+| `{{< xref "err:x" "page" >}}` | `\pageref` | the title of the enclosing section (`##`) or subsection (`###`); in a book, the target chapter's title (`linkTitle`) when the target is in another chapter |
 | `{{< xref "fig:x" "num" >}}` | — | the number only, `??` when there is none |
 | `{{< xref "fig:x" "auto" >}}` | `\ref` | the default format, written out: the number, else the name |
 | `{{< xref "eq:x" "eq" >}}` | `\eqref` | the number in parentheses, “(3)”, like `eqref` |
 | `{{< eqref "eq:x" >}}` | `\eqref` | “(3)” |
-| `{{< label "err:x" >}}` | `\label` anywhere | an anchor at that point; `xref` prints the number of the enclosing numbered section, else of the enclosing numbered chapter or appendix (`\label` after `\chapter`: “1”, “A”; `full` says “Chapter 1”, “Appendix A”), else the section title |
+| `{{< label "err:x" >}}` | `\label` anywhere | an anchor at that point; `xref` prints the number of the enclosing numbered section, else of the enclosing numbered chapter, appendix or part (`\label` after `\chapter` or `\part`: “1”, “A”, “I”; `full` says “Chapter 1”, “Appendix A”, “Part I”: tufte-book numbers parts), else the title of the innermost enclosing `##`/`###` heading (the one `name` prints) |
 
 Named forms: `{{< xref ref="fig:x" fmt="full" >}}`, `{{< eqref ref="eq:x" >}}`, `{{< label key="err:x" >}}`.
 
@@ -1304,7 +1372,9 @@ Unknown keys print `??` and the warning `tufte-undefined-ref`.
 
 `name` and `page` print a title as plain text (no emphasis, links or notes), but math in it stays typeset,
 as `\nameref` prints it: `## Growth of $x^2$ {#sec:g}` gives “Growth of x²”, and so do the `printindex`
-locators of a handout. Where only text fits (a figure's alt text derived from its caption, the page
+locators of a handout. The same holds for a page or chapter title (a front-matter `label`, the chapter of a
+`page` reference, a `label` written before the first heading): `title: "The *Fast* Way $x^2$"` prints
+“The Fast Way x²”. Where only text fits (a figure's alt text derived from its caption, the page
 description, warnings), a formula reads as its TeX, `$x^2$`.
 
 A key defined twice prints `tufte-duplicate-label`, and the first definition wins (a later element with the
@@ -1312,14 +1382,23 @@ same id, e.g. a second `{{< label "dup:x" >}}` written `dup-x`, gets the id `dup
 valid HTML). Headings are the
 exception: the id Goldmark derives from a heading's title (`## Results` → `results`) gives way to any
 other label with that key (`label="results"` on a figure), with the same warning. An id written in the
-Markdown (`## Results {#results}`) is a label like any other. When the two elements would
+Markdown (`## Results {#results}`) is a label like any other: written on two headings of a page (also a
+heading in the inner text of a block shortcode such as `details` or `blockquote`), it is warned, and the
+later heading in document order gets `results-2` (its table-of-contents entry follows); when it repeats the
+id Goldmark gave an earlier heading (`## Intro` twice makes `intro-1`, then `## Other {#intro-1}`), the
+automatic one yields and becomes `intro-1-2`, with a warning; in two chapters of a
+book, it is warned as any label (`xref` reaches the first in reading order). When the two elements would
 carry the same HTML id, the other element is renamed (`results-figure`), so the page has no duplicate id,
 xrefs reach the figure and the table of contents still reaches the heading. Rename one of them to silence
 the warning. A `####` run-in heading, like the `paragraph` shortcode, prints the enclosing section number
 with `auto` when headings are numbered (`\ref` after `\paragraph`), or the chapter number outside a numbered
 section of a numbered chapter, and its title with `name`.
 
-Section numbers (with `headings.number`) are not shown in Hugo's `.TableOfContents`. Math in a heading is typeset in the page contents and the book contents (Hugo itself
+Section numbers (with `headings.number`) are not shown in Hugo's `.TableOfContents`. A heading written inside a
+block shortcode (`fullwidth`, `details`, `blockquote`…) is numbered like the others and listed in the page contents
+and the book contents too (Hugo's `.TableOfContents` and `.Fragments` never see it: the theme adds it in document
+order, at the nesting of its level; when the page has no heading of its own the levels are Hugo's defaults, h2 and
+h3 in a `<ul>`). Math in a heading is typeset in the page contents and the book contents (Hugo itself
 leaves the TeX raw, or drops it on 0.146), the words printed by a shortcode in a heading are kept there (Hugo
 builds those texts before shortcodes run), and links in a heading are unwrapped there.
 
@@ -1354,10 +1433,17 @@ Equations {{< eqref "eq:gauss" >}} and {{< eqref "eq:euler" >}} …
 ```
 
 The number is set on the right of the column and shares one counter per page (per book when `continuous`).
-KaTeX's own environments (`equation`, `align`) restart their numbering in each formula: use `\label` or the
-shortcode for numbers that run through the document. A display gets **one** number, however many rows it has:
+KaTeX's own environments (`equation`, `align`, `gather`) number their rows with KaTeX's CSS counter
+(`katexEqnNo`, reset only on `body`), which runs through the web page on its own: it does not know the theme's
+numbers, follow a book or skip `\label`led displays, so an unlabelled `align` after equation (1) also shows (1).
+Use `\label` or the shortcode for numbered equations, and `align*`, `aligned` or `gathered` for the others; do
+not mix the two kinds on one page. In a display with a `\label` the theme hides KaTeX's row numbers (they do
+not step KaTeX's counter either), so `\begin{equation} … \label{eq:x} \end{equation}` shows only the theme's
+number. A display gets **one** number, however many rows it has:
 in an `aligned` or `align` block with a `\label` on each row, only the first label is kept, and the others are
-reported (`tufte-bad-option`) since references to them would print `??`. Write one `$$…$$` per numbered row.
+reported (`tufte-bad-option`) since references to them would print `??`. Write one `$$…$$` per numbered row. TeX
+comments are honoured: everything after an unescaped `%` on a line (not `\%`) is removed before the labels are
+read, so a `\label` in a comment neither numbers the display nor replaces its real label.
 
 `\tag` with a `\label` works as in amsmath: the tag is the equation's number. In
 `$$ E = mc^2 \tag{$\star$} \label{eq:star} $$` KaTeX prints the tag (⋆), the theme adds no number of its
@@ -1377,7 +1463,9 @@ separated by “;”, as natbib does: “Tufte (2001); Knuth (1984)”). As plai
 extra labels do, two or more works cited in the same bibliography scope (the page, or the whole book) with the same
 author label (“Adams”, “Adams and Brown”, “Adams et al.”) and the same year get a letter after the year, in
 author-year citations (“Adams (1999a) and Adams (1999b)”, “(Adams 1999a; Adams 1999b)”) and in their references
-(“…, 1999a.”), in plainnat's order (authors, year, title). Inside a sidenote, a margin note, a footnote, a margin block or
+(“…, 1999a.”), in plainnat's order (full author names, last name first, then year, then cite key: “Adam Adams” gets 1999a before “Zed Adams”);
+the letter is kept wherever such a citation's text is copied (the page and book contents, `xref` `name`, the
+lists, a figure's alt text, the page description). Inside a sidenote, a margin note, a footnote, a margin block or
 a caption (also a `caption="…"` parameter), `cite` does not cut the text: as in tufte-latex, the references of
 all its cites (and of the holder's own `cite=`) are gathered after the text, in one block joined “E1; E2; and
 E3”. A `cite` in a table cell, in the `table` or `fullwidthtable` shortcode as in a Markdown table, stays a
@@ -1403,9 +1491,12 @@ sans face of the table.
 On a handout the list of references is appended automatically at the end of the page when the page cites
 anything (`bibliography.list`), unless the page has its own `{{< bibliography >}}`. In a book, add a
 back-matter chapter whose body is `{{< bibliography heading="" >}}`; it lists every key cited in the book
-(landing body and part pages included), numbered in reading order.
+(landing body and part pages included), in the order of `bibliography.style` (first citation in reading order,
+or sorted with `plainnat`, the `latex` preset), numbered `[n]` only with `bibliography.margin = false`.
 `all=true` widens only its own list (the cited keys, then the rest of the database); `{{< nocite "*" >}}`
-widens every list. A page may hold several lists: the second gets ids `tufte-references-2` and `ref-KEY-2`
+widens every list. Either way the extra labels (1999a, 1999b) are computed over every entry listed, as
+`\nocite{*}` makes plainnat label the whole database, so a cited work keeps the letter that tells it from
+an uncited one of the same author and year. A page may hold several lists: the second gets ids `tufte-references-2` and `ref-KEY-2`
 (and so on), and citations link to the first.
 
 **The database.** The theme reads `data/bibliography.yaml` (or `.json`, `.toml`, or several files in
@@ -1459,6 +1550,12 @@ pandoc refs.bib -t csljson -o data/bibliography.json
 
 A page (or a book root) can also add its own database with front matter `bibliography: refs.json` (a page
 resource or an `assets/` path; `.json`, `.yaml`, `.toml`) or with inline `references:`; later sources win.
+A book has one database, as a LaTeX document does: the site database, then the `bibliography:` and
+`references:` of every part and chapter, then the book root's own. A page's own sources win on that page,
+except inside a book on a key the book already holds: as BibTeX keeps the first of repeated entries, the root's
+entry, else the first one in reading order, wins on every page of the book, and a chapter that redefines it with a
+different entry prints the warning `tufte-duplicate-cite`. So a key defined in one chapter can be cited from any
+page of the book, and the book's bibliography lists the same entry the citations show.
 Cite keys are case-insensitive, as in BibTeX: a key repeated within one database (a `.bib` file, a data file or
 directory, the `references:` list; `tufte01` and `Tufte01` are the same key) keeps its first entry, and the
 repeat prints the warning `tufte-duplicate-cite`.
@@ -1474,11 +1571,17 @@ conversion of tufte-latex's `sample-handout.bib`.
 
 **Format.** Entries follow plainnat as used by tufte-latex: “Edward R. Tufte. *Beautiful Evidence*.
 Graphics Press, LLC, first edition, May 2006. ISBN 0-9613921-7-7.” (an `address` would follow the
-publisher). An `inproceedings` with an `address`, and any `proceedings`, end the book block with the address and
+publisher). The `edition` is printed as plainnat does in English: a word lowercased (“first edition”), a
+number as an ordinal (`2` or `"02"` → “2nd edition”). In the theme's other languages a positive whole number,
+or an English ordinal (`Second`, `2nd`, up to `Twentieth`), takes the language's own form, number first
+(German “2. Auflage”, French “2e édition”/“1re édition”, Italian “2ª edizione”, Spanish “2.ª edición”); any
+other value (`"3.1"`, `Revised`, `0`, more than six digits) keeps the English phrase as written (“3.1
+edition”, “revised edition”) rather than mixing languages. An `inproceedings` with an `address`, and any `proceedings`, end the book block with the address and
 the date, and the organization and publisher follow as a sentence of their own (“In *Proc. of Conf*, pages
 3–4, NY, 2019. ACM.”), as plainnat prints them. A series without a volume prints “*Title*. Number 12 in
 Lecture Notes. Pub, 1992.” (“In *Book*, number 4 in LN, pages 1–3.” for a part of a book), with a volume
-“*Title*, volume 2 of *Series*.”. An `inbook` is a part of a book whose `title` is the book's title
+“*Title*, volume 2 of *Series*.”. As plainnat does, a `pages` field that holds one page prints “page 42” (“pages 3–4”, “pages 3, 7”
+or “pages 7+” for a range or a list). An `inbook` is a part of a book whose `title` is the book's title
 (“*Whole Book*, chapter 7. Pub, 1996.”); with a `booktitle` it is printed as an `incollection`. The `genre`
 (BibTeX's `type` field) replaces “PhD thesis”, “Technical Report” or “chapter” (“Doctoral dissertation, Uni,
 1994.”). A misc, booklet or manual with nothing but a date after its title, and an inproceedings without
@@ -1491,7 +1594,9 @@ online, unpublished and booklet titles stay upright, and the titles of articles 
 too, with their journal or book in italics. Titles and the `genre` keep the case they are written in:
 plainnat lowercases the titles of articles, chapters and misc entries (“Article title”), but the theme
 cannot tell the words a `.bib` file protects with braces (`{PhD}`), and the other formats have no such
-protection at all. DOIs and URLs are links. An unknown key prints `[key?]` and the warning `tufte-unknown-cite`.
+protection at all. DOIs and URLs are links. An unknown key prints `[key?]` and the warning `tufte-unknown-cite`. With
+`bibliography.margin = false` it prints `[key?]` in place of a number (natbib's `[?]`), takes no number and no entry in
+the list (BibTeX leaves it out of the `.bbl`), so the known entries keep consecutive numbers.
 
 ### Books
 
@@ -1502,7 +1607,8 @@ outer book (the outermost `book: true` wins; warning `tufte-book-structure`), so
 navigation and `print.html` are those of the outer book.
 
 The whole site can also be one book: set `book: true` in `content/_index.md`. The home page is then the
-landing (title page, contents…, and the `print` output if listed in its `outputs`), the top-level regular
+landing (title page, contents…, and the `print` output if listed in its `outputs`, e.g.
+`["html", "rss", "print"]`: keep `rss`, since that list replaces the home page's formats), the top-level regular
 pages are the chapters and the top-level sections are the parts. Tag and category pages stay outside the
 book, and the home page no longer lists post summaries.
 
@@ -1516,7 +1622,7 @@ content/books/my-book/
   part-two/second.md   # a chapter of that part
   appendix.md          # matter: appendix  → lettered A, B, …
   bibliography.md      # matter: back — body: {{< bibliography heading="" >}}
-  general-index.md     # matter: back, title: Index — body: {{< printindex >}}
+  general-index.md     # matter: back, title: Index — body: {{< printindex heading="" >}}
 ```
 
 Name the index chapter anything but `index.md`: that name would make its directory a leaf bundle. Create a
@@ -1536,7 +1642,7 @@ book and its chapters with the archetypes: `hugo new content --kind book books/m
 | `frontispiece` | the frontispiece | `{src, alt, caption}` (or just a `src` string): an image on the page facing the title page. `src` is looked up like the `figure` shortcode's (a resource of the book bundle, then `assets/`, then a `static/` path or a URL); `caption` is inline Markdown, set in the margin like a figure caption, never numbered; `alt` defaults to the plain caption. |
 | `copyrightPage` | the copyright page | A Markdown string, or a map `{year, holder, publisher, url, license, printing}` (defaults: the year of `date`, the author, the publisher, and “First printing, MONTH YEAR” from `date`; `printing: false` removes that line; `publisher` is inline Markdown, several paragraphs become lines; `license` is Markdown blocks). |
 | `dedication` | the dedication | Markdown. Shown on the landing, right after the contents. To place it elsewhere among the front pages, as `sample-book.tex` does after the lists of figures and tables, put `dedication` on a front-matter chapter instead (below). |
-| `outputs` | — | `["html", "print"]` adds `print.html`, the whole book as one document. |
+| `outputs` | — | `["html", "rss", "print"]` adds `print.html`, the whole book as one document. Front-matter `outputs` replaces the section's output formats instead of adding to them, so list `html` and `rss` too: leaving out `rss` drops the book's feed (`index.xml`). |
 | `tufte` | class options | Apply to every chapter (a chapter can still override any key). |
 
 The landing page shows, in this order, the half-title (print), the epigraphs, the frontispiece, the title
@@ -1557,7 +1663,7 @@ last, a part and the loose chapters interleaving by the part's weight and the pa
 then by file name, a part by its directory name; never by date; a part's chapters stay together, as after
 `\part`: a part sorts by the matter of its earliest chapter, and its chapters by matter, weight and file name
 within it), `matter` (`front`, `main` — the default —, `appendix`, `back`; only main matter is numbered,
-appendices are lettered), `unnumbered: true` (`\chapter*`), `intoc: false` (left out of the contents), `label`,
+appendices are lettered), `unnumbered: true` (`\chapter*`), `intoc: false` (left out of the contents; its part is still listed), `label`,
 `dedication` (Markdown: the chapter is a dedication page, the dedication text in place of the chapter head; use it
 with `matter: front` and `intoc: false` and a weight that puts it where it belongs in the front matter),
 and any handout key except those of the author and date line: a chapter's title block has the chapter number,
@@ -1585,7 +1691,7 @@ from all its chapters and cached for one build. `hugo server` rebuilds them afte
 added to chapter 1 renumbers the figures of chapter 3 and the references to them on the next page load. If a
 page ever looks stale (for example with a browser that keeps an old copy), reload it, or restart
 `hugo server`; a one-shot `hugo` build is always consistent. These results are kept in each page's `.Store`,
-marked with the build that computed them, so large books stay fast in every mode (a 150-chapter book builds,
+marked with the build that computed them, so large books stay fast in every mode (a 200-chapter book builds,
 or starts under `hugo server`, in seconds), and a rebuild of `hugo server` or `hugo --watch` computes them
 again instead of reusing the old values.
 
@@ -1596,7 +1702,11 @@ most three levels, as in `makeindex`: deeper ones are folded into the third, wit
 `tufte-bad-option`),
 `sort@display` for each level (the display text is inline Markdown, so `` `code` `` works; a text that starts like a block, `1984. Orwell` or `+ (plus)`, prints as written, as do the `see` texts), `|see{x}`,
 `|seealso{x}`, and `|(` … `|)` for ranges (a range that ends in another chapter or section prints both
-locators, “2–4”, and absorbs the ones inside it; one that ends where it starts prints one). Named alternatives: `term` (alias `entry`), `see`, `seealso`.
+locators, “2–4”, and absorbs the ones inside it; one that ends where it starts prints one). As `makeindex`
+reports them, `{{< printindex >}}` warns (`tufte-bad-option`) about a `|)` with no open range (it is listed as a
+plain locator), a `|(` that is never closed (it is listed from its opening locator) and a second `|(` while the
+same entry's range is still open (it is absorbed by that range); the open and the close must use the same entry
+(`a!b|(` … `a!b|)`). Named alternatives: `term` (alias `entry`), `see`, `seealso`.
 As in `makeindex`, `"` is the quote character: `"!`, `"@`, `"|` and `""` are a literal `!`, `@`, `|` and `"`
 (a `"` before any other character is kept as written). Inside a double-quoted shortcode parameter the `"` is
 written `\"`, or the parameter is written in backticks: `{{< index "Yahoo\"!" >}}`, ``{{< index `user"@example` >}}``,
@@ -1604,9 +1714,10 @@ written `\"`, or the parameter is written in backticks: `{{< index "Yahoo\"!" >}
 numbers) prints the warning `tufte-bad-option`.
 `{{< printindex >}}` (standalone) prints the index of the book (or of the page) in three columns, with links to
 the chapters (or sections) where each entry occurs; an entry in the landing body or on a part page is
-located by the book or part title. Entries are sorted with the site language's collation, and a space separates
-the initial letters (accented initials stay with their base letter, “Élan” under E, unless the language sorts
-the letter on its own, like Spanish “ñ”). Its named parameter `heading` changes the heading text
+located by the book or part title. As in `makeindex`, entries that start with a symbol come first (“+ (plus)”,
+“1984. Orwell”), then the pure numbers in numeric order (42 before 1984), then the words, sorted with the site
+language's collation; a space separates the symbols, the numbers and each initial letter (accented initials stay
+with their base letter, “Élan” under E, unless the language sorts the letter on its own, like Spanish “ñ”). Its named parameter `heading` changes the heading text
 (default “Index”); `heading=""` removes it.
 
 ```markdown
@@ -1663,13 +1774,22 @@ The print stylesheet reproduces the page geometry of `tufte-common.def` for `pri
 Sidenotes, margin notes and captions are printed in the margin column (never behind toggles), floats are not
 split across pages, chapters and the front-matter pages (title, copyright, contents, dedication…) start on a new
 page, and external links in the text column (not in notes, captions or the bibliography) show their URL (once: a link
-whose text is its address, like `<https://…>` or `\url`, is not repeated). Print to PDF
-from the browser. A book with `outputs: ["html", "print"]` has `print.html` next to its landing page: the
+whose text is its address, like `<https://…>` or `\url`, is not repeated). As tufte-book is `openright`
+(`\cleardoublepage`), the title page, the landing's contents and dedication, every part and every chapter (the
+bibliography and index chapters included) open on a right-hand page, and the frontispiece is printed on the
+left-hand page facing the title page; the browser inserts a blank page where one is needed (Chromium honours these
+left/right page breaks; a browser that does not just starts a new page). Print to PDF
+from the browser. A book with `outputs: ["html", "rss", "print"]` has `print.html` next to its landing page
+(front-matter `outputs` replaces Hugo's default formats, so keep `rss` in the list or the book loses its feed;
+with `uglyURLs = true` the print document stays `books/b/print.html`, apart from the landing, which Hugo 0.146
+writes as `books/b.html` and newer Hugo as `books/b/index.html`: the theme's `print` output format sets `noUgly`): the
 title pages, the contents and every chapter in one document, with cross-chapter links (relative, root-relative,
 or absolute ones from `ref` and `absURL`) turned into links inside the document, and relative image and video
 URLs (`src`, `poster`, `srcset`) resolved against their chapter. Each chapter is an `<article id="tufte-cN">` and each part an `<article id="tufte-pK">`,
 and the ids inside them get the `tufte-cN-`/`tufte-pK-` prefix, so they never collide with the ids of the
-landing body, which keep their names (the theme's own ids, such as the `<main id="tufte-main">` landmark,
+landing body, which keep their names (except one in that namespace — `tufte-landing`, the landing's own article,
+or one starting with `tufte-c`/`tufte-p` and a digit, or `tufte-l-` — which gets the `tufte-l-` prefix, with the
+links to it: `## Tufte c0` is `#tufte-l-tufte-c0` in `print.html`; the theme's own ids, such as the `<main id="tufte-main">` landmark,
 are in the `tufte-` namespace; when a page's content uses one itself, as `## Tufte main` does, the theme's
 element takes the next free id, `tufte-main-2`, and the skip link follows it; a bibliography entry
 `ref-KEY` likewise becomes `ref-KEY-2`, with the citation links, when a heading of its page has the id
@@ -1679,7 +1799,7 @@ Chromium 131 and later: a handout prints its title (`linkTitle` when set, as
 with `oneside`; the author is not shown), and a book alternates, with the book title on left pages and the chapter title on right pages (like
 `twoside`). As in tufte-book's `\frontmatter`, the landing's pages and the `matter: front` chapters show only the
 page number in the outer corner, and the half title, epigraphs, frontispiece, title page and copyright page
-show nothing (`\thispagestyle{empty}`), nor do the part pages of `print.html` (`\part`'s plain style is empty in tufte-book). Unlike `\chapter`'s plain style, the first page of each chapter in `print.html` still shows its running head: CSS matches only the first page of the whole document with `:first`, not the first page of each chapter (a chapter printed from its own page has no head on its first page). Other browsers print without running heads. They are set in capitals letterspaced like
+show nothing (`\thispagestyle{empty}`), nor do the part pages of `print.html` (`\part`'s plain style is empty in tufte-book) and, in a browser that supports `@page :blank`, the blank pages left before a right-hand page (`\cleardoublepage`). Unlike `\chapter`'s plain style, the first page of each chapter in `print.html` still shows its running head: CSS matches only the first page of the whole document with `:first`, not the first page of each chapter (a chapter printed from its own page has no head on its first page). Other browsers print without running heads. They are set in capitals letterspaced like
 `\smallcaps` (0.05em), without letterspacing under `letterspacing = false` (`nols`).
 
 ### Warnings
@@ -1693,22 +1813,23 @@ build and cannot be ignored.
 | Id | When |
 |---|---|
 | `tufte-undefined-ref` | `xref` or `eqref` to an unknown key; a Markdown footnote `[^x]` in a shortcode's inner text with no `[^x]:` definition on the page. |
-| `tufte-duplicate-label` | The same key defined twice in a page or a book, including a label equal to a heading's id (Markdown footnote labels are page-local and never reported). |
+| `tufte-duplicate-label` | The same key defined twice in a page or a book, including a label equal to a heading's id and an explicit heading id (`{#sec:x}`) written twice (Markdown footnote labels, and two headings whose ids Goldmark derived from their titles, are never reported). |
 | `tufte-unknown-cite` | A cited key is not in the database. |
-| `tufte-duplicate-cite` | A cite key repeated within one bibliography database (keys are case-insensitive); the first entry is kept, as BibTeX does ("Repeated entry"). |
+| `tufte-duplicate-cite` | A cite key repeated within one bibliography database (keys are case-insensitive), or defined with different entries by two pages of one book (the root, then the parts and chapters in reading order); the first entry is kept, as BibTeX does ("Repeated entry"). |
 | `tufte-heading-depth` | A `#####` or `######` heading (an error with `headings.strict`). |
+| `tufte-heading-id` | A `##` or `###` heading without an id (the site sets `markup.goldmark.parser.autoHeadingID = false` and the heading has no `{#id}`): it is left out of section numbering, of the names `xref` gives to labels and of the tables of contents. |
 | `tufte-unlabeled-float` | A numbered float without a label (only with `debug`). |
 | `tufte-bad-offset` | An invalid `offset`. |
-| `tufte-bad-option` | An unknown or invalid value of an option or parameter: `tufte.*` options (an enum word not in the list, a boolean that is not `true`/`false`/`yes`/`no`/`on`/`off`/`1`/`0`, `headings.number` outside 0–2; the default is used instead), `sections`, `params.math.engine`, `strict` and `macros`, a missing `customCSS` file or a `customCSS` that is neither a list nor a string, partial `params.giscus` settings, an `iframe` `ratio` or `video` `type`, `epigraph` parameters ignored by its block-quote form, a `label=` key without a letter or digit, a second `\label` in one display equation, an `index` entry deeper than three levels, with an empty level (`Yahoo!`: quote it, `Yahoo"!`) or with a page format other than `see`, `seealso`, `(` and `)` (`|textbf` has no effect), and the like. |
-| `tufte-empty` | A shortcode with nothing to show: an empty `sidenote`, `marginnote`, `footnote`, `footnotetext` or `equation`, a `nocite` without a key, `subfigures` without images, a `table`, `margintable`, `fullwidthtable` or `listing` with no table or code block (it keeps its caption and number). |
+| `tufte-bad-option` | An unknown or invalid value of an option or parameter: `tufte.*` options (an enum word not in the list, a boolean that is not `true`/`false`/`yes`/`no`/`on`/`off`/`1`/`0`, `headings.number` outside 0–2; the default is used instead; a `tufte` value that is not a table, such as `tufte: latex`, or a single value in place of an option group, such as `headings: 2` for `headings: {number: 2}`, is ignored), `sections`, `params.math.engine`, `strict` and `macros`, a missing `customCSS` file or a `customCSS` that is neither a list nor a string, partial `params.giscus` settings, an `iframe` `ratio` or `video` `type`, `epigraph` parameters ignored by its block-quote form, a `label=` key without a letter or digit, a second `\label` in one display equation, an `index` entry deeper than three levels, with an empty level (`Yahoo!`: quote it, `Yahoo"!`) or with a page format other than `see`, `seealso`, `(` and `)` (`|textbf` has no effect), and the like. |
+| `tufte-empty` | A shortcode with nothing to show: an empty `sidenote`, `marginnote`, `footnote`, `footnotetext` or `equation`, a `nocite` without a key, `subfigures` without images, a `table`, `margintable` or `fullwidthtable` with no table, or a `listing` with no code block, in its body (it keeps its caption, number and any text; a Markdown table written on one line with its tags, `{{< margintable >}} \| a \| b \| {{< /margintable >}}`, is a paragraph of pipes, not a table: put each row on its own line). |
 | `tufte-math-error` | KaTeX could not render an expression (server engine); the source is shown as `<code class="math-error">`. |
 | `tufte-raw-html` | Hand-written HTML in a shortcode's text was dropped (`unsafe = false`; see `innerHTML`). |
-| `tufte-block-in-note` | A list, code block, quote or table in a sidenote, margin note or caption (or in a Markdown footnote turned sidenote), shown as inline blocks; or a float or block shortcode (`figure`, `table`, `listing`, `iframe`, `epigraph`…) nested in one, shown as a plain image with its caption, or as inline blocks, unnumbered. |
-| `tufte-block-in-paragraph` | A block shortcode (figure, margin block, bibliography, list of figures, contents, index…) written inside a paragraph instead of on its own lines; the paragraph is split around it. Inside an unclosed raw-HTML `<span>` it is left in place (the warning says so). |
+| `tufte-block-in-note` | A list, code block, quote or table in a sidenote, margin note or caption (or in a Markdown footnote turned sidenote, or in HTML kept by `innerHTML`), shown as inline blocks; or a float or block shortcode (`figure`, `table`, `listing`, `iframe`, `epigraph`…) nested in one, shown as a plain image with its caption, or as inline blocks, unnumbered. |
+| `tufte-block-in-paragraph` | A block shortcode (figure, margin block, bibliography, list of figures, contents, index…) written inside a paragraph instead of on its own lines; the paragraph is split around it. Inside emphasis or a link in a tight list item, table cell or definition, the emphasis or link is closed before it and opened again after it. Inside an unclosed raw-HTML `<span>` it is left in place (the warning says so). |
 | `tufte-footnote-labels` | Some Markdown footnotes of a page could not be matched with Goldmark's rendered footnotes, so their `fn-`/`sn-` label prefix is ignored (the message names them; please report it). |
 | `tufte-no-bibliography` | Numbered citations (`bibliography.margin = false`) with no reference list to link to: a book without a `{{< bibliography >}}` chapter, or a handout with `bibliography.list = false` and no `{{< bibliography >}}`. The numbers are printed unlinked. |
 | `tufte-note-in-note` | A `sidenote`, `marginnote` or `marginfigure` shortcode inside a Markdown footnote turned sidenote, or inside a `sidenote`, `marginnote`, `footnotetext` or `marginblock` shortcode, a `margintable` cell, a figure/table caption or a `subfigures` image title: its text is shown inline. |
-| `tufte-book-structure` | A section inside a part of a book (parts are one level deep), or a `book: true` section inside a book. |
+| `tufte-book-structure` | A section inside a part of a book (parts are one level deep), a `book: true` section inside a book, or an unlisted section (`build: {list: never}`) in a book that holds listed pages, which fall out of the book. |
 | `tufte-orphan-footnotemark` | A `footnotemark` without its `footnotetext` (only with `debug`). |
 | `tufte-bib-format` | A bibliography database that cannot be read. |
 | `tufte-katex-version` | `params.math.katexVersion` differs from the KaTeX that Hugo embeds (server engine). |
@@ -1739,10 +1860,10 @@ port of `sample-handout.tex` and a port of `sample-book.tex`.
 | 13 | `\cite` inside `\sidenote`, `\marginnote`, `\caption` | a nested `{{< cite >}}`, or `cite="a,b"` on the note or figure | should | the reference is appended under the note |
 | 14 | natbib `\citet`, `\citep`, `\citeauthor`, `\citeyear` (+ page) | `{{< cite keys="a" mode="text" page="42" >}}`; modes `text`, `paren`, `author`, `year` | could | inline text, no sidenote |
 | 15 | `\bibentry{key}` | `{{< bibentry "key" >}}` | must | the formatted entry, inline |
-| 16 | `\bibliography{f}` + `\bibliographystyle` | automatic at the end of a handout; `{{< bibliography >}}` anywhere (standalone) | must | `tufte.bibliography.style = "tufte"` (citation order) or `"plainnat"` (sorted) |
+| 16 | `\bibliography{f}` + `\bibliographystyle` | automatic at the end of a handout; `{{< bibliography >}}` anywhere (standalone) | must | `tufte.bibliography.style = "tufte"` (citation order) or `"plainnat"` (sorted; with `nobib` the `[n]` follow the sorted list) |
 | 17 | `\nobibliography` | `tufte: {bibliography: {list: false}}` | must |  |
 | 18 | `\nocite{a}`, `\nocite{*}` | `{{< nocite "a,b" >}}`, `{{< nocite "*" >}}`, front matter `nocite: [a]` | should |  |
-| 19 | class option `nobib` | `tufte.bibliography.margin = false` | should | a citation becomes `[n]`, linked to the list |
+| 19 | class option `nobib` | `tufte.bibliography.margin = false` | should | a citation becomes `[n]`, linked to the list (numbered in the order of `bibliography.style`) |
 | 20 | `.bib` database | `data/bibliography.yaml` (native), `data/bibliography.json` (CSL-JSON), front matter `bibliography: refs.json` or `references:` | must | see [Bibliography](#bibliography) |
 | 21 | `.bib` read directly | `bibliography: refs.bib` (page resource or asset) | could | a simple BibTeX reader; pandoc → CSL-JSON is more robust |
 | 22 | `\doi{}`, `\url{}` in entries | fields `doi`, `url` | must | rendered as links |
@@ -1758,7 +1879,7 @@ port of `sample-handout.tex` and a port of `sample-book.tex`.
 | 32 | `margintable[offset]` | `{{< margintable caption="…" offset="…" >}}…{{< /margintable >}}` | should |  |
 | 33 | booktabs | Markdown tables | should | rules come from the CSS; `\cmidrule` and `\multicolumn` are **wont** (no Markdown syntax) |
 | 34 | algorithm / listing floats | `{{< listing caption="…" label="lst:x" style="ruled" >}}` + a fenced code block | could | styles `plain`, `ruled`, `boxed` |
-| 35 | subfigures, `\fbox` image grids | `{{< subfigures cols=2 type="fullwidth" caption="…" >}}` with images on consecutive lines | could | a blank line between images would make them separate figures |
+| 35 | subfigures, `\fbox` image grids | `{{< subfigures cols=2 type="fullwidth" caption="…" >}}` with images on consecutive lines | could | linked images (thumbnails) keep their link and subcaption |
 | 36 | `\ref` | `{{< xref "fig:x" >}}` | must | forward references work |
 | 37 | `Figure~\ref{fig:x}` | `{{< xref "fig:x" "full" >}}` | must | with a non-breaking space |
 | 38 | `\nameref` | `{{< xref "sec:x" "name" >}}` | must |  |
@@ -1787,7 +1908,7 @@ port of `sample-handout.tex` and a port of `sample-book.tex`.
 | 61 | frontispiece | book root `frontispiece: {src, alt, caption}` | could | an unnumbered figure, caption in the margin, before the title page |
 | 62 | `\blankpage`, `\cleardoublepage`, `\clearpage` | `{{< clearpage >}}`; `halftitle: true` | could | print only |
 | 63 | running heads (fancyhdr) | `tufte.print.runningHeads = true` | could | print only, Chromium ≥ 131 |
-| 64 | the book printed as one PDF | book root `outputs: [html, print]` → `…/print.html` | should | see [Printing](#printing-and-pdf) |
+| 64 | the book printed as one PDF | book root `outputs: [html, rss, print]` → `…/print.html` | should | see [Printing](#printing-and-pdf) |
 | 65 | `\index{…}` with `!`, `@`, `\|see{}`, `\|seealso{}`, `\|(`, `\|)` | `{{< index "classes!a4paper" >}}`, same syntax | should |  |
 | 66 | `\printindex` | `{{< printindex >}}` (standalone) | should | three columns |
 | 67 | the index as a site taxonomy | — | **wont** | `/index/` clashes with Hugo's index files; use the shortcode |
@@ -1827,7 +1948,7 @@ port of `sample-handout.tex` and a port of `sample-book.tex`.
 | 101 | `hyper`, `colorlinks`, PDF metadata | — | **wont** | links are native; colours via `customCSS`; metadata is in `<head>` |
 | 102 | `tufte-*-local.tex` hooks | `params.customCSS`, the `*_custom.html` partials | must | body classes `tufte-book`/`tufte-handout` allow scoping |
 | 103 | `\hangp`, `\hangleft`, `\hangstar` | — | **wont** | sample-book macros, not class features; CSS `hanging-punctuation` (Safari only) is used |
-| 104 | setspace `doublespace` | — | **wont** | not loaded by the classes |
+| 104 | setspace `doublespace` | — | **wont** | loaded by `tufte-common.def`, but it is a general line-spacing package, not a class feature: set the leading with CSS (`line-height`) through `customCSS` |
 | 105 | doc macros (`\doccmd`…), text shortcuts (`\TL`, `\monthyear`) | inline code, your own shortcodes | **wont** | not class features |
 | 106 | TeX machinery (`\morefloats`, engine detection, `\TufteRecalculate`, other paper options) | — | **wont** | no meaning in HTML |
 
@@ -1844,18 +1965,18 @@ Code uses Hugo's built-in Chroma highlighter and the monospace style of Tufte CS
 
 | Page | Template | Notes |
 |---|---|---|
-| Home | `home.html` | Intro from `content/_index.md` (if `homeIntro`), then paginated summaries of `mainSections`. With `book: true` in `content/_index.md`, the book landing (`tufte/book/landing.html`). |
+| Home | `home.html` | Its `<h1>` is the title of `content/_index.md` when that differs from the site title; otherwise the site title, visually hidden (the header already shows it). Intro from `content/_index.md` (if `homeIntro`), then paginated summaries of `mainSections`. With `book: true` in `content/_index.md`, the book landing (`tufte/book/landing.html`). |
 | Section list | `list.html` | Paginated summaries. |
 | Single page | `page.html` | Title, subtitle, metadata, optional TOC, sectioned content, tags, post navigation, comments. |
 | Taxonomy | `taxonomy.html` | All terms with page counts (for example `/tags/`). |
 | Term | `term.html` | Pages for one term (for example `/tags/typography/`). |
-| Archives | `archive.html` | Any page with `layout: archive`. It lists all posts grouped by year (pages without a date, such as book chapters, last under an “Undated” heading, as on term pages). |
+| Archives | `archive.html` | Any page with `layout: archive`. It lists all posts grouped by year (pages without a date, such as book chapters, last under an “Undated” heading, as on term pages, in the order of the RSS feed: each book's chapters in its reading order, book after book, then the other undated pages in Hugo's default order). |
 | Not found | `404.html` | Localised "page not found" page. |
 | Book landing | `list.html` → `tufte/book/landing.html` | A section with `book: true`: title page, contents, dedication. See [Books](#books). |
 | Book part | `list.html` → `tufte/book/part.html` | A sub-section of a book: part number, title and its chapters. |
 | Book chapter | `page.html` → `tufte/book/chapter.html` | A page inside a book: chapter number, content, book navigation. |
-| Whole book | `list.print.html` | `print.html` of a book with `outputs: ["html", "print"]`. |
-| RSS feeds | `rss.xml` | Hugo's feed, with each item's description taken from the theme's processed summary (numbers and cross-references resolved). |
+| Whole book | `list.print.html` | `print.html` of a book with `outputs: ["html", "rss", "print"]` (keep `rss`: front-matter `outputs` replaces the default formats, feed included). |
+| RSS feeds | `rss.xml` | Hugo's feed, with each item's description taken from the theme's processed summary (numbers and cross-references resolved). Items are ordered by publication date, newest first (Hugo orders by weight first), so the limit `[services.rss] limit` keeps the newest posts; undated pages (book chapters, which have a weight and no date) come after the dated ones and have no `<pubDate>`: each book's chapters in its reading order (matter, weight, file name, parts kept together, as in the book contents), book after book, then any other undated pages in Hugo's default order (weight, then title). The feed of a book's section (`/BOOK/index.xml`) or of one of its parts lists all its chapters, those inside its parts included (a section outside a book lists its own pages, as in Hugo). |
 
 Every template takes a page's text from `partialCached "func/content.html" …`, never from Hugo's `.Content`,
 `.Summary` or `.Plain`, which still hold the theme's unresolved markers. Do the same in a template you override
@@ -1891,14 +2012,22 @@ page-relative link or image (`[other](../other/)`, `img.png`) gets the URL the b
   schema.org descriptions are the same text: the theme removes the title and description tags of Hugo's
   templates and emits its own.
 - **Pages that are not rendered** (`build: {render: never, list: always}`) are listed without links (in
-  summaries, the archive, term pages, the book contents, the lists of figures, tables and listings and the
-  index), and the post navigation, the book navigation and feeds skip them. An `xref` to a label on such a
-  page prints its text without a link. In a book's print document, where the chapter is still printed, the
-  xref, the contents entry and the list and index entries link to the chapter or the label there.
+  summaries, the archive, the book contents, the lists of figures, tables and listings and the index), and
+  the post navigation, the book navigation and feeds skip them. Hugo leaves such pages out of taxonomy terms,
+  so they appear in neither term pages nor term feeds. An `xref` to a label on such a
+  page prints its text without a link. With `book.tocDepth = 1` the contents list such a chapter's `##`
+  sections too, also without links. In a book's print document, where the chapter is still printed, the
+  xref, the contents entry (and its sections) and the list and index entries link to the chapter or the label
+  there.
 - **Pages that are not listed** (`build: {list: never}`) are in no page collection, so a book cannot read them
   as chapters: such a page under a book section is an ordinary page (handout layout, its own numbers and
   labels, no book navigation), and an `xref` from the book to one of its labels is undefined; use a full
-  `xref` path (`/books/b/page.md#fig:x`) to reach it. `list: local` pages stay chapters.
+  `xref` path (`/books/b/page.md#fig:x`) to reach it. `list: local` pages stay chapters. An unlisted
+  **section** under a book (a part, or a section inside one) is not in its parent's sections either, so the
+  book cannot read it as a part: the section page and every page under it, listed or not, are ordinary pages
+  outside the book (no contents entry, numbers, navigation or `print.html`), and the warning
+  `tufte-book-structure` names the section when listed pages fall out this way (set `build: {list: never}` on
+  those pages too, or drop it from the section). An unlisted section with `book: true` is a book of its own.
 
 ## Customisation
 
@@ -1969,14 +2098,17 @@ English string, so the navigation, the skip link and the 404 page are never left
 the default language's words either (Hugo's own fallback, which the theme bypasses for its strings: a Japanese
 page of an Italian-default site reads “Skip to content”, not “Vai al contenuto”, until `i18n/ja.yaml` has
 `skipToContent`). The theme reads that file from your project's `i18n/` directory (`.yaml`, `.yml`, `.toml` or
-`.json`, named by the language key, such as `ja` or `pt-br`/`pt-BR`); strings for a sixth language that come
+`.json`, named by the language key in any casing, as Hugo reads it: `ja`, `pt-br`/`pt-BR`, or with a script
+subtag `zh-Hans`, `zh-Hant-TW`, `sr-Latn`); strings for a sixth language that come
 from another theme or module are not seen, so copy them into your project's `i18n/`. Bibliography entries have their own keys for words whose sense
 differs from the interface: `bibOf` ("volume 42 *of* Series"), `bibNumber` and `bibIn` ("*number* 12 *in*
 Lecture Notes", capitalized at the start of a sentence), `bibChapter` (the lowercase "chapter 3"
-inside an entry), `bibPageAbbr` and `bibPagesAbbr` (the page locator of `cite page=`: “p. 42”, “pp. 42–45”;
+inside an entry), `bibPage` (the lowercase "page 42" of an entry with one page; a range takes `pages`), `bibPageAbbr` and `bibPagesAbbr` (the page locator of `cite page=`: “p. 42”, “pp. 42–45”;
 German “S.”) and `bibNamesLast`, the join before the last of three or more names, a template with
 `{{ .Names }}` and `{{ .Last }}` (English `"{{ .Names }}, and {{ .Last }}"` keeps plainnat's serial comma;
-Italian `"{{ .Names }} e {{ .Last }}"` has none).
+Italian `"{{ .Names }} e {{ .Last }}"` has none). `edition` is a template with `{{ .Edition }}`, which is a
+plain number (“2”) in every language but English, where it is the ordinal (“2nd”); a non-numeric edition
+does not use the language's template but the English phrase (Bibliography, Format).
 
 Titles that Hugo writes in English are translated too: the 404 page (`pageNotFound`, also in `<title>` and the
 social titles), a taxonomy page whose title is Hugo's default, the title-cased plural (no content `_index.md`
@@ -1986,7 +2118,8 @@ as `series` to your `i18n/<lang>.yaml` for your own taxonomies), and an archive 
 
 On a multilingual site, a page that has translations gets a small language switcher under the site header
 (`nav.site-languages`, labelled with each language's `languageName`, or `label` from Hugo 0.158) and
-`<link rel="alternate" hreflang="…">` tags in `<head>`. `<html>` carries the language's `languageCode`
+`<link rel="alternate" hreflang="…">` tags in `<head>`. On a multihost site (a `baseURL` per language) the
+switcher links to a translation on another host by its absolute URL. `<html>` carries the language's `languageCode`
 (`locale` from Hugo 0.158) and, when `languageDirection` (`direction`) is set, a `dir` attribute. The Language
 methods renamed in Hugo 0.158 are handled by `layouts/_partials/func/lang.html`.
 
@@ -2033,9 +2166,12 @@ The example site sets `theme = "tufte.hugo"` and `themesDir = "../.."`, so the t
   `.bib` bundle resource, the frontispiece) and the cheat-sheet page;
 - variant builds with `tufte.style = "latex"`, with `math.engine = "client"` (KaTeX in the browser, with a
   script and stylesheet of the same version) and with A4 paper, numbered sections and `nobib` citations;
-- performance: a generated 150-chapter book (with `print.html`, cross-chapter references, figures, citations,
-  a list of figures, a bibliography and an index) must build with `--panicOnWarning` within 240 seconds, with
-  its cross-chapter numbers and print document correct;
+- performance: a generated 200-chapter book (with `print.html`, cross-chapter references, figures, citations,
+  chapters with their own `references` cited author-year and from other chapters, a list of figures, a
+  bibliography and an index) must build with `--panicOnWarning` within 240 seconds, with its cross-chapter
+  numbers, extra labels (2000a, 2000b…) and print document correct, and without computing a page's cached
+  results twice in one build (counted with `--templateMetrics`); under `hugo server`, an edit of the first
+  chapter must renumber the last one;
 - nested and mixed footnotes, in a small generated site: footnotes inside `footnote`, `sidenote` and `fig`
   shortcodes and inside Markdown footnotes, `[^x]` in an image title and in a table caption, and a label
   repeated in the body and in a `table` shortcode. The pages must have no footnote markers left, balanced

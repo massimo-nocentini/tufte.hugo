@@ -23,7 +23,7 @@
   {{- $label = printf "%v" (.Get "label" | default "") -}}
 {{- end -}}
 {{- $html := "" -}}
-{{- with strings.TrimSpace .Inner -}}
+{{- with strings.TrimSpace .InnerDeindent -}}
   {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "block" "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
   {{- /* A sidenote or margin note nested in it cannot float. */ -}}
   {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $.Name) "where" $.Position) -}}

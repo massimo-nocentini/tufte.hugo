@@ -35,7 +35,11 @@
 {{- $caption := printf "%v" (index $get "caption" | default "") -}}
 {{- $capHTML := "" -}}
 {{- if not $caption -}}
-  {{- with findRESubmatch `(?s)^\s*<p>(.*?)</p>` $html 1 -}}
+  {{- /* The caption paragraph may hold a margin figure or a footnotetext,
+         whose own <p class="…-anchor">…</p> wrapper must not end the
+         match: such a wrapper is skipped whole ($capP). */ -}}
+  {{- $capP := `<p>((?:<p class="(?:margin-figure-anchor|footnotetext-anchor)[^"]*"[^>]*>.*?</p>|.)*?)</p>` -}}
+  {{- with findRESubmatch (printf `(?s)^\s*%s` $capP) $html 1 -}}
     {{- $capHTML = index . 0 1 -}}
     {{- $html = replace $html (index . 0 0) "" 1 -}}
   {{- else -}}
@@ -47,7 +51,7 @@
     {{- with $end -}}
       {{- $parts := split $html $end -}}
       {{- $tail := index $parts (sub (len $parts) 1) -}}
-      {{- with findRESubmatch `(?s)<p>(.*?)</p>` $tail 1 -}}
+      {{- with findRESubmatch (printf `(?s)%s` $capP) $tail 1 -}}
         {{- $capHTML = index . 0 1 -}}
         {{- $tail = replace $tail (index . 0 0) "" 1 -}}
         {{- $html = printf "%s%s%s" (delimit (first (sub (len $parts) 1) $parts) $end) $end $tail -}}
@@ -59,8 +63,20 @@
 {{- /* Nothing left (a self-closing call, an empty inner text, or one that
        is only the caption paragraph): the float keeps its caption and
        number, with an empty body (HasBody: never an image). */ -}}
-{{- if not $html -}}
-  {{- warnidf "tufte-empty" "%s shortcode: no %s inside; write it between {{< %s >}} and {{< /%s >}} (%s)" $c.Name (cond (eq $kind "listing") "code block" "table") $c.Name $c.Name $c.Position -}}
+{{- /* Text but no table (or no code): e.g. a Markdown table written on
+       one line with its tags ("{{< margintable >}} | a | b |"), which
+       Goldmark keeps as a paragraph of pipes. Same warning; the text is
+       kept as the body. */ -}}
+{{- $missing := not $html -}}
+{{- if not $missing -}}
+  {{- if eq $kind "listing" -}}
+    {{- $missing = not (strings.Contains $html "<pre") -}}
+  {{- else -}}
+    {{- $missing = not (strings.Contains $html "<table") -}}
+  {{- end -}}
+{{- end -}}
+{{- if $missing -}}
+  {{- warnidf "tufte-empty" "%s shortcode: no %s inside; write %s between {{< %s >}} and {{< /%s >}} (%s)" $c.Name (cond (eq $kind "listing") "code block" "table") (cond (eq $kind "listing") "a fenced code block" "a Markdown table, each row on its own line,") $c.Name $c.Name $c.Position -}}
 {{- end -}}
 {{- /* A margin float (margintable) already sits in the margin: a sidenote
        or margin note in its cells cannot float there either, so it is

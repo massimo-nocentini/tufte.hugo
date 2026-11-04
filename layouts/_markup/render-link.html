@@ -4,7 +4,8 @@
   a relative destination that names a page (e.g. "../other-post.md" or
   "/about") or a page/global resource is replaced by its relative
   permalink, keeping any query and fragment. Fragment-only links ("#x"),
-  absolute URLs and unresolved paths are left as written (in a summary on
+  absolute URLs, dot-only paths ("./", "../") and unresolved paths are
+  left as written, for the browser to resolve against the page (in a summary on
   a list page, tufte/postprocess.html points "#x" to the page: PAGE#x).
 
   Notes in the link text ([text[^1]](url), a sidenote, marginnote or cite
@@ -33,7 +34,12 @@
   {{- if in (slice "javascript" "vbscript" "data" "file") (lower .Scheme) -}}
     {{- $safe = false -}}
   {{- end -}}
-  {{- if and .Path (not .IsAbs) (not .Host) -}}
+  {{- /* A path of dot segments only ("./", ".", "../", "../..") names no
+         page: GetPage "" is the home page and a relative "../" resolves
+         against the content file, not the URL. It is left as written, so
+         the browser resolves it against the page (and a summary elsewhere
+         gets the same URL from tufte/postprocess.html). */ -}}
+  {{- if and .Path (not .IsAbs) (not .Host) (not (findRE `^\.\.?(?:/\.\.?)*/?$` .Path 1)) -}}
     {{- $path := strings.TrimPrefix "./" .Path -}}
     {{- $target := "" -}}
     {{- with $.PageInner.GetPage $path -}}

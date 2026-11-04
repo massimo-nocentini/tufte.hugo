@@ -1,0 +1,62 @@
+{{- /*
+  Unique ids for the headings that hold a shortcode (area B helper).
+
+  tufte/heading-id.html removes Hugo's shortcode placeholders from a
+  heading id, so "## Results {{< sidenote >}}…" gets "results", not
+  Goldmark's "results-hahahugoshortcode…hbhb". When another heading of
+  the page already has that id (a plain "## Results", or a second heading
+  that differs only by its shortcodes), the cleaned id would repeat, and
+  the section-number token keyed on it would give both headings the same
+  number. This partial makes such ids unique again, as Goldmark does:
+  the cleaned id gets "-1", "-2"… (the first suffix that no other heading
+  id of the page uses). Ids without a placeholder (Goldmark's own,
+  already unique, and explicit {#id}) never change; among the headings
+  that hold a shortcode the earlier one in document order keeps the plain
+  cleaned id.
+
+  Read from the page's .Fragments (document order: a preorder walk of the
+  heading tree), so render-heading.html, tufte/page-toc.html and
+  tufte/book/toc-headings.html agree. Callers use tufte/heading-anchor.html.
+
+  Takes: the page (or, internally, a dict {"hs": headings} for the walk).
+  Returns: map Goldmark id → final id, only for the ids that hold a
+  placeholder (internally: the flat slice of ids).
+  Call through partialCached (key: RelPermalink or Path).
+*/ -}}
+{{- $out := dict -}}
+{{- if reflect.IsMap . -}}
+  {{- $ids := slice -}}
+  {{- range .hs -}}
+    {{- with .ID }}{{ $ids = $ids | append . }}{{ end -}}
+    {{- with .Headings }}{{ $ids = $ids | append (partial "tufte/heading-ids.html" (dict "hs" .)) }}{{ end -}}
+  {{- end -}}
+  {{- $out = $ids -}}
+{{- else -}}
+{{- $flat := slice -}}
+{{- with .Fragments }}{{ with .Headings }}{{ $flat = partial "tufte/heading-ids.html" (dict "hs" .) }}{{ end }}{{ end -}}
+{{- $isPh := `(?i)hahahugoshortcode` -}}
+{{- if findRE $isPh (delimit $flat " ") 1 -}}
+  {{- $S := newScratch -}}
+  {{- $S.Set "taken" dict -}}
+  {{- range $flat -}}
+    {{- if not (findRE $isPh . 1) }}{{ $S.SetInMap "taken" . true }}{{ end -}}
+  {{- end -}}
+  {{- $S.Set "map" dict -}}
+  {{- range $flat -}}
+    {{- if findRE $isPh . 1 -}}
+      {{- $c := partial "tufte/heading-id.html" . -}}
+      {{- $final := $c -}}
+      {{- if isset ($S.Get "taken") $c -}}
+        {{- range $i := seq 999 -}}
+          {{- $cand := printf "%s-%d" $c $i -}}
+          {{- if not (isset ($S.Get "taken") $cand) }}{{ $final = $cand }}{{ break }}{{ end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $S.SetInMap "taken" $final true -}}
+      {{- $S.SetInMap "map" . $final -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $out = $S.Get "map" -}}
+{{- end -}}
+{{- end -}}
+{{- return $out -}}

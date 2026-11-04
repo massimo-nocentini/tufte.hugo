@@ -161,7 +161,11 @@ specifications are:
 
 ```text
 {{</* marginfigure src="…" caption="…" offset="offset" */>}}
-{{</* margintable caption="…" offset="offset" */>}} | a | b | {{</* /margintable */>}}
+{{</* margintable caption="…" offset="offset" */>}}
+| a | b |
+|---|---|
+| … | … |
+{{</* /margintable */>}}
 ```
 
 {{< xref "fig:fullfig" "full" >}} is an example of the `fullwidthfigure` shortcode

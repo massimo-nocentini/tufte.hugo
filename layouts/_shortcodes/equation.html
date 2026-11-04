@@ -26,7 +26,12 @@
 {{- else -}}
   {{- $label = printf "%v" (.Get 0 | default "") -}}
 {{- end -}}
-{{- $tex := strings.TrimSpace .Inner -}}
+{{- $tex := strings.TrimSpace .InnerDeindent -}}
+{{- /* TeX comments first (as render-passthrough.html): a \label in a %
+       comment is no label. */ -}}
+{{- if strings.Contains $tex "%" -}}
+  {{- $tex = replaceRE `(?m)((?:^|[^\\])(?:\\\\)*)%.*$` "$1" $tex | strings.TrimSpace -}}
+{{- end -}}
 {{- with findRESubmatch `\\label\{([^}]+)\}` $tex -}}
   {{- if not (strings.TrimSpace $label) }}{{ $label = index . 0 1 }}{{ end -}}
   {{- $tex = replaceRE `\\label\{[^}]+\}` "" $tex -}}

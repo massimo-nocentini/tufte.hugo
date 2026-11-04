@@ -29,7 +29,9 @@
      which marks them data-tufte-inner): one whose id the page already
      uses (a heading of the text, an earlier inner heading, any element)
      gets the first free ID-1, ID-2…, with its anchor link and section
-     number key; the page's own headings keep their ids (TOC links).
+     number key; the page's own headings keep their ids (TOC links). An
+     id written in the inner text ({#sec:x}) is left to tufte/labels.html
+     (mark data-tufte-xinner), which treats it as a page heading's.
   The front-matter `abstract` (Markdown, shortcodes run) is part of the
   full content: it comes first, as
     <section class="abstract">BLOCKS</section><i class="tufte-abstract-end" hidden></i>
@@ -149,7 +151,10 @@
 {{- if not $summary -}}
   {{- $ff = partial "tufte/book/front-fields.html" (dict "page" $page "mode" "raw") -}}
   {{- with $page.Params.abstract -}}
-    {{- $md := printf "%v" . -}}
+    {{- /* A footnote defined in the abstract itself belongs to it
+           (tufte/book/fn-local.html), as the dedication's does: its `[^1]`
+           is not the body's `[^1]`. */ -}}
+    {{- $md := partial "tufte/book/fn-local.html" (dict "text" (printf "%v" .) "tag" "abs") -}}
     {{- $abs = partial "tufte/render-inner.html" (dict "page" $page "inner" $md "display" "block" "shortcodes" "run" "where" "front matter abstract") | string -}}
   {{- end -}}
   {{- $tn = partial "tufte/title-notes.html" (dict "page" $page "mode" "raw") | string -}}
@@ -290,12 +295,17 @@
        a parent, so a cite made a citation sidenote and a sidenote or margin
        note floats inside the caption. As tufte/figure.html does for a
        caption= parameter: cites join the caption's citation block, other
-       notes stay inline text (tufte-note-in-note). */ -}}
-{{- if strings.Contains $html `<i class="tufte-capsc" hidden></i>` -}}
-  {{- $capRE := `(?s)<i class="tufte-capsc" hidden></i>(.*?)<i class="tufte-capsc-mid" hidden></i>(.*?)<i class="tufte-capsc-end" hidden></i>` -}}
+       notes stay inline text (tufte-note-in-note). The texts tufte/figure.html
+       deferred with the token TUFTECAP<key>END (data-key) are then filled
+       from the cleaned caption: the img's alt text (its plain text,
+       tufte/plain-caption.html, without the "Figure N:" label) and the
+       data-name of an unnumbered float's tufte-float marker (the caption). */ -}}
+{{- if strings.Contains $html `<i class="tufte-capsc" ` -}}
+  {{- $capRE := `(?s)<i class="tufte-capsc" data-key="([0-9a-f]*)" hidden></i>(.*?)<i class="tufte-capsc-mid" hidden></i>(.*?)<i class="tufte-capsc-end" hidden></i>` -}}
   {{- range findRESubmatch $capRE $html -}}
-    {{- $cap := index . 1 -}}
-    {{- $blk := index . 2 -}}
+    {{- $capKey := index . 1 -}}
+    {{- $cap := index . 2 -}}
+    {{- $blk := index . 3 -}}
     {{- if strings.Contains $cap `class="margin-toggle` -}}
       {{- $at := $page.RelPermalink -}}
       {{- with $page.File }}{{ $at = .Path }}{{ end -}}
@@ -309,7 +319,20 @@
       {{- end -}}
     {{- end -}}
     {{- $html = replace $html (index . 0) (printf "%s%s" $cap $blk) 1 -}}
+    {{- with $capKey -}}
+      {{- $tok := printf "TUFTECAP%sEND" . -}}
+      {{- if strings.Contains $html $tok -}}
+        {{- $text := $cap -}}
+        {{- with findRESubmatch `(?s)<span class="caption-text">(.*)</span><i class="cap-end" hidden></i>` $cap 1 }}{{ $text = index . 0 1 }}{{ end -}}
+        {{- $html = replace $html (printf `alt="%s"` $tok) (printf `alt="%s"` (htmlEscape (partial "tufte/plain-caption.html" $text))) -}}
+        {{- $html = replace $html (printf `data-name="%s"` $tok) (printf `data-name="%s"` (htmlEscape $cap)) -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
+{{- end -}}
+{{- /* A deferred text whose caption was not found (cut off in a summary). */ -}}
+{{- if strings.Contains $html "TUFTECAP" -}}
+  {{- $html = replaceRE `TUFTECAP[0-9a-f]+END` "" $html -}}
 {{- end -}}
 
 {{- /* 5a. Cites with as="footnote" (or citeas = "footnote") left in the
@@ -394,14 +417,27 @@
        (theme.css: details:not([open]) + .sn-skip-details), so the marks
        after it keep their numbers either way. Nested blocks: the outer
        count includes the inner ones (an inner span inside a closed outer
-       block steps nothing). */ -}}
+       block steps nothing).
+       The text of a real footnote is still at its reference here
+       (<span class="tufte-fn" … hidden>TEXT</span>, tufte/fn-split.html),
+       but postprocess moves it to the footnote list, outside the block:
+       its marks are not counted for the blocks around the reference (the
+       span is followed by balancing <span>/</span>, as fn-split does). A
+       block inside the footnote text travels with it and still counts
+       them ($fnBase = the stack depth where the footnote text began). */ -}}
 {{- if strings.Contains $html "</details>" -}}
   {{- $segs := split $html "</details>" -}}
   {{- $last := sub (len $segs) 1 -}}
   {{- $out := "" -}}
   {{- $stack := slice -}}
   {{- $inSum := false -}}
+  {{- $fnDepth := 0 -}}
+  {{- $fnBase := 0 -}}
+  {{- $hasFn := strings.Contains $html `<span class="tufte-fn"` -}}
   {{- $detRE := `<details(?:\s[^>]*)?>|<summary(?:\s[^>]*)?>|</summary>|<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>|<span class="sn-skip" aria-hidden="true" style="counter-increment: sidenote-counter [0-9]+">` -}}
+  {{- if $hasFn -}}
+    {{- $detRE = printf `%s|<span class="tufte-fn"|<span[\s>]|</span>` $detRE -}}
+  {{- end -}}
   {{- range $i, $seg := $segs -}}
     {{- range findRE $detRE $seg -}}
       {{- if strings.HasPrefix . "<details" -}}
@@ -411,15 +447,27 @@
         {{- $inSum = true -}}
       {{- else if eq . "</summary>" -}}
         {{- $inSum = false -}}
-      {{- else if and $stack (not (strings.Contains . "data-number=")) -}}
-        {{- $step := 1 -}}
-        {{- with findRESubmatch `sidenote-counter ([0-9]+)"` . 1 }}{{ $step = int (index . 0 1) }}{{ end -}}
-        {{- $top := sub (len $stack) 1 -}}
-        {{- $new := slice -}}
-        {{- range $j, $c := $stack -}}
-          {{- $new = $new | append (cond (and $inSum (eq $j $top)) $c (add $c $step)) -}}
+      {{- else if eq . "</span>" -}}
+        {{- if gt $fnDepth 0 }}{{ $fnDepth = sub $fnDepth 1 }}{{ end -}}
+      {{- else if strings.HasPrefix . `<span class="tufte-fn"` -}}
+        {{- if eq $fnDepth 0 }}{{ $fnBase = len $stack }}{{ end -}}
+        {{- $fnDepth = add $fnDepth 1 -}}
+      {{- else if and (strings.HasPrefix . "<span") (not (strings.HasPrefix . `<span class="sn-skip"`)) -}}
+        {{- if gt $fnDepth 0 }}{{ $fnDepth = add $fnDepth 1 }}{{ end -}}
+      {{- else -}}
+        {{- /* A mark (label or sn-skip; an sn-skip is also an open span). */ -}}
+        {{- $inFn := gt $fnDepth 0 -}}
+        {{- if and $inFn (strings.HasPrefix . "<span") }}{{ $fnDepth = add $fnDepth 1 }}{{ end -}}
+        {{- if and $stack (not (strings.Contains . "data-number=")) -}}
+          {{- $step := 1 -}}
+          {{- with findRESubmatch `sidenote-counter ([0-9]+)"` . 1 }}{{ $step = int (index . 0 1) }}{{ end -}}
+          {{- $top := sub (len $stack) 1 -}}
+          {{- $new := slice -}}
+          {{- range $j, $c := $stack -}}
+            {{- $new = $new | append (cond (or (and $inSum (eq $j $top)) (and $inFn (lt $j $fnBase))) $c (add $c $step)) -}}
+          {{- end -}}
+          {{- $stack = $new -}}
         {{- end -}}
-        {{- $stack = $new -}}
       {{- end -}}
     {{- end -}}
     {{- $out = printf "%s%s" $out $seg -}}
@@ -441,7 +489,15 @@
 {{- /* 7. Unique ids for the headings of inner texts (see above). Each
        piece after a mark starts with the heading's id; its anchor link
        and section number token follow in the same piece (headings do not
-       nest). In a summary (headings removed) only the mark goes. */ -}}
+       nest). In a summary (headings removed) only the mark goes. A
+       heading with an id written in its inner text (data-tufte-xinner,
+       tufte/render-inner.html) is an author label: it keeps its id and
+       its mark here, and tufte/labels.html dedupes it with the page's
+       headings (first in document order wins, warned); postprocess drops
+       the mark. */ -}}
+{{- if and $summary (strings.Contains $html ` data-tufte-xinner id="`) -}}
+  {{- $html = replace $html ` data-tufte-xinner id="` ` id="` -}}
+{{- end -}}
 {{- $innerMark := ` data-tufte-inner id="` -}}
 {{- if strings.Contains $html $innerMark -}}
   {{- $pieces := split $html $innerMark -}}

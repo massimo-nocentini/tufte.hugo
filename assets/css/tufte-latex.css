@@ -131,6 +131,14 @@ figcaption,
     text-indent: 0;
 }
 
+/* tufte.css makes the mark an inline-block, a block container whose first
+   line takes the inherited text-indent: without this the number of a note
+   in an indented paragraph (indent) sits a parindent after its word, and
+   in a verse line (negative indent) over it. */
+label.sidenote-number {
+    text-indent: 0;
+}
+
 /* Fonts and alignment of the marginalia: sidenote=, marginnote=, caption=,
    citation= and \setXfont, from tufte/head-style.html. A family or colour
    that is not set leaves the declaration invalid at computed-value time,
@@ -190,42 +198,43 @@ figcaption,
     color: var(--tufte-citation-color);
 }
 
-/* Notes inside a .sans span or a table: \@tufte@marginfont is \normalfont,
-   so they do not take the sans face of their holder (tufte.css sets
-   div.table-wrapper in Trebuchet MS). theme.css gives .sans notes the serif
+/* Notes inside a .sans span, a table or an open epigraph: \@tufte@marginfont
+   is \normalfont, so they do not take the sans face of their holder
+   (tufte.css sets div.table-wrapper in Trebuchet MS; \openepigraph is
+   \sffamily). theme.css gives .sans notes the serif
    face back; here both get the default margin face explicitly, the
    old-style digits of the body under numerals = "oldstyle", and the
    marginalia options still win. Notes in a cell also drop the table's
    lining tabular figures. A .citation-block inherits from its note. */
-:is(.sans, div.table-wrapper) .sidenote {
+:is(.sans, div.table-wrapper, .open-epigraph blockquote) .sidenote {
     font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, var(--tufte-serif)));
 }
 
-:is(.sans, div.table-wrapper) .marginnote {
+:is(.sans, div.table-wrapper, .open-epigraph blockquote) .marginnote {
     font-family: var(--tufte-marginnote-family, var(--tufte-margin-family, var(--tufte-serif)));
 }
 
-:is(.sans, div.table-wrapper) :is(.marginnote.caption, .marginnote.margin-figure) {
+:is(.sans, div.table-wrapper, .open-epigraph blockquote) :is(.marginnote.caption, .marginnote.margin-figure) {
     font-family: var(--tufte-caption-family, var(--tufte-margin-family, var(--tufte-serif)));
 }
 
-:is(.sans, div.table-wrapper) .sidenote.citation {
+:is(.sans, div.table-wrapper, .open-epigraph blockquote) .sidenote.citation {
     font-family: var(--tufte-citation-family, var(--tufte-margin-family, var(--tufte-serif)));
 }
 
-body.tufte-osf :is(.sans, div.table-wrapper) .sidenote {
+body.tufte-osf :is(.sans, div.table-wrapper, .open-epigraph blockquote) .sidenote {
     font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, et-book-osf-digits, var(--tufte-serif)));
 }
 
-body.tufte-osf :is(.sans, div.table-wrapper) .marginnote {
+body.tufte-osf :is(.sans, div.table-wrapper, .open-epigraph blockquote) .marginnote {
     font-family: var(--tufte-marginnote-family, var(--tufte-margin-family, et-book-osf-digits, var(--tufte-serif)));
 }
 
-body.tufte-osf :is(.sans, div.table-wrapper) :is(.marginnote.caption, .marginnote.margin-figure) {
+body.tufte-osf :is(.sans, div.table-wrapper, .open-epigraph blockquote) :is(.marginnote.caption, .marginnote.margin-figure) {
     font-family: var(--tufte-caption-family, var(--tufte-margin-family, et-book-osf-digits, var(--tufte-serif)));
 }
 
-body.tufte-osf :is(.sans, div.table-wrapper) .sidenote.citation {
+body.tufte-osf :is(.sans, div.table-wrapper, .open-epigraph blockquote) .sidenote.citation {
     font-family: var(--tufte-citation-family, var(--tufte-margin-family, et-book-osf-digits, var(--tufte-serif)));
 }
 
@@ -243,13 +252,16 @@ div.table-wrapper :is(.sidenote, .marginnote) {
     font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, et-book-roman-old-style, et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif));
 }
 
-/* Notes nested in letterspaced or case-changing spans look like notes. */
+/* Notes nested in letterspaced or case-changing spans (or in an open
+   epigraph, set \allcaps) look like notes. */
 .allcaps .sidenote,
 .allcaps .marginnote,
 .smallcaps .sidenote,
 .smallcaps .marginnote,
 .sc .sidenote,
-.sc .marginnote {
+.sc .marginnote,
+.open-epigraph blockquote .sidenote,
+.open-epigraph blockquote .marginnote {
     text-transform: none;
     font-variant-caps: normal;
 }
@@ -278,10 +290,16 @@ p.footnotetext-anchor {
 span[data-sn] {
     display: block;
 }
+/* A span is not a list owner: its items would step the list-item counter
+   of the nearest real <ol>/<ul> (a note in a list item would renumber
+   that list). Style containment makes the span a list owner in Chromium
+   and scopes the counter elsewhere; the counter-reset starts a fresh one. */
 span[data-sn="ul"],
 span[data-sn="ol"] {
     padding-inline-start: 1.2em;
     margin: 0.2rem 0;
+    contain: style;
+    counter-reset: list-item;
 }
 span[data-sn="li"] {
     display: list-item;
@@ -289,6 +307,11 @@ span[data-sn="li"] {
 }
 span[data-sn="ol"] > span[data-sn="li"] {
     list-style-type: decimal;
+}
+/* The number from the list's start (or the item's value), written as
+   data-n by tufte/inline-blocks.html. */
+span[data-sn="ol"] > span[data-sn="li"][data-n]::marker {
+    content: attr(data-n) ". ";
 }
 span[data-sn="pre"] {
     white-space: pre;
@@ -417,6 +440,8 @@ div.tufte-anchor {
      in an item or dt:   width 32.353% + 22px, margin-right 2.353% - 30.4px
      in a dd:            width 32.353% + 0.679rem + 22px,
                          margin-right 2.353% + 0.049rem - 30.4px.
+   The percentages are of the item (100% + --tufte-nest of a nested
+   item, §9b), so notes in nested lists land there too.
    Desktop screens only: print places them with --pw/--pl (§12), phones
    with the toggle rules. Alerts have their own geometry (theme.css). */
 @media screen and (width > 760px) {
@@ -447,27 +472,27 @@ div.tufte-anchor {
     :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote),
     :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote) {
         min-width: 0;
-        width: calc(55% + 22px);
-        margin-right: calc(-66% - 30.4px);
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 22px);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 30.4px);
     }
 
     :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote) {
         min-width: 0;
-        width: calc(55% + 1.155rem + 22px);
-        margin-right: calc(-66% - 1.386rem - 30.4px);
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 1.155rem + 22px);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem - 30.4px);
     }
 
     div.open-epigraph > blockquote > :is(ul, ol) > li :is(.sidenote, .marginnote),
     div.open-epigraph > blockquote > dl > dt :is(.sidenote, .marginnote) {
         min-width: 0;
-        width: calc(32.353% + 22px);
-        margin-right: calc(2.353% - 30.4px);
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.32353 + 22px);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * 0.02353 - 30.4px);
     }
 
     div.open-epigraph > blockquote > dl > dd :is(.sidenote, .marginnote) {
         min-width: 0;
-        width: calc(32.353% + 0.679rem + 22px);
-        margin-right: calc(2.353% + 0.049rem - 30.4px);
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.32353 + 0.679rem + 22px);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * 0.02353 + 0.049rem - 30.4px);
     }
 
     :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote) {
@@ -757,6 +782,18 @@ a.citation-ref:visited {
     letter-spacing: var(--tufte-smallcaps-ls);
 }
 
+/* Math never takes the case or tracking of the text around it: textcase's
+   \MakeTextUppercase/\MakeTextLowercase (\allcaps, \smallcaps) skip math
+   and \textls does not letterspace it. KaTeX's own font shorthand resets
+   font-variant-caps but not these two, so without this an x in \allcaps,
+   an open epigraph or an sfsidenotes title would become X, and a \Gamma in
+   \smallcaps a \gamma. .math holds the TeX for the client engine, and
+   .katex-error and code.math-error the TeX source of a failed formula. */
+:is(.katex, .katex-error, .math, .math-error) {
+    text-transform: none;
+    letter-spacing: normal;
+}
+
 /* Chroma names its LiteralStringChar token "sc" too (syntax.css): a
    character literal in highlighted code (a block or an inline
    highlight) keeps its letters and the monospace grid. */
@@ -776,11 +813,20 @@ a.citation-ref:visited {
 }
 
 /* Class options hyphenate / justified, and {.justify} {.raggedright}
-   {.raggedleft} on a single block. */
+   {.raggedleft} on a single block. In tufte-latex both are document-wide
+   (\AtBeginDocument{\@tufte@justification}), so the text blocks of the
+   column (a quote, an epigraph, an alert, a details block, the fullwidth
+   shortcode) follow them as well: they get the value on the block and
+   their paragraphs and items inherit it. Anything that sets its own
+   alignment or hyphenation keeps it (notes, captions, the attribution
+   footer, the open epigraphs, table cells, display math); a fullwidth
+   table and the index (raggedright, as theindex in tufte-book) are left
+   out. */
 body.tufte-hyphenate section > p,
 body.tufte-hyphenate section > ul,
 body.tufte-hyphenate section > ol,
-body.tufte-hyphenate section > dl {
+body.tufte-hyphenate section > dl,
+body.tufte-hyphenate section > :is(blockquote, details, div.epigraph, div.fullwidth:not(.table-wrapper, .tufte-index)) {
     -webkit-hyphens: auto;
     hyphens: auto;
 }
@@ -788,7 +834,8 @@ body.tufte-hyphenate section > dl {
 body.tufte-justified section > p,
 body.tufte-justified section > ul > li,
 body.tufte-justified section > ol > li,
-body.tufte-justified section > dl > dd {
+body.tufte-justified section > dl > dd,
+body.tufte-justified section > :is(blockquote, details, div.epigraph, div.fullwidth:not(.table-wrapper, .tufte-index)) {
     text-align: justify;
 }
 
@@ -799,17 +846,52 @@ section > p.justify {
     hyphens: auto;
 }
 
+/* {.nohyphens} on a block wins over the hyphenate option and {.justify}
+   above: :is() takes its heaviest argument, so this weighs (0,2,3) on any
+   body, more than body.tufte-hyphenate section > p (0,1,3); the second
+   line (0,4,3) beats the text-block line above (0,3,3). A paragraph
+   inside a quote or a fullwidth block with its own class wins over the
+   value it would inherit. The same holds for the ragged lines below. */
+:is(body.tufte-hyphenate, body) section > :is(p, ul, ol, dl).nohyphens,
+:is(body.tufte-hyphenate, body) section > :is(blockquote, details, div.epigraph, div.fullwidth:not(.table-wrapper, .tufte-index)).nohyphens {
+    -webkit-hyphens: none;
+    hyphens: none;
+}
+
+/* Monospace text and addresses are never hyphenated, whatever the
+   hyphenate option, {.justify} or the marginalia setting gives the block
+   around them: TeX's \texttt fonts have \hyphenchar -1 and \url never
+   breaks with a hyphen, so an identifier, a command name, a code line
+   wrapped in print or a URL keeps the characters the reader copies.
+   hyphens is inherited, so the value is set on the element itself. */
+:is(code, kbd, samp, pre, a.url, .bib-entry a) {
+    -webkit-hyphens: manual;
+    hyphens: manual;
+}
+
+/* Nor is a code block justified (TeX's verbatim and listings never are):
+   a code line wrapped in print (pre-wrap, theme.css and §12) would
+   otherwise inherit the justify of the list item, quote, alert, details,
+   fullwidth block or note around it and stretch the spaces in the code.
+   Code runs left to right in an RTL document too (theme.css), so the
+   value is left, not start. */
+:is(pre, span[data-sn="pre"]) {
+    text-align: left;
+}
+
 .raggedright,
 body.tufte-justified section > p.raggedright,
 body.tufte-justified section > ul.raggedright > li,
-body.tufte-justified section > ol.raggedright > li {
+body.tufte-justified section > ol.raggedright > li,
+body.tufte-justified section > :is(blockquote, details, div.epigraph, div.fullwidth:not(.table-wrapper, .tufte-index)).raggedright {
     text-align: left;
 }
 
 .raggedleft,
 body.tufte-justified section > p.raggedleft,
 body.tufte-justified section > ul.raggedleft > li,
-body.tufte-justified section > ol.raggedleft > li {
+body.tufte-justified section > ol.raggedleft > li,
+body.tufte-justified section > :is(blockquote, details, div.epigraph, div.fullwidth:not(.table-wrapper, .tufte-index)).raggedleft {
     text-align: right;
 }
 
@@ -977,6 +1059,12 @@ div.verse > p:last-child {
     text-indent: -1.4rem;
 }
 
+/* The <br> between verse lines is for readers without this stylesheet
+   (feeds): here the block lines already break. */
+.verse-br {
+    display: none;
+}
+
 body.tufte-indent div.verse > p {
     text-indent: 0;
 }
@@ -1117,10 +1205,12 @@ section > h6 {
     line-height: 1.364;
 }
 
-/* secnumdepth: "3.1  Title". */
+/* secnumdepth: "3.1  Title". titlesec's \titleformat{\section} (and
+   \subsection, \paragraph) of tufte-common.def sets the label in the
+   format of the whole heading (\itshape) with a 1em gap before the
+   title: the number keeps the heading's italic. */
 .tufte-num[data-kind="sec"] {
-    margin-right: 0.5em;
-    font-style: normal;
+    margin-inline-end: 1em;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1255,6 +1345,31 @@ body.tufte-sf section.abstract {
     overflow-y: hidden;
 }
 
+/* KaTeX's equation/align/gather environments number their rows with a
+   CSS counter of their own (katex.min.css: .eqn-num::before counts
+   katexEqnNo, reset only on body, so it runs through the page). A
+   display numbered by the theme (\label, the equation shortcode) has
+   one number, the theme's: KaTeX's row numbers are hidden there and do
+   not step KaTeX's counter. */
+.math-display.numbered .katex .eqn-num::before,
+.math-display.numbered .katex .mml-eqn-num::before {
+    content: none;
+    counter-increment: none;
+}
+
+/* \tag{X} with a \label (tufte/math-render.html): KaTeX prints the tag,
+   the wrapper span.math-display.tagged carries the id and is the
+   scroller with the display's margins. With the client engine the
+   display inside it is span.math.math-display: no second margin (the
+   wrapper's overflow would stop the two from collapsing) and no second
+   scroller. */
+.math-display.tagged > .math {
+    margin: 0;
+    width: auto;
+    max-width: 100%;
+    overflow: visible;
+}
+
 .eq-number {
     flex: 0 0 auto;
     margin-left: auto;
@@ -1293,20 +1408,25 @@ body.tufte-sf section.abstract {
     font-style: normal;
 }
 
+/* The reference list keeps natbib/book.cls's thebibliography (tufte
+   only redefines \bibsection): \normalsize 10/14pt (1.4rem on a 2rem
+   leading), a 10pt hang (1.4rem) and 4pt \itemsep + 4pt \parsep between
+   entries (22pt baseline to baseline, a 1.12rem gap), as in
+   sample-book.pdf and sample-handout.pdf. */
 ol.bibliography-list {
     box-sizing: border-box;
     width: 55%;
     list-style: none;
-    padding-left: 1.5em;
-    -webkit-padding-start: 1.5em;
-    padding-inline-start: 1.5em;
-    text-indent: -1.5em;
-    font-size: 1.2rem;
-    line-height: 1.5;
+    padding-left: 1.4rem;
+    -webkit-padding-start: 1.4rem;
+    padding-inline-start: 1.4rem;
+    text-indent: -1.4rem;
+    font-size: 1.4rem;
+    line-height: 2rem;
 }
 
 ol.bibliography-list > li {
-    margin: 0.5rem 0;
+    margin: 1.12rem 0;
 }
 
 ol.bibliography-list .bib-num {
@@ -1372,6 +1492,15 @@ ol.tufte-lof a:hover {
     text-indent: -2em;
     margin-top: 0;
     break-inside: avoid;
+}
+
+/* tufte-common.def: \@idxitem hangs 2em, \subitem is \hangindent 3em
+   \hspace*{1em} and \subsubitem 4em / 2em, all from the column edge. A
+   nested list starts in its parent item's 2em (or 3em) padding, so it
+   steps back 2em: subitem first line 1em, continuation 3em; subsubitem
+   2em and 4em. */
+.index-list ul {
+    margin-inline-start: -2em;
 }
 
 .index-list ul li {
@@ -1493,6 +1622,23 @@ ol.footnotes-list pre > code {
     margin-left: 0;
 }
 
+/* A quote in a real footnote or a margin block keeps the note look of
+   theme.css (1em in on both sides, its blocks fill it). The quotation
+   geometry of the text column (theme.css's 55% / 52.5% tables, math and
+   code; §12's 3.5% indent and (pt-7)% / (pt-12)% widths on paper) is not
+   for it: at (0,1,3), (0,3,3) and (0,3,4) these outrank those rules on
+   screen and in print, and the notes inside keep the container's
+   --pw/--pl. */
+:is(.margin-block, ol.footnotes-list) blockquote :is(p, footer),
+:is(.margin-block, ol.footnotes-list) blockquote:not(.alert) > :is(.math-display, div.table-wrapper, ul, ol, dl),
+:is(.margin-block, ol.footnotes-list) blockquote:not(.alert) > div.highlight > :is(pre, div) {
+    width: auto;
+    max-width: 100%;
+    margin-left: 0;
+    --pw: inherit;
+    --pl: inherit;
+}
+
 /* The reference: a small superscript that leaves the leading alone. */
 sup.footnote-ref {
     font-size: 0.75em;
@@ -1549,17 +1695,47 @@ li.footnote-item:target {
    column, as a \sidenote in itemize. The list item is 50% of the section,
    5% in, so 55% of it is 27.5% of the section and its right edge lands at
    55% + 33% = 88%, as for a paragraph. The theme's own lists with another
-   width are left out. Notes in nested lists keep this geometry, measured
-   against the narrower nested item (a known limitation on screen). The
-   print block overrides all of this with its --pw/--pl geometry. */
+   width are left out. The print block overrides all of this with its
+   --pw/--pl geometry (§12).
+
+   Nested lists (a list in an item or a dd) keep the browser's 40px
+   indent on screen: --tufte-nest adds up those indents (0 in a list
+   that is not nested), so a nested item N is the outer item less
+   --tufte-nest, with the same right edge (left to right). The note
+   rules of the lists (here, the dds, the fullwidth shortcode, alerts,
+   details and quotes) measure that outer item, 100% + --tufte-nest of
+   N, so a note in a nested item lands where it would in the outer one;
+   right to left the nested indents are on the right, so the note also
+   moves --tufte-nest further right. Theme navigation lists (contents,
+   index) are not prose lists and are left out. A quote, an alert, a
+   details block or the fullwidth shortcode is measured on its own, so
+   the count starts again inside it. An alert in an item measures the
+   item it sits in through --tufte-lnest, the item's own --tufte-nest
+   (inherited by the alert, whose --tufte-nest is 0). */
+:is(blockquote, details, div.fullwidth) {
+    --tufte-nest: 0px;
+}
+
+:is(li, dd) > :is(ul, ol):not(nav *, .toc *, .tufte-index *, .book-toc-chapters *) {
+    --tufte-nest-in: calc(var(--tufte-nest, 0px) + 40px);
+}
+
+:is(li, dd) > :is(ul, ol):not(nav *, .toc *, .tufte-index *, .book-toc-chapters *) > li {
+    --tufte-nest: var(--tufte-nest-in);
+}
+
+:is(li, dd) {
+    --tufte-lnest: var(--tufte-nest, 0px);
+}
+
 @media (width > 760px), print {
     ol.footnotes-list .sidenote,
     ol.footnotes-list .marginnote,
     section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters) > li .sidenote,
     section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters) > li .marginnote {
-        width: 55%;
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.55);
         min-width: 0;
-        margin-right: -66%;
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66);
     }
 }
 
@@ -1592,9 +1768,9 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
     }
 
     section > dl > dd :is(.sidenote, .marginnote):not(figure *) {
-        width: calc(55% + 1.155rem);
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 1.155rem);
         min-width: 0;
-        margin-right: calc(-66% - 1.386rem);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem);
     }
 
     div.fullwidth > :is(p, footer) :is(.sidenote, .marginnote):not(figure *),
@@ -1606,9 +1782,9 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
     }
 
     div.fullwidth > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *) {
-        width: 32.164%;
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.32164);
         min-width: 0;
-        margin-right: 2.339%;
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * 0.02339);
     }
 
     div.fullwidth > dl > dd :is(.sidenote, .marginnote):not(figure *) {
@@ -1630,8 +1806,14 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
    (D = C - 2.1rem): 50% + 1.05rem, -(60% + 1.26rem). Right to left the
    indents are on the right (inline start): an item ends 5% of C short
    of C (-68.421%), a dd 2.1rem (-(60% + 3.36rem)). Notes in nested
-   lists keep this geometry, measured against the narrower item (as in
-   a section list). Desktop screens; print uses --pw/--pl (§12). */
+   lists measure the outer item through --tufte-nest (as in a section
+   list, §9b), and so does the caption of a figure in an item or dd at
+   any depth, the figure filling it. In the formulas below C is
+   (100% + --tufte-nest) / 0.95 of an item, 100% + --tufte-nest + 2.1rem
+   of a dd; an alert that is not at section level (below the right-to-
+   left rules) narrows C and sets --tufte-ae/-ak/-ar/-an so that the
+   same formulas reach the note column (unset, as in details, they give
+   the values above). Desktop screens; print uses --pw/--pl (§12). */
 :is(section > details, blockquote.alert) > :is(ul, ol) {
     padding-inline-start: 5%;
 }
@@ -1641,41 +1823,76 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
 }
 
 @media screen and (width > 760px) {
-    :is(section > details, blockquote.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *) {
+    :is(section > details, blockquote.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    :is(section > details, blockquote.alert) > :is(ul, ol) li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         min-width: 0;
-        width: 52.632%;
-        margin-right: -63.158%;
+        width: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-ae, 0px)) * var(--tufte-ak, 1) * 0.5);
+        margin-right: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px));
     }
 
-    :is(section > details, blockquote.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+    :is(section > details, blockquote.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    :is(section > details, blockquote.alert) > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    :is(section > details, blockquote.alert) > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         min-width: 0;
-        width: calc(50% + 1.05rem);
-        margin-right: calc(-60% - 1.26rem);
+        width: calc((100% + var(--tufte-nest, 0px) + 2.1rem + var(--tufte-ae, 0px)) * var(--tufte-ak, 1) * 0.5);
+        margin-right: calc((100% + var(--tufte-nest, 0px) + 2.1rem + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px));
     }
 
-    html[dir="rtl"] :is(section > details, blockquote.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *) {
-        margin-right: -68.421%;
+    :is(section > details, blockquote.alert) > :is(ul, ol) li > figure:not(.fullwidth, .iframe-wrapper),
+    :is(section > details, blockquote.alert) > dl > dd > figure:not(.fullwidth, .iframe-wrapper),
+    :is(section > details, blockquote.alert) > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) {
+        max-width: 100%;
     }
 
-    html[dir="rtl"] :is(section > details, blockquote.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
-        margin-right: calc(-60% - 3.36rem);
+    :is(section > details, blockquote.alert) > :is(ul, ol) li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px));
+        margin-right: 0;
+    }
+
+    :is(section > details, blockquote.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    :is(section > details, blockquote.alert) > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px) + 2.1rem + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px));
+        margin-right: 0;
+    }
+
+    html[dir="rtl"] :is(section > details, blockquote.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > details, blockquote.alert) > :is(ul, ol) li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        margin-right: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px) - (100% + var(--tufte-nest, 0px)) * 0.05263 - var(--tufte-nest, 0px));
+    }
+
+    html[dir="rtl"] :is(section > details, blockquote.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > details, blockquote.alert) > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    html[dir="rtl"] :is(section > details, blockquote.alert) > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        margin-right: calc((100% + var(--tufte-nest, 0px) + 2.1rem + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px) - 2.1rem - var(--tufte-nest, 0px));
+    }
+
+    html[dir="rtl"] :is(section > details, blockquote.alert) > :is(ul, ol) li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px) - (100% + var(--tufte-nest, 0px)) * 0.05263 - var(--tufte-nest, 0px));
+        margin-right: 0;
+    }
+
+    html[dir="rtl"] :is(section > details, blockquote.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    html[dir="rtl"] :is(section > details, blockquote.alert) > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px) + 2.1rem + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px) - 2.1rem - var(--tufte-nest, 0px));
+        margin-right: 0;
     }
 }
 
 /* Figures nested in such a list item fill it, as tables, math and code
    do: the rule above then also fits their caption (its containing block
-   is the figure, as wide as the item). A figure inside the fullwidth
+   is the figure, as wide as the item), in a nested item too, through
+   --tufte-nest. A figure inside the fullwidth
    shortcode (div.fullwidth, 90% of the section) takes the text column,
    55/90 of the div, so its margin-note caption keeps tufte.css's figure
    geometry (50%, -60%: the note column). Screens only; print sets the
    same with --pw/--pl (§12). */
 @media screen and (width > 760px) {
-    :is(ol.footnotes-list, section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters)) > li > figure:not(.fullwidth, .iframe-wrapper) {
+    :is(ol.footnotes-list, section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters)) li > figure:not(.fullwidth, .iframe-wrapper) {
         max-width: 100%;
     }
 
-    :is(ol.footnotes-list, section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters)) > li > figure.caption-bottom:not(.fullwidth) > span.marginnote {
-        right: -66%;
+    :is(ol.footnotes-list, section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters)) li > figure.caption-bottom:not(.fullwidth) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * -0.66);
         margin-right: 0;
     }
 
@@ -1716,39 +1933,45 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
        it as in a section-level item: its caption then takes the
        container's note geometry (above and §2), measured from the figure,
        as wide as the container. The section dd rule leaves figures out,
-       so the caption gets it here. */
-    :is(section > dl > dd, :is(section, div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl) > :is(li, dd)) > figure:not(.fullwidth, .iframe-wrapper) {
+       so the caption gets it here. The same holds for an item of a list
+       nested in them (--tufte-nest, §9b). */
+    :is(section > dl > dd, :is(section, div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl) > :is(li, dd)) > figure:not(.fullwidth, .iframe-wrapper),
+    :is(section > dl > dd, :is(section, div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl)) li > figure:not(.fullwidth, .iframe-wrapper) {
         max-width: 100%;
     }
 
-    section > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        width: calc(55% + 1.155rem);
+    section > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    section > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 1.155rem);
         min-width: 0;
-        margin-right: calc(-66% - 1.386rem);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem);
     }
 
-    section > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        right: calc(-66% - 1.386rem);
+    section > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    section > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem);
         margin-right: 0;
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        right: calc(-66% - 30.4px);
+    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 30.4px);
         margin-right: 0;
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        right: calc(-66% - 1.386rem - 30.4px);
+    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem - 30.4px);
         margin-right: 0;
     }
 
-    div.open-epigraph > blockquote > :is(ul, ol) > li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        right: calc(2.353% - 30.4px);
+    div.open-epigraph > blockquote > :is(ul, ol) li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * 0.02353 - 30.4px);
         margin-right: 0;
     }
 
-    div.open-epigraph > blockquote > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        right: calc(2.353% + 0.049rem - 30.4px);
+    div.open-epigraph > blockquote > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    div.open-epigraph > blockquote > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * 0.02353 + 0.049rem - 30.4px);
         margin-right: 0;
     }
 }
@@ -1761,7 +1984,9 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
    right, ends at 50% - 2.1rem (76% of D + 3.696rem); an item of
    div.fullwidth's lists ends at 85.5% (2.5/85.5 short of the edge); an
    item or dt of a quote list ends at 50% of the section (76% of L +
-   30.4px). Desktop screens; print keeps the left-hand indent of §12. */
+   30.4px). A nested item ends --tufte-nest short of its outer item
+   (§9b), so its notes move that much further right. Desktop screens;
+   print keeps the left-hand indent of §12. */
 @media screen and (width > 760px) {
     html[dir="rtl"] :is(section, div.fullwidth) > dl > dd {
         margin-left: 0;
@@ -1770,47 +1995,260 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
 
     html[dir="rtl"] :is(ol.footnotes-list, section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters)) > li :is(.sidenote, .marginnote),
     html[dir="rtl"] section > dl > dt :is(.sidenote, .marginnote):not(figure *) {
-        margin-right: -76%;
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - var(--tufte-nest, 0px));
     }
 
-    html[dir="rtl"] :is(ol.footnotes-list, section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters)) > li > figure.caption-bottom:not(.fullwidth) > span.marginnote {
-        right: -76%;
+    html[dir="rtl"] :is(ol.footnotes-list, section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters)) li > figure.caption-bottom:not(.fullwidth) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - var(--tufte-nest, 0px));
         margin-right: 0;
     }
 
     html[dir="rtl"] section > dl > dd :is(.sidenote, .marginnote):not(figure *),
-    html[dir="rtl"] section > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        margin-right: calc(-76% - 3.696rem);
+    html[dir="rtl"] section > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    html[dir="rtl"] section > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 3.696rem - var(--tufte-nest, 0px));
     }
 
-    html[dir="rtl"] section > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        right: calc(-76% - 3.696rem);
+    html[dir="rtl"] section > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    html[dir="rtl"] section > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 3.696rem - var(--tufte-nest, 0px));
         margin-right: 0;
     }
 
     html[dir="rtl"] div.fullwidth > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *) {
-        margin-right: -2.924%;
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.02924 - var(--tufte-nest, 0px));
     }
 
     html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote),
     html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote) {
-        margin-right: calc(-76% - 30.4px);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 30.4px - var(--tufte-nest, 0px));
     }
 
     /* A dd of a quote list, its 2.1rem indent on the right, ends 2.1rem
        short of the item edge: 76% of D + 3.696rem + 30.4px. */
     html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote) {
-        margin-right: calc(-76% - 3.696rem - 30.4px);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 3.696rem - 30.4px - var(--tufte-nest, 0px));
     }
 
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        right: calc(-76% - 30.4px);
+    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 30.4px - var(--tufte-nest, 0px));
         margin-right: 0;
     }
 
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
-        right: calc(-76% - 3.696rem - 30.4px);
+    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+        right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 3.696rem - 30.4px - var(--tufte-nest, 0px));
         margin-right: 0;
+    }
+}
+
+/* Alerts that are not at section level. An alert in a list item, a dd
+   or the details shortcode fills it (theme.css), so its paragraphs (C,
+   the alert less its 1.2rem padding and 2px rule) are wider than an
+   alert's own 55%. With S the section and R the box the alert fills,
+   measured from C as R = C + --tufte-ae, the text column is
+   0.55 S = --tufte-ak R and the note column 27.5% of S, its right edge
+   60% of the text column past it:
+     in an item (R = 0.5 S, its right edge at 55%):
+       ae 1.2rem + 2px + the item's nesting (--tufte-lnest), ak 1.1
+     in a dd (R = D + 2.1rem):            ae 3.3rem + 2px + nesting, ak 1.1
+     in a real footnote (its quotes' 1em = 1.1rem margins, theme.css):
+       ae 3.4rem + 2px + nesting, ak 1.1, right edge 1.1rem in (an)
+     in details (R = 55% of S):           ae 1.2rem + 2px, ak 1
+   A note in a paragraph (P = C) is then (100% + ae) ak / 2 wide, with
+   margin-right -((100% + ae) (0.6 ak + ar) + an): 50% and -60% for an
+   alert at section level (theme.css), whose values are the defaults
+   (ae 0, ak 1, ar 0, an 0). Right to left an item ends 5% of S (0.1 R,
+   --tufte-ar) and its nesting further left, a dd also its 2.1rem
+   (--tufte-an). The alert's lists use the same terms (above). A quote in
+   an alert keeps the UA's 40px (pinned), so its paragraphs are
+   C - 80px, their right edge 40px short of C's. Desktop screens: print
+   measures the alert with --pw/--pl (§12), phones toggle. */
+blockquote.alert {
+    --tufte-ae: 0px;
+    --tufte-ak: 1;
+    --tufte-ar: 0;
+    --tufte-an: 0px;
+}
+
+@media screen and (width > 760px) {
+    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) li:not(:is(blockquote, details, div.fullwidth) *) > blockquote.alert {
+        --tufte-ae: calc(1.2rem + 2px + var(--tufte-lnest, 0px));
+        --tufte-ak: 1.1;
+    }
+
+    :is(section > dl > dd, section > dl > dd li:not(:is(blockquote, details, div.fullwidth) *)) > blockquote.alert {
+        --tufte-ae: calc(3.3rem + 2px + var(--tufte-lnest, 0px));
+        --tufte-ak: 1.1;
+    }
+
+    ol.footnotes-list li:not(:is(blockquote, details, div.fullwidth) *) > blockquote.alert {
+        --tufte-ae: calc(3.4rem + 2px + var(--tufte-lnest, 0px));
+        --tufte-ak: 1.1;
+        --tufte-an: 1.1rem;
+    }
+
+    section > details > blockquote.alert {
+        --tufte-ae: calc(1.2rem + 2px);
+    }
+
+    html[dir="rtl"] section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) li:not(:is(blockquote, details, div.fullwidth) *) > blockquote.alert {
+        --tufte-ar: 0.1;
+        --tufte-an: var(--tufte-lnest, 0px);
+    }
+
+    html[dir="rtl"] :is(section > dl > dd, section > dl > dd li:not(:is(blockquote, details, div.fullwidth) *)) > blockquote.alert {
+        --tufte-ar: 0.1;
+        --tufte-an: calc(2.1rem + var(--tufte-lnest, 0px));
+    }
+
+    html[dir="rtl"] ol.footnotes-list li:not(:is(blockquote, details, div.fullwidth) *) > blockquote.alert {
+        --tufte-ar: 0.1;
+        --tufte-an: calc(1.1rem + var(--tufte-lnest, 0px));
+    }
+
+    /* After the list rules above (same specificity, also right to
+       left). */
+    :is(li, dd, details) > blockquote.alert > :is(p, footer) :is(.sidenote, .marginnote),
+    html[dir="rtl"] :is(li, dd, details) > blockquote.alert > :is(p, footer) :is(.sidenote, .marginnote) {
+        min-width: 0;
+        width: calc((100% + var(--tufte-ae, 0px)) * var(--tufte-ak, 1) * 0.5);
+        margin-right: calc((100% + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px));
+    }
+
+    blockquote.alert > blockquote:not(.alert) {
+        margin-left: 40px;
+        margin-right: 40px;
+    }
+
+    blockquote.alert > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    html[dir="rtl"] blockquote.alert > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote) {
+        min-width: 0;
+        width: calc((100% + 80px + var(--tufte-ae, 0px)) * var(--tufte-ak, 1) * 0.5);
+        margin-right: calc((100% + 80px + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px) - 40px);
+    }
+}
+
+/* Lists in a quote that is not at section level.
+   In a quote in a section-level list item or dd, or in the details
+   shortcode (§2: Q wide, the UA's 40px pinned, its paragraphs filling
+   it), a list fills the quote, 5% of Q in, its dds 2.1rem in (as the
+   lists of a section-level quote), and a paragraph of a loose item fills
+   the item: an item is L = 0.95 Q, a dd D = 0.95 Q - 2.1rem. The
+   container sets R = Q + --tufte-qe, the text column 0.55 S =
+   --tufte-qk R, and the gap between Q's right edge and the text
+   column's, --tufte-qd (+ --tufte-qr R right to left):
+     in an item (R = 0.5 S):        qe 80px,          qk 1.1, qd 40px
+     in a dd (R = D + 2.1rem):      qe 80px + 2.1rem, qk 1.1, qd 40px
+     in details (R = 55% of S):     qe 80px,          qk 1,   qd 40px
+   and right to left qr 0.1 in an item or dd, and qd 2.1rem more in a dd.
+   A note in an item (Q = (100% + --tufte-nest) / 0.95) or a dd
+   (Q = (100% + --tufte-nest + 2.1rem) / 0.95) is (Q + qe) qk / 2 wide,
+   with margin-right -((Q + qe) (0.6 qk + qr) + qd); right to left the
+   list's indents are on the right, 5% of Q and the nesting (and the
+   dd's 2.1rem) further left.
+   In a quote nested in a section-level quote (Q = S - 160px, 80px in;
+   tufte.css's 55% paragraphs, §2) a list is 50% of Q + 5%, as in the
+   outer quote: an item, L = 0.5 Q, ends at 55% - 8px, so its notes are
+   55% of L + 44px wide, margin-right -(66% of L + 60.8px), a dd's
+   (D = L - 2.1rem) 1.155rem and 1.386rem more; right to left an item
+   ends at 50% (-(76% of L + 60.8px)), a dd 2.1rem before it
+   (-(76% of D + 3.696rem + 60.8px)). Desktop screens: print measures the
+   lists with --pw/--pl (§12), phones toggle. */
+@media screen and (width > 760px) {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol, dl) {
+        width: auto;
+        -webkit-padding-start: 5%;
+        padding-inline-start: 5%;
+    }
+
+    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(ul, ol, dl) {
+        width: 50%;
+        -webkit-padding-start: 5%;
+        padding-inline-start: 5%;
+    }
+
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > blockquote:not(.alert) > :is(ul, ol, dl) p {
+        width: auto;
+        margin-right: 0;
+    }
+
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > blockquote:not(.alert) > dl > dd {
+        margin-inline-start: 2.1rem;
+    }
+
+    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) {
+        --tufte-qe: 80px;
+        --tufte-qk: 1.1;
+        --tufte-qd: 40px;
+        --tufte-qr: 0;
+    }
+
+    section > dl > dd > blockquote:not(.alert) {
+        --tufte-qe: calc(80px + 2.1rem);
+        --tufte-qk: 1.1;
+        --tufte-qd: 40px;
+        --tufte-qr: 0;
+    }
+
+    section > details > blockquote:not(.alert) {
+        --tufte-qe: 80px;
+        --tufte-qk: 1;
+        --tufte-qd: 40px;
+        --tufte-qr: 0;
+    }
+
+    html[dir="rtl"] section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) {
+        --tufte-qr: 0.1;
+    }
+
+    html[dir="rtl"] section > dl > dd > blockquote:not(.alert) {
+        --tufte-qr: 0.1;
+        --tufte-qd: calc(40px + 2.1rem);
+    }
+
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
+        min-width: 0;
+        width: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-qe, 0px)) * var(--tufte-qk, 1) * 0.5);
+        margin-right: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-qe, 0px)) * (var(--tufte-qk, 1) * -0.6 - var(--tufte-qr, 0)) - var(--tufte-qd, 0px));
+    }
+
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+        min-width: 0;
+        width: calc(((100% + var(--tufte-nest, 0px) + 2.1rem) * 1.05263 + var(--tufte-qe, 0px)) * var(--tufte-qk, 1) * 0.5);
+        margin-right: calc(((100% + var(--tufte-nest, 0px) + 2.1rem) * 1.05263 + var(--tufte-qe, 0px)) * (var(--tufte-qk, 1) * -0.6 - var(--tufte-qr, 0)) - var(--tufte-qd, 0px));
+    }
+
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
+        margin-right: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-qe, 0px)) * (var(--tufte-qk, 1) * -0.6 - var(--tufte-qr, 0)) - var(--tufte-qd, 0px) - (100% + var(--tufte-nest, 0px)) * 0.05263 - var(--tufte-nest, 0px));
+    }
+
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+        margin-right: calc(((100% + var(--tufte-nest, 0px) + 2.1rem) * 1.05263 + var(--tufte-qe, 0px)) * (var(--tufte-qk, 1) * -0.6 - var(--tufte-qr, 0)) - var(--tufte-qd, 0px) - (100% + var(--tufte-nest, 0px) + 2.1rem) * 0.05263 - 2.1rem - var(--tufte-nest, 0px));
+    }
+
+    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
+        min-width: 0;
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 44px);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 60.8px);
+    }
+
+    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+        min-width: 0;
+        width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 1.155rem + 44px);
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem - 60.8px);
+    }
+
+    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 60.8px - var(--tufte-nest, 0px));
+    }
+
+    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+        margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 3.696rem - 60.8px - var(--tufte-nest, 0px));
     }
 }
 
@@ -1983,6 +2421,35 @@ nav.book-toc {
     margin: 2rem 0 4rem;
 }
 
+/* Its heading is a \chapter* title (\huge italic, as .chapter-title),
+   above the size of the entries: tufte-common.def's \titlecontents sets
+   part and chapter entries in \LARGE (14/18pt, 1.96rem) italic, each
+   after \vspace{1.5\baselineskip} (21pt, 2.94rem), and section entries
+   in \Large (12/16pt, 1.68rem). */
+nav.book-toc > h2 {
+    font-style: italic;
+    font-weight: 400;
+    font-size: 2.8rem;
+    line-height: 1.5;
+    margin: 0 0 1.4rem;
+}
+
+/* The book's own contents (the landing's, also in print.html) is
+   book.cls's \chapter*{\contentsname}, which titlesec spaces as every
+   chapter: \titlespacing*{\chapter}{0pt}{50pt}{40pt}, the 7rem / 5.6rem
+   of header.chapter-head (reduced with it on narrow screens). The nav
+   adds no top margin of its own, so after the forced page break of the
+   front-matter page before it the title starts at the height of the
+   List of Figures and of every chapter title. A tableofcontents
+   shortcode inside a chapter keeps the compact spacing above. */
+article.book-landing > nav.book-toc {
+    margin-top: 0;
+}
+
+article.book-landing > nav.book-toc > h2 {
+    margin: 7rem 0 5.6rem;
+}
+
 .book-toc ol,
 ol.book-toc-chapters {
     list-style: none;
@@ -1994,24 +2461,24 @@ ol.book-toc-chapters {
 .book-toc li.toc-chapter,
 ol.book-toc-chapters > li {
     font-style: italic;
-    font-size: 2.2rem;
-    line-height: 1.3;
+    font-size: 1.96rem;
+    line-height: 1.286;
     margin-top: 1.5em;
 }
 
 .book-toc li.toc-part {
-    margin-top: 2.5rem;
+    margin-top: 2.94rem;
 }
 
 .book-toc li.toc-part > .toc-part-title {
     font-style: italic;
-    font-size: 2.6rem;
-    line-height: 1.3;
+    font-size: 1.96rem;
+    line-height: 1.286;
 }
 
 .book-toc .toc-sections {
-    font-size: 1.6rem;
-    line-height: 1.4;
+    font-size: 1.68rem;
+    line-height: 1.333;
     padding-inline-start: 2em;
     margin-top: 0.3em;
 }
@@ -2020,10 +2487,11 @@ ol.book-toc-chapters > li {
     margin-top: 0.2em;
 }
 
+/* \titlecontents{chapter}: the label in a \contentslabel{2em} box, in the
+   entry's \itshape (only the page number is \upshape). */
 .book-toc .toc-num {
     display: inline-block;
-    min-width: 1.5em;
-    font-style: normal;
+    min-width: 2em;
 }
 
 .book-toc a,
@@ -2250,7 +2718,8 @@ nav.book-nav .next {
     }
 
     article.chapter header.chapter-head,
-    article.part header.part-head {
+    article.part header.part-head,
+    article.book-landing > nav.book-toc > h2 {
         margin: 3rem 0 2.5rem;
     }
 
@@ -2258,6 +2727,11 @@ nav.book-nav .next {
         font-size: 2.2rem;
         line-height: 1.3;
         max-width: 100%;
+    }
+
+    nav.book-toc > h2 {
+        font-size: 2.2rem;
+        line-height: 1.3;
     }
 
     .chapter-number {
@@ -2270,17 +2744,17 @@ nav.book-nav .next {
         line-height: 1.3;
     }
 
+    /* The \LARGE entries scaled with the contents heading (2.8rem to
+       2.2rem): 1.96rem to 1.54rem, parts as chapters. The \Large section
+       entries stop at the body size, never below the text. */
     .book-toc li.toc-chapter,
-    ol.book-toc-chapters > li {
-        font-size: 1.7rem;
-    }
-
+    ol.book-toc-chapters > li,
     .book-toc li.toc-part > .toc-part-title {
-        font-size: 2rem;
+        font-size: 1.54rem;
     }
 
     .book-toc .toc-sections {
-        font-size: 1.3rem;
+        font-size: 1.4rem;
         padding-inline-start: 1em;
     }
 
@@ -2415,10 +2889,15 @@ nav.book-nav .next {
 
     /* A figure in a list item (or footnote), a dd, or an item or dd of a
        list in a quote fills it and keeps its geometry for the caption
-       (see the lists below). */
+       (see the lists below). So does a figure in an item of a nested
+       list, or of a list in a dd, an alert or a details block, at any
+       depth (the nested lists below carry their own --pw/--pl). The
+       fullwidth shortcode's lists and the theme's navigation lists are
+       left out. */
     :is(section > ul, section > ol, div.footnotes > ol) > li > figure:not(.fullwidth),
     section > dl > dd > figure:not(.fullwidth),
-    blockquote:not(.alert) > :is(ul, ol, dl) > :is(li, dd) > figure:not(.fullwidth) {
+    blockquote:not(.alert) > :is(ul, ol, dl) > :is(li, dd) > figure:not(.fullwidth),
+    :is(section, div.footnotes, blockquote, details) :is(li, dd):not(div.fullwidth *, nav *, .toc *, .tufte-index *) > figure:not(.fullwidth) {
         width: auto;
         --pw: inherit;
         --pl: inherit;
@@ -2471,30 +2950,45 @@ nav.book-nav .next {
         margin-right: 0;
     }
 
+    /* An alert in a list item (or footnote), a dd or details fills it
+       (theme.css) and keeps its --pw/--pl; at section level it is the
+       text column (above). Its paragraphs and lists measure the alert,
+       through --aw/--al (--pw cannot refer to itself). */
+    :is(li, dd, details) > blockquote.alert {
+        --pw: inherit;
+        --pl: inherit;
+    }
+
+    :is(section > details, blockquote.alert) {
+        --aw: var(--pw);
+        --al: var(--pl);
+    }
+
     blockquote.alert p,
     blockquote.alert footer {
         width: auto;
         margin-left: 0;
-        --pw: var(--pt);
-        --pl: 0;
+        --pw: var(--aw);
+        --pl: var(--al);
     }
 
     /* Lists in an alert or the details shortcode (§9b): 5% of the
        container in, on the left (right to left too, as the lists
        above), their dds 5% of the list; a paragraph of a loose item or
-       dd fills it. The container's --pw/--pl are --pt and 0. */
+       dd fills it. The container's --pw/--pl are --aw/--al (--pt and 0
+       at section level). */
     :is(section > details, blockquote.alert) > :is(ul, ol) {
         padding-left: 5%;
         padding-right: 0;
-        --pw: calc(var(--pt) * 0.95);
-        --pl: calc(var(--pt) * 0.05);
+        --pw: calc(var(--aw) * 0.95);
+        --pl: calc(var(--al) + var(--aw) * 0.05);
     }
 
     :is(section > details, blockquote.alert) > dl > dd {
         margin-left: 5%;
         margin-right: 0;
-        --pw: calc(var(--pt) * 0.95);
-        --pl: calc(var(--pt) * 0.05);
+        --pw: calc(var(--aw) * 0.95);
+        --pl: calc(var(--al) + var(--aw) * 0.05);
     }
 
     blockquote.alert > :is(ul, ol, dl) p {
@@ -2571,6 +3065,28 @@ nav.book-nav .next {
         --pl: calc(var(--ql) + var(--qw) * 0.05);
     }
 
+    /* A list in such a quote: 5% in on both sides as its paragraphs, its
+       items 5% of the quote further in, its dds 5% of the list further
+       still (as a list in a section-level quote, measured from the
+       container instead of the text column). */
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol, dl) {
+        width: auto;
+        max-width: none;
+        margin-left: 5%;
+        margin-right: 5%;
+        padding-left: 5%;
+        -webkit-padding-start: 5%;
+        padding-inline-start: 5%;
+        padding-right: 0;
+        --pw: calc(var(--qw) * 0.85);
+        --pl: calc(var(--ql) + var(--qw) * 0.1);
+    }
+
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dd {
+        --pw: calc(var(--qw) * 0.8075);
+        --pl: calc(var(--ql) + var(--qw) * 0.1425);
+    }
+
     /* The abstract (a quotation in tufte-handout): its indents in % of
        the page, as the quotations above, so the notes can measure them. */
     section.abstract > p {
@@ -2597,6 +3113,26 @@ nav.book-nav .next {
         margin-left: 3%;
         --pw: 97;
         --pl: 3;
+    }
+
+    /* Nested lists (a list in an item or a dd, in a section, a footnote,
+       a quote, an alert, details or the fullwidth shortcode): 5% of the
+       item in, in place of the browser's 40px, measured from the item's
+       --pw/--pl (kept as --lw/--ll, since --pw cannot refer to itself),
+       so their notes and captions reach the margin column too. The
+       theme's navigation lists (contents, index) keep their own indent. */
+    :is(li, dd) {
+        --lw: var(--pw);
+        --ll: var(--pl);
+    }
+
+    :is(li, dd) > :is(ul, ol):not(nav *, .toc *, .tufte-index *, .book-toc-chapters *) {
+        padding-left: 5%;
+        -webkit-padding-start: 5%;
+        padding-inline-start: 5%;
+        padding-right: 0;
+        --pw: calc(var(--lw) * 0.95);
+        --pl: calc(var(--ll) + var(--lw) * 0.05);
     }
 
     /* Right to left keeps these left-hand indents on paper (§12): undo
@@ -2792,24 +3328,65 @@ nav.book-nav .next {
         display: none !important;
     }
 
-    /* Book: chapters and the front-matter pages start on a new page. */
+    /* Book: chapters and the front-matter pages start on a new page.
+       tufte-book is openright: \chapter (and \frontmatter, \mainmatter,
+       \backmatter) begins with \cleardoublepage, so every chapter, the
+       bibliography and the index open on a recto (a blank verso before
+       them when needed). The part pages (tufte/book/print-style.html) do
+       the same. */
     article.chapter {
-        break-before: page;
+        break-before: right;
     }
 
     /* Each front-matter page has a page to itself (\cleardoublepage
        before the dedication in sample-book.tex): break before as well as
-       after, so a page following the contents never starts under it. */
+       after, so a page following the contents never starts under it.
+       section.copyright-page and section.dedication match the weight
+       (0,1,1) of their screen rules (min-height: 50vh), which would
+       otherwise win on paper and end the copyright notice (\vfill, then
+       the text at the foot of the page) halfway down. */
     .title-page,
     .copyright-page,
+    section.copyright-page,
     .open-epigraphs,
     .frontispiece,
     .dedication,
+    section.dedication,
     .half-title {
         min-height: var(--print-page-h);
         break-before: page;
         break-after: page;
         box-sizing: border-box;
+    }
+
+    /* Sides of the spread. \maketitlepage begins with \cleardoublepage
+       (tufte-common.def), so the title page is a recto, and the
+       frontispiece is the verso facing it (a blank recto before the
+       frontispiece when needed). The landing's contents (\tableofcontents,
+       a \chapter*) and its dedication (\cleardoublepage in
+       sample-book.tex) open on a recto too. The half title is the first
+       page, a recto; the epigraphs and the copyright page keep a plain
+       break (versos 2 and 4 of sample-book.tex). section.dedication
+       repeats the weight of the rule above. */
+    .frontispiece {
+        break-before: left;
+    }
+
+    .title-page,
+    .dedication,
+    section.dedication,
+    article.book-landing > nav.book-toc {
+        break-before: right;
+    }
+
+    /* The copyright page is set in the fullwidth environment
+       (sample-book.tex): its paragraphs fill the page width on paper, as
+       every other fullwidth block does, not the 90% of the screen rule. */
+    section.copyright-page > p {
+        width: 100%;
+        max-width: none;
+        --pw: 100;
+        --pl: 0;
     }
 
     /* The landing's contents (not a tableofcontents shortcode inside a
@@ -2839,9 +3416,10 @@ nav.book-nav .next {
         break-after: page;
     }
 
-    article.chapter header.chapter-head {
-        margin-top: 4rem;
-    }
+    /* The chapter head keeps the screen margins on paper:
+       \titlespacing*{\chapter}{0pt}{50pt}{40pt} is 7rem / 5.6rem at the
+       print root size (§10), as the part head keeps its 7rem and the
+       book's Contents title (a \chapter*) its 7rem / 5.6rem. */
 
     /* Chapter titles are set full width (\titleformat … {fullwidth}). */
     .chapter-title,
@@ -2857,6 +3435,8 @@ nav.book-nav .next {
         font-family: var(--tufte-sans, "Gill Sans", "Gill Sans MT", Calibri, sans-serif);
         font-size: 0.8em;
         overflow-wrap: anywhere;
+        -webkit-hyphens: manual;
+        hyphens: manual;
         color: var(--tufte-muted, #444);
     }
 

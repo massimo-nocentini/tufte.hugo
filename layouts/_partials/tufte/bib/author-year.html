@@ -1,0 +1,36 @@
+{{- /*
+  The natbib author-year group of a cite key as a page resolves it: the
+  entry of the page's database (tufte/bib/db.html), else of the first page
+  of its scope that holds the key (tufte/scope.html), as tufte/bib/list.html
+  looks entries up. tufte/bib/extra.html groups the cited entries of a
+  scope by it, and tufte/postprocess.html checks that the entry a page
+  resolves is the one that earned the letter (a page may resolve a key to
+  another entry than its scope does).
+
+  Takes a dict:
+    page  the page
+    key   the lowercased cite key
+  Returns: a dict  group ("author label|year", lowercased), sort (the
+  plainnat sort key) — or "" when the key is unknown or has no year.
+*/ -}}
+{{- $p := .page -}}
+{{- $k := .key -}}
+{{- $raw := index (partialCached "tufte/bib/db.html" $p (or $p.RelPermalink $p.Path)) $k -}}
+{{- $from := $p -}}
+{{- if not $raw -}}
+  {{- range partial "tufte/scope.html" $p -}}
+    {{- if not $raw -}}
+      {{- with index (partialCached "tufte/bib/db.html" . (or .RelPermalink .Path)) $k }}{{ $raw = . }}{{ end -}}
+      {{- if $raw }}{{ $from = . }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $res := "" -}}
+{{- with $raw -}}
+  {{- $e := partialCached "tufte/bib/normalize.html" (dict "entry" . "key" $k) (or $from.RelPermalink $from.Path) $k -}}
+  {{- with printf "%v" ($e.year | default "") | strings.TrimSpace -}}
+    {{- $who := partial "tufte/bib/cite-label.html" (dict "n" $e "key" $k) -}}
+    {{- $res = dict "group" (printf "%s|%s" (lower $who) .) "sort" (printf "%s|%s" $e.sortkey $k) -}}
+  {{- end -}}
+{{- end -}}
+{{- return $res -}}

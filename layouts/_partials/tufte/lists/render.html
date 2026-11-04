@@ -87,7 +87,7 @@
            (finished spans become <xspan>, finished notes are replaced by
            the cut sentinel <zcut>, which the $C class lets through). */ -}}
     {{- if findRE `<span class="(?:sidenote|marginnote|citation-block)` $text 1 -}}
-      {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<s[^p]|</[^s]|</s[^p])*` -}}
+      {{- $C := `(?:[^<]|<[^s/t]|<t[^u]|<tu[^f]|<tuf[^n]|<s[^p]|</[^s]|</s[^p])*` -}}
       {{- $text = replaceRE `<span class="(sidenote|marginnote|citation-block)` `<tufnote class="$1` $text -}}
       {{- range seq 40 -}}
         {{- if not (or (strings.Contains $text "<span") (strings.Contains $text "<tufnote")) }}{{ break }}{{ end -}}
@@ -125,7 +125,7 @@
     {{- $num := "" -}}
     {{- with $e.display }}{{ $num = printf `<span class="lof-num">%v</span> ` . }}{{ end -}}
     {{- $whereHTML := "" -}}
-    {{- if $root }}{{ $whereHTML = printf `<span class="lof-where">%s</span>` (partial "tufte/plain-title.html" (dict "page" $c) | htmlEscape) }}{{ end -}}
+    {{- if $root }}{{ $whereHTML = printf `<span class="lof-where">%s</span>` (partial "tufte/name-title.html" (dict "page" $c)) }}{{ end -}}
     {{- $lis = $lis | append (printf `<li>%s%s</li>` (partial "tufte/page-link.html" (dict "page" $c "anchor" ($e.anchor | default "") "html" (printf "%s%s" $num $text) "book" $root)) $whereHTML) -}}
   {{- end -}}
 {{- end -}}

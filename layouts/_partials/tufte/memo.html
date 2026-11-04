@@ -9,8 +9,10 @@
 
     .Store.Set KEY (dict "v" VALUE "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp"))
 
-  and is valid only in that build (an edit shows on the next rebuild). If
-  the stamp is ever evicted, it changes, and the memos are computed again.
+  and is valid only in that build (an edit shows on the next rebuild). The
+  stamp is kept in hugo.Store and changed only at the end of a build
+  (baseof.html), so an eviction from partialCached gives the same stamp
+  back and no memo is computed twice in one build.
 
   Takes: a dict with page and key.
   Returns: the stored map ({v, b}) when it is from this build, else false.

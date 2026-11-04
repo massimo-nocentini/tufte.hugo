@@ -1,0 +1,15 @@
+{{- /*
+  Whether Goldmark's footnote extension is on
+  (markup.goldmark.extensions.footnote, true by default). Templates cannot
+  read the markup configuration, so a probe text with one footnote is
+  rendered with the page's RenderString: the extension is on when
+  Goldmark made a footnote reference of it. With the extension off,
+  "[^x]" is literal text in the page and in RenderString alike, and the
+  theme leaves it so (tufte/render-inner.html copies no definition).
+
+  Takes: a page. Call it with partialCached, keyed by the language name
+  (the markup configuration may differ per language).
+  Returns: bool.
+*/ -}}
+{{- $probe := .RenderString (dict "display" "block") "x[^tuftefnprobe]\n\n[^tuftefnprobe]: y\n" | string -}}
+{{- return (strings.Contains $probe "footnote-ref") -}}

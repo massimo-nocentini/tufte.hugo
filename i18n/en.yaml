@@ -34,6 +34,8 @@ alertWarning: "Warning"
 alertCaution: "Caution"
 translations: "Translations"
 undated: "Undated"
+# The title of a regular page without one (tufte/page-title.html).
+untitled: "Untitled"
 # The short date of the archive list (a Go layout: month and day).
 archiveDateFormat: "Jan 2"
 # The date of the post metadata, summaries and title blocks, unless
@@ -90,6 +92,8 @@ bibIn: "in"
 # Page locator of a citation (cite page=): one page, a range or list.
 bibPageAbbr: "p."
 bibPagesAbbr: "pp."
+# One page in an entry ("pages 3–4", but "page 42"; plainnat's bbl.page).
+bibPage: "page"
 bibNamesLast: "{{ .Names }}, and {{ .Last }}"
 phdThesis: "PhD thesis"
 mastersThesis: "Master's thesis"

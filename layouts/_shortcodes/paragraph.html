@@ -17,7 +17,7 @@
 
   Output (SPEC-LATEX §3.8): <span class="run-in"[ id="KEY"]>TITLE</span>
 */ -}}
-{{- $text := strings.TrimSpace .Inner -}}
+{{- $text := strings.TrimSpace .InnerDeindent -}}
 {{- $label := "" -}}
 {{- if .IsNamedParams -}}
   {{- if not $text }}{{ $text = printf "%v" (.Get "text" | default "") }}{{ end -}}
@@ -27,8 +27,8 @@
 {{- end -}}
 {{- $html := "" -}}
 {{- with $text -}}
-  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.Inner) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
-  {{- $html = $html | replaceRE `</p>\s*<p>` " " | replaceRE `</?p>` "" | strings.TrimSpace -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $.Page "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.InnerDeindent) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = partial "func/flatten-p.html" (dict "html" $html "sep" " ") | strings.TrimSpace -}}
 {{- end -}}
 {{- $idAttr := "" -}}
 {{- with partial "tufte/label-key.html" (dict "key" $label "where" (printf "%s shortcode in %v" .Name .Position)) -}}

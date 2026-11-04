@@ -21,7 +21,9 @@
 
   Validated here (warning tufte-bad-option, naming the file or the site
   configuration that sets the value; the preset's default is used
-  instead): style (css, latex), the boolean options (a bool, or true,
+  instead): a `tufte` value that is not a table, or a scalar in place of
+  an option group (headings, book, print…; ignored), style (css, latex),
+  the boolean options (a bool, or true,
   false, yes, no, on, off, 1, 0), floats.number (those or "auto") and
   headings.number (0, 1, 2).
 
@@ -49,7 +51,9 @@
          set by the site or a book is reported once, not once per page). */ -}}
   {{- $here := $page.RelPermalink -}}
   {{- with $page.File }}{{ $here = .Path }}{{ end -}}
-  {{- $levels := slice (dict "m" $top "w" $here) (dict "m" (partial "tufte/flatten.html" (dict "m" (index $page.Params "tufte"))) "w" $here) -}}
+  {{- /* The `tufte` value of each level with where it is set, nearest
+         first (flattened below). */ -}}
+  {{- $raws := slice (dict "t" (index $page.Params "tufte") "w" $here) -}}
   {{- with $root -}}
     {{- if ne $page . -}}
       {{- /* The part is the ancestor that is a child of the root (as in
@@ -63,13 +67,23 @@
       {{- end -}}
       {{- with $part -}}
         {{- $w := .RelPermalink }}{{ with .File }}{{ $w = .Path }}{{ end -}}
-        {{- $levels = $levels | append (dict "m" (partial "tufte/flatten.html" (dict "m" (index .Params "tufte"))) "w" $w) -}}
+        {{- $raws = $raws | append (dict "t" (index .Params "tufte") "w" $w) -}}
       {{- end -}}
       {{- $w := .RelPermalink }}{{ with .File }}{{ $w = .Path }}{{ end -}}
-      {{- $levels = $levels | append (dict "m" (partial "tufte/flatten.html" (dict "m" (index .Params "tufte"))) "w" $w) -}}
+      {{- $raws = $raws | append (dict "t" (index .Params "tufte") "w" $w) -}}
     {{- end -}}
   {{- end -}}
-  {{- $levels = $levels | append (dict "m" (partial "tufte/flatten.html" (dict "m" (index site.Params "tufte"))) "w" "the site configuration ([params.tufte])") -}}
+  {{- $raws = $raws | append (dict "t" (index site.Params "tufte") "w" "the site configuration ([params.tufte])") -}}
+  {{- $levels := slice (dict "m" $top "w" $here) -}}
+  {{- range $raws -}}
+    {{- /* `tufte` must be a table of options: a scalar (`tufte: latex`,
+           HUGO_PARAMS_TUFTE=latex) is reported and ignored, not dropped
+           without a word (flatten.html reads it as no options). */ -}}
+    {{- if and (ne .t nil) (not (reflect.IsMap .t)) -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: tufte must be a table of options (for example tufte: {style: latex}), not %q, in %s; ignored" (printf "%v" .t) .w -}}
+    {{- end -}}
+    {{- $levels = $levels | append (dict "m" (partial "tufte/flatten.html" (dict "m" .t)) "w" .w) -}}
+  {{- end -}}
   {{- $siteTop := dict -}}
   {{- range $fk := $flatKeys -}}
     {{- with index site.Params $fk }}{{ $siteTop = merge $siteTop (dict $fk .) }}{{ end -}}
@@ -98,6 +112,18 @@
     {{- $style = "css" -}}
   {{- end -}}
   {{- $S.SetInMap "m" "style" $style -}}
+  {{- /* citeAs: sidenote or footnote (an empty value is the default). It is
+         checked here, once per page and naming where it is set (a site
+         value gives one message for the whole site), not by each cite
+         shortcode, whose own as= parameter cite.html checks. */ -}}
+  {{- if isset $m "citeas" -}}
+    {{- $ca := lower (strings.TrimSpace (printf "%v" (index $m "citeas"))) | default "sidenote" -}}
+    {{- if not (in (slice "sidenote" "footnote") $ca) -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: citeAs must be sidenote or footnote, not %q, in %s; using sidenote" (printf "%v" (index $m "citeas")) (index $from "citeas") -}}
+      {{- $ca = "sidenote" -}}
+    {{- end -}}
+    {{- $S.SetInMap "m" "citeas" $ca -}}
+  {{- end -}}
   {{- $book := false -}}
   {{- with $root }}{{ $book = true }}{{ end -}}
   {{- $defs := partial "tufte/flatten.html" (dict "m" (partialCached "tufte/defaults.html" (dict "style" $style "book" $book) $style $book)) -}}
@@ -107,7 +133,16 @@
          and replaced by the preset's default. The other enum options are
          checked where they are read (titleBlock, numerals, marginals,
          *.align, *.font, print.paper, bibliography.style, book.tocDepth,
-         footnotes, footnoteStyle, footnotePlacement, citeAs). */ -}}
+         footnotes, footnoteStyle, footnotePlacement; citeAs is checked
+         above). */ -}}
+  {{- /* The option groups (headings, book, print…: the prefixes of the
+         dotted keys of the defaults): a scalar written in place of a
+         group (`headings: 2` for `headings: {number: 2}`) is reported and
+         ignored. */ -}}
+  {{- $groups := slice -}}
+  {{- range $k, $_ := $defs -}}
+    {{- if strings.Contains $k "." }}{{ $g := index (split $k ".") 0 }}{{ if not (in $groups $g) }}{{ $groups = $groups | append $g }}{{ end }}{{ end -}}
+  {{- end -}}
   {{- $bools := slice "justified" "hyphenate" "indent" "sfsidenotes" "letterspacing" "debug" "innerhtml" "headings.strict" "bibliography.list" "bibliography.margin" "book.numberchapters" "book.continuous" "book.toc" "book.titlepage" "print.runningheads" -}}
   {{- $boolWords := slice "true" "false" "yes" "no" "on" "off" "1" "0" -}}
   {{- range $k, $v := $m -}}
@@ -115,6 +150,13 @@
     {{- $use := index $defs $k -}}
     {{- $sv := lower (strings.TrimSpace (printf "%v" $v)) -}}
     {{- $isBool := or (eq (printf "%T" $v) "bool") (in $boolWords $sv) -}}
+    {{- if in $groups $k -}}
+      {{- $ex := "" -}}
+      {{- range $dk, $_ := $defs }}{{ if and (not $ex) (hasPrefix $dk (printf "%s." $k)) }}{{ $ex = strings.TrimPrefix (printf "%s." $k) $dk }}{{ end }}{{ end -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.%s must be a table of options (for example %s: {%s: …}), not %q, in %s; ignored" $k $k $ex (printf "%v" $v) (index $from $k) -}}
+      {{- $S.DeleteInMap "m" $k -}}
+      {{- continue -}}
+    {{- end -}}
     {{- if in $bools $k -}}
       {{- if not $isBool }}{{ $bad = "true or false" }}{{ end -}}
       {{- if eq $k "innerhtml" }}{{ $use = false }}{{ end -}}

@@ -17,7 +17,9 @@ hugo server -s exampleSite --disableFastRender  # live preview
 
 CI (`.github/workflows/ci.yml`) builds the example site with Hugo `0.146.0` and `latest` (standard edition).
 It checks for sidenote, margin note, section, epigraph and KaTeX markup (the `katex.min.css` version must match
-the KaTeX that Hugo embeds: `katex-base` classes need 0.18+) and for duplicate ids, then runs a second minified
+the KaTeX that Hugo embeds: `katex-base` classes need 0.18+; the bundle must keep theme.css's
+`html body { counter-reset: sidenote-counter katexEqnNo mmlEqnNo }`, which outranks katex.min.css's `body` reset)
+and for duplicate ids, then runs a second minified
 build with `HUGO_PARAMS_SECTIONS=none` and `HUGO_PARAMS_FOOTNOTES=endnotes`. Two §11 steps check sidenotes and
 real footnotes together (`posts/footnotes-as-sidenotes`: one `section.footnotes`; `posts/footnotes-and-sidenotes`:
 `div.footnotes.footnotes-section` per section; letter marks, links in both directions, no Goldmark leftovers)
@@ -30,14 +32,22 @@ bibliography), the book (`books/sample-book`: continuous numbering, cross-chapte
 (including real footnotes and the list of listings). Variant builds run it
 in `markers` mode with `HUGO_PARAMS_TUFTE_STYLE=latex`, with `HUGO_PARAMS_MATH_ENGINE=client` (which also checks
 that the KaTeX script and stylesheet have the same version) and with A4 paper, `nobib` and numbered sections.
-The step "Build a 150-chapter book within the time limit" gates performance: it generates a book of 150
-chapters (html + `print.html`; sidenotes, cross-chapter xrefs, labelled figures, citations, index entries, a
-list of figures, a bibliography and an index) in `$RUNNER_TEMP`, builds it with `--panicOnWarning` under
-`timeout 240`, and checks a cross-chapter xref number and the print document. Cross-page results must stay
+An `HUGO_UGLYURLS=true` build checks that each book's landing and `print.html` stay separate files (the `print`
+output format needs `noUgly`: on 0.146 it would otherwise overwrite the landing `books/b.html`).
+The step "Build a 200-chapter book within the time limit" gates performance: it generates a book of 200
+chapters (html + `print.html`; sidenotes, cross-chapter xrefs, labelled figures, citations, per-chapter
+`references` cited author-year and across chapters (1200 entries in plainnat extra-label groups), index entries,
+a list of figures, a bibliography and an index) in `$RUNNER_TEMP`, builds it with `--panicOnWarning` under
+`timeout 240`, and checks a cross-chapter xref number, the extra labels (2000a…) of two author-year cites
+and the print document. Cross-page results must stay
 memoised in `.Store`, or this step times out; read a memo only through `_partials/tufte/memo.html` and store
 it with the build stamp (`"b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")`), so that the rebuilds of
-`hugo server` and `hugo --watch` recompute it. The same step starts the book under `hugo server` and checks that
-an edit of chapter 1 renumbers chapter 150. The last step, "Check nested and mixed footnotes", builds a small
+`hugo server` and `hugo --watch` recompute it. The stamp lives in `hugo.Store` and changes only at the end of a
+build (a keyed `templates.Defer` in `baseof.html`): never derive it from a value partialCached can evict, since
+from about 160 chapters up partialCached evicts its own entries during a build. The step builds with
+`--templateMetrics` and fails when `func/content-raw.html` runs 24 times per chapter or more (memos recomputed
+within one build). It also starts the book under `hugo server` and checks that an edit of chapter 1 renumbers
+the last chapter, and that undoing it renumbers it back. The last step, "Check nested and mixed footnotes", builds a small
 site in `$RUNNER_TEMP/nested` (footnotes inside `footnote`/`sidenote`/`fig` shortcodes and inside Markdown
 footnotes, `[^x]` in an image title and a table caption, a label repeated in the body and in a `table` shortcode,
 `footnotes: endnotes`). It checks every post for leftover footnote markers, balanced `<span>`s, unique ids and
@@ -86,13 +96,18 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   `.Page.Store` key `tufteNoteCounter`). Every shortcode or hook that makes a sidenote, margin note, figure
   caption, index anchor or `footnote` **must** use it. Footnotes converted from Markdown do not: their ids are
   deterministic (`sn-<hash6>-fnref-N` for sidenotes, `fn-<hash6>-LABEL` for real footnotes), because phase 1 is
-  cached. Ids must stay unique on list pages that show several summaries.
+  cached. Nor does the checkbox of a `footnotemark`/`footnotetext` pair: both build `sn-<hash6>-ft-<name>` from the
+  name (`tufte/ft-name.html`; `.2`, `.3`… for a later `footnotetext` of the same name, numbered by
+  `func/content-raw.html`) so the mark's label finds the text; the mark's `data-ft` still comes from `note-id.html`.
+  Ids must stay unique on list pages that show several summaries.
 - `layouts/_partials/tufte/figure.html` is the shared float renderer: the `figure`, `marginfigure`,
   `fullwidthfigure` and `fig` shortcodes, the image render hook, the book frontispiece, and (through `Body`) the
   table, listing and subfigures floats.
 - Notes and captions are `<span>`s and must never hold block elements. `tufte/render-inner.html` (inline mode)
   and `func/footnotes.html` pass their HTML through `func/inline-figures.html`, which turns a `<figure>` made
   by the image render hook (an image alone in a note) back into a plain `<img>`.
+  Paragraphs in a note are flattened only through `func/flatten-p.html` (a `<p>` with attributes, such as an
+  alert title or `{.class}`, becomes `span[data-sn="p"]`; never strip `</?p>` with a bare regex).
 - `i18n/` has `en`, `it`, `fr`, `de`, `es`. Every key must exist in all five files. Templates translate with
   `partial "func/t.html" KEY` (or a dict with `key`, `count`, `data`), never `T` directly: it falls back to
   `i18n/en.yaml` (mounted as the asset `tufte/i18n-en.yaml` in `hugo.toml`, whose `[[module.mounts]]` must keep
@@ -124,7 +139,8 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
 - **`.IsBlock` in `render-image.html`** works only when the site sets
   `wrapStandAloneImageWithinParagraph = false`.
 - **Use `relURL` / `.RelPermalink`** for assets and links. `absURL` / `.Permalink` are acceptable only in
-  canonical, Open Graph, Twitter, schema and RSS output.
+  canonical, Open Graph, Twitter, schema and RSS output, and for a link to a translation served from another
+  host (multihost: a `baseURL` per language; the language switcher in `header.html`).
 - **The CSS class names are a contract** between `layouts/` and `assets/css/theme.css` /
   `assets/css/tufte-latex.css`. Rename a class in both places or not at all.
 - **Document features.** Each new param, front matter key, shortcode or render hook goes in `README.md` and in
@@ -180,7 +196,9 @@ The spec is the parity table in `README.md` ("tufte-latex parity"). Key mechanic
 - **Warnings** use `warnidf` with the ids listed in README ("Warnings"); never warn in summary mode.
 - **Example content**: `posts/sample-handout/` and `books/sample-book/` are ports of Tufte-LaTeX's samples
   (keep them faithful); `posts/latex-to-hugo.md` exercises every tufte-latex shortcode (the base shortcodes are
-  shown in the other posts; `video` only as escaped code, since the site ships no video file); `books/parts-demo/` exercises parts,
+  shown in the other posts; `video` only as escaped code, since the site ships no video file; `bibliography`
+  with a `heading`, so that page has no automatic list, while the handout keeps the automatic one and the book
+  ports use `heading=""`; `all=true` runs on no example page); `books/parts-demo/` exercises parts,
   numbered chapters and appendices. The figures are in `exampleSite/static/images/latex/` (SVG converted from the
   Tufte-LaTeX PDFs; ink is `currentColor` with a dark-mode rule). The cheat-sheet table appears both in README and
   in `posts/latex-to-hugo.md` (where shortcodes are escaped as `{{</* … */>}}`): update both together.

@@ -3,13 +3,23 @@
 
     <ol class="toc-sections"><li><a href="REL#id">Section</a></li>…</ol>
 
+  A chapter that is never rendered (build.render = never) has no URL: its
+  sections get the placeholder links of tufte/page-link.html
+  (<a data-tufte-path="PATH" data-tufte-anchor="id">), plain text on the
+  website and in-document links in the book's print document, where the
+  chapter is printed (tufte/book/print-links.html), as its title gets.
+
   Walks the .Fragments.Headings tree of the chapter and keeps the nodes
   with Level 2 and a non-empty ID (h2 = \section), at any depth of the tree
   (the tree starts at h1 when the content has one). Margin material and
   Hugo's shortcode placeholders are removed from the heading texts (R27),
-  and the ids are cleaned like render-heading.html's (tufte/heading-id.html).
+  and the ids are cleaned like render-heading.html's (tufte/heading-anchor.html).
   A heading with math gets its typeset formula, and a heading that held a
   shortcode its rendered text (tufte/toc-text.html).
+  The h2 of a shortcode's inner text (fullwidth, details…), which
+  .Fragments never sees but which is numbered like the others, is added
+  in document order (tufte/content-headings.html), so the section numbers
+  of the contents do not skip.
 
   Takes: a dict with
     page      the chapter page
@@ -29,7 +39,7 @@
   {{- $id := "" -}}
   {{- $nth := 1 -}}
   {{- with .ID -}}
-    {{- $id = partial "tufte/heading-id.html" . -}}
+    {{- $id = partial "tufte/heading-anchor.html" (dict "page" $p "id" .) -}}
     {{- $seen.Add (printf "id:%s" $id) 1 -}}
     {{- $nth = $seen.Get (printf "id:%s" $id) -}}
   {{- end -}}
@@ -51,12 +61,41 @@
            shortcode: the rendered text, with the words the shortcode
            prints (tufte/toc-text.html). */ -}}
     {{- $t = partial "tufte/toc-text.html" (dict "page" $p "id" $id "text" (strings.TrimSpace $t) "shortcode" $hasSC "nth" $nth) -}}
-    {{- $items = printf `%s<li><a href="%s#%s">%s</a></li>` $items $p.RelPermalink $id $t -}}
+    {{- /* Headings renamed ID-2… (an explicit id written on two headings,
+           or an automatic id that an explicit one repeats:
+           tufte/labels.html "htoc", by position among the headings of
+           .Fragments). */ -}}
+    {{- $href := $id -}}
+    {{- with index ((partialCached "tufte/labels.html" $p (or $p.RelPermalink $p.Path)).htoc | default dict) $id -}}
+      {{- if le $nth (len .) }}{{ with index . (sub $nth 1) }}{{ $href = . }}{{ end }}{{ end -}}
+    {{- end -}}
+    {{- $items = printf `%s<li>%s</li>` $items (partial "tufte/page-link.html" (dict "page" $p "anchor" $href "html" $t "book" true)) -}}
   {{- end -}}
   {{- /* Deeper levels: h2 below an h1 are listed; the subheadings of an
          h2 list nothing but are counted. */ -}}
   {{- with .Headings -}}
     {{- $items = printf "%s%s" $items (partial "tufte/book/toc-headings.html" (dict "page" $p "headings" . "inner" true "seen" $seen) | string) -}}
+  {{- end -}}
+{{- end -}}
+{{- if not .inner -}}
+  {{- $ch := partialCached "tufte/content-headings.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- if $ch.inner -}}
+    {{- $old := findRE `(?s)<li><a [^>]*>.*?</a></li>` $items -}}
+    {{- $new := "" -}}
+    {{- $i := 0 -}}
+    {{- range $ch.headings -}}
+      {{- if eq .level 2 -}}
+        {{- if .inner -}}
+          {{- $t := partial "tufte/toc-text.html" (dict "page" $p "id" (.tid | default .id) "text" "" "shortcode" true "nth" (.tnth | default 1) "xinner" (eq .xinner true)) -}}
+          {{- $new = printf `%s<li>%s</li>` $new (partial "tufte/page-link.html" (dict "page" $p "anchor" .id "html" $t "book" true)) -}}
+        {{- else if lt $i (len $old) -}}
+          {{- $new = printf "%s%s" $new (index $old $i) -}}
+          {{- $i = add $i 1 -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- range after $i $old }}{{ $new = printf "%s%s" $new . }}{{ end -}}
+    {{- $items = $new -}}
   {{- end -}}
 {{- end -}}
 {{- $out := $items -}}

@@ -104,8 +104,7 @@
       {{- end -}}
     {{- end -}}
   {{- end -}}
-  {{- $t = replaceRE `</p>\s*<p>` "<br>" $t -}}
-  {{- $t = replaceRE `</?p>` "" $t | strings.TrimSpace -}}
+  {{- $t = partial "func/flatten-p.html" $t | strings.TrimSpace -}}
   {{- /* A note that starts like a list item ([^y]: 1999. The year…) is a
          one-item list for Goldmark: in a sidenote (an inline text, like
          \sidenote{1999. …}) the marker is text, as in the sidenote

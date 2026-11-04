@@ -5,6 +5,8 @@
  * keeping with Tufte CSS: no block background, muted hues, italic comments.
  * Light and dark palettes follow prefers-color-scheme, or data-theme on <html>.
  *
+ * Text tokens reach WCAG AA (4.5:1) on the page background and on a
+ * highlighted line (hl_lines, --syn-hl); line numbers are text too.
  * Every colour is a custom property, so a site can retune the palette from
  * a customCSS file, e.g.  :root { --syn-keyword: #000; }
  * Layout of code blocks (width, indent, line-number tables) lives in theme.css.
@@ -14,7 +16,7 @@
     --syn-bg: transparent;
     --syn-fg: currentColor;
     --syn-hl: #f1efd8;
-    --syn-linenumber: #8a8a80;
+    --syn-linenumber: #6b6b63;
     --syn-keyword: #8b1e1e;
     --syn-keyword-type: #8b1e1e;
     --syn-name-attr: #7a5200;
@@ -35,7 +37,7 @@
     --syn-number: #7a5200;
     --syn-operator: #555;
     --syn-punctuation: #555;
-    --syn-comment: #6e6e66;
+    --syn-comment: #66665e;
     --syn-preproc: #5e3a87;
     --syn-deleted: #8b1e1e;
     --syn-deleted-bg: #f8e6e2;
@@ -43,8 +45,8 @@
     --syn-inserted-bg: #e6f1df;
     --syn-heading: #1f4e79;
     --syn-subheading: #5e3a87;
-    --syn-output: #6e6e66;
-    --syn-prompt: #6e6e66;
+    --syn-output: #66665e;
+    --syn-prompt: #66665e;
     --syn-error: #b00020;
     --syn-whitespace: #bbb;
 }
@@ -52,7 +54,7 @@
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         --syn-hl: #2a2a22;
-        --syn-linenumber: #6f6f6a;
+        --syn-linenumber: #929289;
         --syn-keyword: #e39a8f;
         --syn-keyword-type: #e39a8f;
         --syn-name-attr: #d9b26f;
@@ -73,7 +75,7 @@
         --syn-number: #d9b26f;
         --syn-operator: #b0b0b0;
         --syn-punctuation: #b0b0b0;
-        --syn-comment: #8c8c84;
+        --syn-comment: #96968e;
         --syn-preproc: #c4a6e3;
         --syn-deleted: #f0aaa0;
         --syn-deleted-bg: #3a1f1c;
@@ -81,8 +83,8 @@
         --syn-inserted-bg: #1d3320;
         --syn-heading: #94b9de;
         --syn-subheading: #c4a6e3;
-        --syn-output: #8c8c84;
-        --syn-prompt: #8c8c84;
+        --syn-output: #96968e;
+        --syn-prompt: #96968e;
         --syn-error: #ff7a7a;
         --syn-whitespace: #4a4a4a;
     }
@@ -90,7 +92,7 @@
 
 :root[data-theme="dark"] {
     --syn-hl: #2a2a22;
-    --syn-linenumber: #6f6f6a;
+    --syn-linenumber: #929289;
     --syn-keyword: #e39a8f;
     --syn-keyword-type: #e39a8f;
     --syn-name-attr: #d9b26f;
@@ -111,7 +113,7 @@
     --syn-number: #d9b26f;
     --syn-operator: #b0b0b0;
     --syn-punctuation: #b0b0b0;
-    --syn-comment: #8c8c84;
+    --syn-comment: #96968e;
     --syn-preproc: #c4a6e3;
     --syn-deleted: #f0aaa0;
     --syn-deleted-bg: #3a1f1c;
@@ -119,8 +121,8 @@
     --syn-inserted-bg: #1d3320;
     --syn-heading: #94b9de;
     --syn-subheading: #c4a6e3;
-    --syn-output: #8c8c84;
-    --syn-prompt: #8c8c84;
+    --syn-output: #96968e;
+    --syn-prompt: #96968e;
     --syn-error: #ff7a7a;
     --syn-whitespace: #4a4a4a;
 }

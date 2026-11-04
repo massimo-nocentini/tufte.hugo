@@ -18,7 +18,10 @@
   the same way.
 
   Two headings that differ only by their shortcodes end up with the same
-  id: give such headings an explicit {#id} (README, "Headings").
+  id here; for the headings of the page content, tufte/heading-anchor.html
+  (which callers use) makes them unique again (tufte/heading-ids.html:
+  "-1", "-2"…). Headings in a block shortcode's inner text are not in
+  the page's .Fragments and can still share one (README, "Headings").
 
   Takes: an id (string).
   Returns: the id (string); unchanged when it holds no placeholder.

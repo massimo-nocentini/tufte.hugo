@@ -7,7 +7,10 @@
     href="ROOT/#x"     → href="#x"           href="ROOT/"    → href="#tufte-landing"
 
   (the landing body keeps its own ids, so a link into it only loses its
-  path; tufte-landing is the id of its article in list.print.html.)
+  path; tufte-landing is the id of its article in list.print.html. A
+  landing id in the document's namespace, tufte-landing, tufte-cN…,
+  tufte-pK… or tufte-l-…, gets the tufte-l- prefix there, and so does
+  the fragment of a link to it: ROOT/#tufte-c0 → #tufte-l-tufte-c0.)
 
   Root-relative links (/books/b/ch2/, as the theme's generators and
   render hooks write them), absolute links to this site
@@ -27,6 +30,8 @@
   Returns: the HTML string.
 */ -}}
 {{- $html := .html | string -}}
+{{- /* Landing ids renamed by list.print.html (same pattern). */ -}}
+{{- $landRE := `^tufte-(?:landing$|l-|[cp][0-9])` -}}
 {{- $p := .page -}}
 {{- $root := .root -}}
 {{- /* Target paths (no trailing slash) → anchor ids, built once per book. */ -}}
@@ -54,7 +59,11 @@
     {{- $abs = path.Clean $abs -}}
     {{- with index $targets $abs -}}
       {{- $new := cond (ne $frag "") (printf `href="#%s-%s"` . $frag) (printf `href="#%s"` .) -}}
-      {{- if and (eq . "tufte-landing") (ne $frag "") }}{{ $new = printf `href="#%s"` $frag }}{{ end -}}
+      {{- if and (eq . "tufte-landing") (ne $frag "") -}}
+        {{- $f := $frag -}}
+        {{- if findRE $landRE $f 1 }}{{ $f = printf "tufte-l-%s" $f }}{{ end -}}
+        {{- $new = printf `href="#%s"` $f -}}
+      {{- end -}}
       {{- $html = replace $html (printf `href="%s"` $url) $new -}}
     {{- else -}}
       {{- /* Another page: a relative link must not be resolved against
@@ -106,6 +115,7 @@
       {{- $href := printf "#%s" . -}}
       {{- if strings.Contains $tag ` data-tufte-anchor="` -}}
         {{- $a := replaceRE `^.* data-tufte-anchor="([^"]*)".*$` "$1" $tag | htmlUnescape -}}
+        {{- if and (eq . "tufte-landing") (findRE $landRE $a 1) }}{{ $a = printf "tufte-l-%s" $a }}{{ end -}}
         {{- $href = cond (eq . "tufte-landing") (printf "#%s" $a) (printf "#%s-%s" . $a) -}}
       {{- end -}}
       {{- $cls := "" -}}
