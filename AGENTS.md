@@ -56,6 +56,13 @@ title or table caption does not change the kind of the page's other notes; one l
 the automatic summaries on the home and section pages are closed.
 Any change to the example content must keep those checks true.
 
+`.github/workflows/pages.yml` deploys the example site to GitHub Pages (push to `master`, Hugo `0.169.0`,
+`--minify --panicOnWarning`, base URL from `actions/configure-pages`) under the subpath `/tufte.hugo/`. It fails
+if any URL of the Pages host escapes that subpath (`href`/`src`/`srcset`, `og:image`/`twitter:image`, CSS
+`url()`, sitemap and RSS), so build every URL with `relURL`/`.RelPermalink`,
+and pass a root-absolute path an author writes (`/images/x.svg`) through `tufte/site-url.html` (`relURL` keeps a
+leading-slash path as written).
+
 ## Hugo Version and Config
 
 - Minimum Hugo is `0.146.0`, declared in `hugo.toml` (`[module.hugoVersion]`) and `theme.toml` (`min_version`).

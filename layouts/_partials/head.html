@@ -83,6 +83,35 @@
        $description of <meta name="description"> above. */ -}}
 {{- $social := printf "%s\n%s\n%s" (partial "opengraph.html" . | string) (partial "twitter_cards.html" . | string) (partial "schema.html" . | string) -}}
 {{- $social = replaceRE `[ \t]*<meta (?:property="og:(?:title|description)"|name="twitter:(?:title|description)"|itemprop="(?:name|description)") content="[^"]*"\s*/?>\n?` "" $social -}}
+{{- /* A root-absolute `images` entry ("/images/card.png") that is not a page
+       resource: the embedded templates absURL it, which resolves it
+       against the host and drops the base path of a site hosted under a
+       subpath (https://host/project/). It names a file under the site
+       root, as for an image src (tufte/site-url.html), so its URL is
+       rebuilt from the path without its "/". Matched in the content
+       attributes as html/template escapes them; nothing changes on a
+       root-hosted site. A page without `images` falls back to the
+       site-wide `params.images` (Hugo's order), so that list is checked
+       then. */ -}}
+{{- with .Params.images | default site.Params.images -}}
+  {{- if reflect.IsSlice . -}}
+    {{- range . -}}
+      {{- $img := printf "%v" . -}}
+      {{- if and (strings.HasPrefix $img "/") (not (strings.HasPrefix $img "//")) -}}
+        {{- $bad := absURL $img -}}
+        {{- $good := absURL (strings.TrimPrefix "/" $img) -}}
+        {{- if ne $bad $good -}}
+          {{- /* html/template's attribute escaping; "&" first. */ -}}
+          {{- range slice (slice "&" "&amp;") (slice `"` "&#34;") (slice "'" "&#39;") (slice "+" "&#43;") (slice "<" "&lt;") (slice ">" "&gt;") -}}
+            {{- $bad = replace $bad (index . 0) (index . 1) -}}
+            {{- $good = replace $good (index . 0) (index . 1) -}}
+          {{- end -}}
+          {{- $social = replace $social (printf `content="%s"` $bad) (printf `content="%s"` $good) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
 {{- $socialTitle := site.Title -}}
 {{- with partial "tufte/page-title.html" . }}{{ $socialTitle = partial "tufte/plain-title.html" (dict "page" $ "title" .) | default site.Title }}{{ end }}
 {{ $social | safeHTML }}

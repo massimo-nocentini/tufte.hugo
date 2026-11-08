@@ -4,9 +4,12 @@
   a relative destination that names a page (e.g. "../other-post.md" or
   "/about") or a page/global resource is replaced by its relative
   permalink, keeping any query and fragment. Fragment-only links ("#x"),
-  absolute URLs, dot-only paths ("./", "../") and unresolved paths are
-  left as written, for the browser to resolve against the page (in a summary on
-  a list page, tufte/postprocess.html points "#x" to the page: PAGE#x).
+  absolute URLs, dot-only paths ("./", "../") and unresolved relative paths
+  are left as written, for the browser to resolve against the page (in a
+  summary on a list page, tufte/postprocess.html points "#x" to the page:
+  PAGE#x). An unresolved root-absolute path ("/images/x.svg", "/index.xml")
+  is resolved against the site's base path (tufte/site-url.html), like an
+  image src, so that it also works on a site hosted under a subpath.
 
   Notes in the link text ([text[^1]](url), a sidenote, marginnote or cite
   shortcode) are moved after the </a> by tufte/postprocess.html
@@ -52,6 +55,13 @@
           {{- $target = .RelPermalink -}}
         {{- end -}}
       {{- end -}}
+    {{- end -}}
+    {{- /* An unresolved root-absolute path ("/images/x.svg", "/index.xml")
+           names a file under the site root: it is resolved against the
+           site's base path like an image src (tufte/site-url.html), so it
+           also works on a site hosted under a subpath. */ -}}
+    {{- if and (not $target) (strings.HasPrefix .Path "/") (not (strings.HasPrefix .Path "//")) -}}
+      {{- $target = partial "tufte/site-url.html" .EscapedPath -}}
     {{- end -}}
     {{- with $target -}}
       {{- $href = . -}}

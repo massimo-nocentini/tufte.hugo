@@ -314,8 +314,10 @@
   {{- if eq $type "inline" }}{{ $imgClass = $class }}{{ end -}}
   {{- $img = printf `<img src="%s" alt="%s"%s%s%s%s loading="lazy"/>` (htmlEscape $url) (htmlEscape $alt) (cond (ne $width "") (printf ` width="%s"` (htmlEscape $width)) "") (cond (ne $height "") (printf ` height="%s"` (htmlEscape $height)) "") (cond (ne $imgClass "") (printf ` class="%s"` (htmlEscape $imgClass)) "") $extra -}}
   {{- with $link -}}
-    {{- /* As html/template would: no script URLs (tufte/safe-url.html). */ -}}
-    {{- $href := partial "tufte/safe-url.html" . -}}
+    {{- /* As html/template would: no script URLs (tufte/safe-url.html);
+           a root-absolute path is resolved against the site's base path
+           (tufte/site-url.html), as $src is above. */ -}}
+    {{- $href := partial "tufte/safe-url.html" . | partial "tufte/site-url.html" -}}
     {{- $img = printf `<a href="%s">%s</a>` (htmlEscape $href) $img -}}
   {{- end -}}
 {{- end -}}

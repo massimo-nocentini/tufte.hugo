@@ -49,7 +49,9 @@
        URLs refused) so that it goes through tufte/nest.html: nested in a
        theme shortcode (fullwidth, marginblock, epigraph…) its HTML is
        kept, also with markup.goldmark.renderer.unsafe = false. */ -}}
-{{- $url := partial "tufte/safe-url.html" $src -}}
+{{- /* A root-absolute src ("/demo/") is resolved against the site's base
+       path (tufte/site-url.html), as figure and video sources are. */ -}}
+{{- $url := partial "tufte/safe-url.html" $src | partial "tufte/site-url.html" -}}
 {{- $out := printf `<figure class="iframe-wrapper%s"%s>` (cond (ne (printf "%v" $class) "") (printf " %s" (htmlEscape (printf "%v" $class))) "") (cond (ne $style "") (printf ` style="%s"` (htmlEscape $style)) "") -}}
 {{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" loading=\"lazy\"%s allowfullscreen></iframe>\n</figure>" $out (htmlEscape $url) (htmlEscape (printf "%v" ($title | default (partial "func/t.html" "embeddedContent") | default "Embedded content"))) (cond (ne (printf "%v" $allow) "") (printf ` allow="%s"` (htmlEscape (printf "%v" $allow))) "") -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

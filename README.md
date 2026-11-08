@@ -39,7 +39,7 @@ Hugo 0.146 template system (`layouts/baseof.html`, `home.html`, `page.html`, `li
 - [Comments, analytics and social links](#comments-analytics-and-social-links)
 - [Customisation](#customisation)
 - [Languages](#languages)
-- [Example site](#example-site)
+- [Example site](#example-site) ([deploying it to GitHub Pages](#deploying-the-example-site-to-github-pages))
 - [Credits](#credits)
 
 ## Installation
@@ -285,7 +285,7 @@ mainSections = ["posts"]
 | `mathMacros` | KaTeX macros for this page, added to `params.math.macros` (same list-of-pairs form), e.g. `mathMacros: [["\\E", "\\mathbb{E}"]]` in YAML. |
 | `comments` | `true`/`false`. Overrides `params.comments.enable`. `true` is needed on pages outside any section (such as `content/about.md`), which have no comments otherwise. |
 | `draft` | Hugo's standard draft flag. |
-| `images` | Images for Open Graph and Twitter cards. |
+| `images` | Images for Open Graph and Twitter cards: page resources, absolute URLs, or paths under the site root (`/images/card.png`, resolved against the base path also on a site hosted under a subpath). A page without `images` uses the site-wide `params.images`, resolved the same way. |
 | `layout` | Set `layout: archive` on a page to render the archives (posts grouped by year; undated pages, such as book chapters, last under “Undated”, in the order of the RSS feed: each book's chapters in its reading order, then the other undated pages). |
 
 Create a post with the bundled archetype:
@@ -2177,6 +2177,27 @@ The example site sets `theme = "tufte.hugo"` and `themesDir = "../.."`, so the t
   repeated in the body and in a `table` shortcode. The pages must have no footnote markers left, balanced
   `<span>`s, unique ids, no dangling links and every note's text; a note in a title or caption must not change
   the kind (sidenote or real footnote) of the page's other notes; the automatic summaries must be closed.
+
+### Deploying the example site to GitHub Pages
+
+`.github/workflows/pages.yml` builds the example site and publishes it with GitHub Pages on every push to
+`master` (and on demand, from the Actions tab). It installs Hugo 0.169.0 (standard edition, from the release
+`.deb`, checked against the release checksums), builds with
+`hugo --gc --minify --panicOnWarning --baseURL <Pages URL>/` in the production environment, checks that no
+URL of the Pages host escapes the site's base path (links, images and `srcset`, `og:image` and
+`twitter:image`, CSS `url()`, the sitemap and the RSS feed), and deploys the result with
+`actions/deploy-pages`. The site is a project site under a subpath
+(`https://massimo-nocentini.github.io/tufte.hugo/`); the theme writes every link and asset URL through
+`relURL`/`.RelPermalink`, and resolves a root-absolute path written by an author (`/images/…`, `/index.xml`)
+against the base path wherever it takes one: Markdown links and images (also in notes and footnotes), the
+`src`, `link` and `attrlink` of the figure shortcodes, the `url` of `blockquote` and `epigraph`, the `src` of
+`iframe` and `video`, and the front-matter `images` (or the site-wide `params.images`) of the Open Graph, Twitter
+and schema.org tags. So root paths in content get the subpath too.
+
+One-time setup: in the repository, open **Settings → Pages → Build and deployment** and set **Source** to
+**GitHub Actions**. The workflow needs no secrets; its permissions are `contents: read`, `pages: write` and
+`id-token: write`. A fork works under its own name too: the workflow checks the theme out into a directory
+named `tufte.hugo` and takes the base URL from `actions/configure-pages` (a custom domain included).
 
 ## Credits
 

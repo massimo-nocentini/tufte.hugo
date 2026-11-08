@@ -1,0 +1,180 @@
+# Build the example site with Hugo and deploy it to GitHub Pages.
+#
+# One-time setup: repository Settings → Pages → Build and deployment →
+# Source: "GitHub Actions". The site is then published at
+# https://<owner>.github.io/<repo>/ (a project site under a subpath; the
+# theme emits every URL through relURL/RelPermalink, so the subpath works).
+
+name: Deploy example site to GitHub Pages
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+# Least privilege: read the repository, deploy to Pages, and mint the OIDC
+# token that actions/deploy-pages needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; never cancel one that is in progress.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HUGO_VERSION: 0.169.0
+    steps:
+      # exampleSite/hugo.toml uses theme = "tufte.hugo" and themesDir = "../..",
+      # so the theme must be checked out in a directory named tufte.hugo
+      # (whatever the repository is called). No fetch-depth: 0, because the
+      # site does not use enableGitInfo.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: tufte.hugo
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Install Hugo ${{ env.HUGO_VERSION }} (standard edition)
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          base="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}"
+          deb="hugo_${HUGO_VERSION}_linux-amd64.deb"
+          curl -sSfL -o "$deb" "$base/$deb"
+          curl -sSfL -o checksums.txt "$base/hugo_${HUGO_VERSION}_checksums.txt"
+          grep " ${deb}\$" checksums.txt | sha256sum -c -
+          sudo dpkg -i "$deb"
+          hugo version
+
+      - name: Build
+        working-directory: tufte.hugo/exampleSite
+        env:
+          HUGO_ENVIRONMENT: production
+          HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache
+        run: |
+          hugo --gc --minify --panicOnWarning \
+            --baseURL "${{ steps.pages.outputs.base_url }}/"
+
+      # Guard: no URL of this host may escape the Pages subpath (e.g. a
+      # hard-coded "/images/…" instead of "/<repo>/images/…"). It resolves
+      # every URL against its page and checks HTML attributes (href, src,
+      # poster, srcset, imagesrcset, style), <meta> image/url content
+      # (og:image, twitter:image), <style> and CSS url()/@import, the sitemap
+      # and RSS (<loc>, <link>, href, the HTML of item descriptions) and
+      # robots.txt.
+      - name: Check URLs stay under the base path
+        env:
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: |
+          set -euo pipefail
+          [ -n "$BASE_PATH" ] || { echo "Site served at the root: nothing to check."; exit 0; }
+          python3 -I - tufte.hugo/exampleSite/public <<'PY'
+          import html, os, re, sys
+          from html.parser import HTMLParser
+          from urllib.parse import urljoin, urlsplit
+
+          base = os.environ["BASE_URL"].rstrip("/") + "/"   # https://<owner>.github.io/<repo>/
+          host, prefix = urlsplit(base).netloc, urlsplit(base).path
+          CSS_URL = re.compile(r"""url\(\s*['"]?([^'")\s]+)|@import\s+['"]([^'"]+)""")
+          URL_ATTRS = {"href", "src", "poster", "data", "action", "formaction", "cite", "background", "xlink:href"}
+          bad = set()
+
+          def check(page, where, url):
+              url = html.unescape(url.strip())
+              if not url or re.match(r"(?i)(mailto|tel|javascript|data|blob|about):", url):
+                  return
+              u = urlsplit(urljoin(page, url))
+              if u.scheme in ("http", "https") and u.netloc == host \
+                      and not (u.path + "/").startswith(prefix):
+                  bad.add(f"{where}: {url}  ({page[len(base) - 1:]})")
+
+          def css_urls(page, where, text):
+              for a, b in CSS_URL.findall(text):
+                  check(page, where, a or b)
+
+          class Page(HTMLParser):
+              def __init__(self, page):
+                  super().__init__(convert_charrefs=True)
+                  self.page, self.style = page, False
+              def handle_starttag(self, tag, attrs):
+                  a = {k: v for k, v in attrs if v is not None}
+                  self.style = tag == "style"
+                  for k, v in a.items():
+                      if k in URL_ATTRS:
+                          check(self.page, f"{tag}@{k}", v)
+                      elif k in ("srcset", "imagesrcset"):
+                          for part in v.split(","):
+                              if part.split():
+                                  check(self.page, f"{tag}@{k}", part.split()[0])
+                      elif k == "style":
+                          css_urls(self.page, f"{tag}@style", v)
+                  prop = a.get("property") or a.get("name") or a.get("itemprop") or ""
+                  if tag == "meta" and re.search(r"(?i)image|url", prop) and "content" in a:
+                      check(self.page, f"meta[{prop}]", a["content"])
+              handle_startendtag = handle_starttag
+              def handle_endtag(self, tag):
+                  self.style = False
+              def handle_data(self, data):
+                  if self.style:
+                      css_urls(self.page, "style", data)
+
+          root = sys.argv[1]
+          for d, _, files in os.walk(root):
+              for f in files:
+                  path = os.path.join(d, f)
+                  page = base + os.path.relpath(path, root).replace(os.sep, "/")
+                  if f.endswith((".html", ".xml", ".css")):
+                      text = open(path, encoding="utf-8", errors="replace").read()
+                  if f.endswith(".html"):
+                      Page(page).feed(text)
+                  elif f.endswith(".css"):
+                      css_urls(page, "css", text)
+                  elif f.endswith(".xml"):
+                      # Sitemap/RSS elements, attribute URLs, and the escaped HTML of
+                      # RSS descriptions.
+                      for u in re.findall(r"<(?:loc|link|guid|url|id)>\s*([^<\s]+)\s*</", text):
+                          check(page, "xml", u)
+                      for u in re.findall(r"""\shref=["']([^"']+)""", text):
+                          check(page, "xml@href", u)
+                      for d_ in re.findall(r"<description>(.*?)</description>", text, re.S):
+                          Page(page).feed(html.unescape(d_.replace("<![CDATA[", "").replace("]]>", "")))
+                  elif f == "robots.txt":
+                      for u in re.findall(r"(?im)^\s*sitemap:\s*(\S+)", open(path, encoding="utf-8").read()):
+                          check(page, "robots", u)
+
+          if bad:
+              print(f"::error::URLs outside {prefix}:")
+              print("\n".join(sorted(bad)))
+              sys.exit(1)
+          print(f"ok: every same-host URL stays under {prefix}")
+          PY
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: tufte.hugo/exampleSite/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,20 @@
+{{- /*
+  Site-root URL for a root-absolute path written by an author ("/images/x.svg",
+  "/about/?q#x"): the leading "/" names the site root, so the path is
+  resolved with relURL against the baseURL's path, as the image hook and
+  tufte/figure.html do for an image src. On a site hosted under a subpath
+  (https://host/project/) "/images/x.svg" becomes "/project/images/x.svg";
+  on a root-hosted site it is unchanged. relURL alone would keep a
+  leading-slash path as written.
+
+  Any other value (a relative path, "//host/…", "https://…", "#x", "?q",
+  "mailto:…") is returned unchanged.
+
+  Takes: the URL (any value, printed with %v).
+  Returns: the URL, not HTML-escaped (the caller escapes it).
+*/ -}}
+{{- $u := printf "%v" . -}}
+{{- if and (strings.HasPrefix $u "/") (not (strings.HasPrefix $u "//")) (not (strings.HasPrefix $u "/\\")) -}}
+  {{- $u = strings.TrimPrefix "/" $u | relURL -}}
+{{- end -}}
+{{- return $u -}}

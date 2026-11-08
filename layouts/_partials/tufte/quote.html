@@ -42,7 +42,9 @@
 {{- end -}}
 {{- $url := "" -}}
 {{- with .url -}}
-  {{- $url = partial "tufte/safe-url.html" . | htmlEscape -}}
+  {{- /* No script URLs (tufte/safe-url.html); a root-absolute path is
+         resolved against the site's base path (tufte/site-url.html). */ -}}
+  {{- $url = partial "tufte/safe-url.html" . | partial "tufte/site-url.html" | htmlEscape -}}
 {{- end -}}
 {{- $foot := "" -}}
 {{- with $footer -}}
