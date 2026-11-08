@@ -1,0 +1,22 @@
+{{- /*
+  End-of-proof symbol here (inline; amsthm \qedhere, \qed):
+
+    - the last item of the proof.{{< qedhere >}}
+
+  Inside a proof (or a theorem with a qed symbol) the proof claims it and
+  prints no symbol at its end (tufte/thm/render.html re-skins it in its own
+  symbol, data-qedhere="2"); elsewhere it prints the symbol of the option
+  theorems.qed, as \qed does. With theorems.qed = none it is an empty
+  span of class thm-qed-none (a holder with a symbol of its own still
+  claims it; func/content-raw.html removes it otherwise). In display TeX write \qedhere itself
+  ($$ … \qedhere $$, tufte/math-render.html). No parameters.
+
+  Output: <span class="thm-qed thm-qed-SYMBOL" role="img" aria-label="End of proof" data-qedhere="1">GLYPH</span>
+*/ -}}
+{{- if .Params -}}
+  {{- warnidf "tufte-bad-option" "qedhere shortcode: takes no parameters, ignored (%s)" .Position -}}
+{{- end -}}
+{{- $p := .Page -}}
+{{- $sym := partialCached "tufte/opt.html" (dict "page" $p "key" "theorems.qed") (or $p.RelPermalink $p.Path) "theorems.qed" -}}
+{{- $out := partial "tufte/thm/qed.html" (dict "symbol" $sym "qedhere" "1") -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}

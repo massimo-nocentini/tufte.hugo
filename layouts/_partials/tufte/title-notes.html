@@ -103,7 +103,7 @@
              text (tufte/book/fn-local.html), as the dedication's does: its
              `[^1]` is not the body's `[^1]`, nor another note's. */ -}}
       {{- $text = partial "tufte/book/fn-local.html" (dict "text" $text "tag" (printf "%s%d" $tag $ti)) -}}
-      {{- $h := partial "tufte/render-inner.html" (dict "page" $p "inner" $text "display" "inline" "shortcodes" "run" "where" $where) | string -}}
+      {{- $h := partial "tufte/render-inner.html" (dict "page" $p "inner" $text "display" "inline" "thmInline" true "shortcodes" "run" "where" $where) | string -}}
       {{- $h = partial "tufte/note-in-note.html" (dict "page" $p "html" $h "holder" "thanks note" "where" (printf "%s (%s)" $at $where)) -}}
       {{- $h = partial "func/flatten-p.html" $h | strings.TrimSpace -}}
       {{- with partial "tufte/cite-gather.html" (dict "page" $p "html" $h "keys" slice) -}}

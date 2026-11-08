@@ -56,5 +56,22 @@
   "print" (dict
     "paper" "letter"
     "runningheads" $latex)
+  "theorems" (dict
+    "look" (cond $latex "amsthm" "tufte")
+    "within" "auto"
+    "shared" true
+    "qed" (cond $latex "openbox" "blacksquare")
+    "kinds" (dict
+      "theorem" (dict "style" "plain")
+      "lemma" (dict "style" "plain")
+      "proposition" (dict "style" "plain")
+      "corollary" (dict "style" "plain")
+      "conjecture" (dict "style" "plain")
+      "claim" (dict "style" "plain")
+      "definition" (dict "style" "definition")
+      "example" (dict "style" "definition")
+      "exercise" (dict "style" "definition")
+      "remark" (dict "style" "remark")
+      "notation" (dict "style" "remark")))
 -}}
 {{- return $d -}}

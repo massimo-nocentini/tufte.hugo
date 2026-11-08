@@ -1,0 +1,15 @@
+{{- /*
+  Corollary (block; amsthm \begin{corollary}[Note] … \end{corollary}). Put it on its own
+  lines, with a blank line before and after, and close it:
+
+    {{< corollary >}}…{{< /corollary >}}
+    {{< corollary "Note" >}}…{{< /corollary >}}                 \begin{corollary}[Note]
+    {{< corollary "Note" "cor:x" >}}…{{< /corollary >}}         … plus \label{cor:x}
+    {{< corollary note="Note" label="cor:x" >}}…{{< /corollary >}}
+
+  Positional: 0 = note, 1 = label. Named: note (alias title), label,
+  numbered, style (plain | definition | remark), name, cite, qed, class.
+  Numbering, options and markup: tufte/thm/render.html, tufte/thm/kind.html
+  (README, "Theorems and proofs").
+*/ -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" (partial "tufte/thm/render.html" (dict "ctx" . "inner" .InnerDeindent "kind" "corollary"))) | safeHTML -}}

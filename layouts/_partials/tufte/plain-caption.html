@@ -7,7 +7,7 @@
   its MathML copy). The rest of the MathML copy and the visual HTML
   (span.katex-html, whose text is in layout order: \frac{a}{b} would read
   "ba") are left out. Also left out, as not part of the caption's
-  wording: the toggles (label/input, "⊕") and the nested sidenotes, margin notes,
+  wording: the toggles (label/input, "⊕"), end-of-proof symbols and the nested sidenotes, margin notes,
   notes in notes, citation blocks and real-footnote markers (span.tufte-fn)
   (spans balanced, so their own nested spans do not end them early).
   Cross-reference markers are kept as they are: the caller escapes them
@@ -17,7 +17,9 @@
   punctuation (`Caption {{< cite "k" >}}.`), the space written before the
   dropped element goes too ("Caption.", as the visible caption reads):
   only at these points, so a code span keeps its own spaces.
-  So are nobib citation numbers (cite-num spans, "[2]") and plainnat's
+  So are the number tokens of a theorem in the caption (SPEC-THM;
+  tufte/resolve-refs.html fills the escaped copy with the plain number)
+  and nobib citation numbers (cite-num spans, "[2]") and plainnat's
   extra-letter markers (bib-extra spans, the "a" of "1999a"): postprocess
   fills the escaped span as it fills the visible one
   (tufte/bib/fill-extra.html). A shortcode placeholder
@@ -38,7 +40,7 @@
 {{- $skipMath := false -}}
 {{- $cut := false -}}
 {{- $noteSkip := false -}}
-{{- range $t := findRE `(?s)<a class="xref"[^>]*>[^<]*</a>|<span class="(?:cite-num|bib-extra)"[^>]*></span>|<[^>]*>|[^<]+` (string .) -}}
+{{- range $t := findRE `(?s)<a class="xref"[^>]*>[^<]*</a>|<span class="(?:cite-num|bib-extra)"[^>]*></span>|<span class="tufte-num" data-kind="thm"[^>]*></span>|<[^>]*>|[^<]+` (string .) -}}
   {{- if eq $t `<annotation encoding="application/x-tex">` -}}
     {{- /* only the formula's own (not one in a skipped note or label) */ -}}
     {{- $inTex = and $skipMath (not $inLabel) -}}
@@ -46,11 +48,11 @@
     {{- $buf = printf "%s$%s$" $buf (strings.TrimSpace (htmlUnescape $t)) -}}
   {{- else if eq $t "</annotation>" -}}
     {{- $inTex = false -}}
-  {{- else if or (strings.HasPrefix $t `<span class="cite-num"`) (strings.HasPrefix $t `<span class="bib-extra"`) -}}
+  {{- else if or (strings.HasPrefix $t `<span class="cite-num"`) (strings.HasPrefix $t `<span class="bib-extra"`) (strings.HasPrefix $t `<span class="tufte-num" data-kind="thm"`) -}}
     {{- if not (or (gt $skip 0) $inLabel) }}{{ $buf = printf "%s%s" $buf $t }}{{ $cut = false }}{{ end -}}
   {{- else if strings.HasPrefix $t "<span" -}}
     {{- $depth = add $depth 1 -}}
-    {{- if and (eq $skip 0) (findRE `^<span class="(?:sidenote|marginnote|note-in-note|katex-mathml|katex-html|citation-block|tufte-fn)[" ]` $t 1) }}{{ $skip = $depth }}{{ $skipMath = strings.HasPrefix $t `<span class="katex-mathml"` }}{{ $noteSkip = not (strings.HasPrefix $t `<span class="katex`) }}{{ end -}}
+    {{- if and (eq $skip 0) (findRE `^<span class="(?:sidenote|marginnote|note-in-note|katex-mathml|katex-html|citation-block|tufte-fn|thm-qed)[" ]` $t 1) }}{{ $skip = $depth }}{{ $skipMath = strings.HasPrefix $t `<span class="katex-mathml"` }}{{ $noteSkip = not (strings.HasPrefix $t `<span class="katex`) }}{{ end -}}
   {{- else if eq $t "</span>" -}}
     {{- if eq $skip $depth }}{{ $skip = 0 }}{{ $cut = $noteSkip }}{{ end -}}
     {{- $depth = sub $depth 1 -}}

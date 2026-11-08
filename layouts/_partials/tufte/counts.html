@@ -22,8 +22,14 @@
               which a summary does not show (post-summary.html starts
               after them)
 
+    thm       map counter → numbered theorems (section.tufte-thm with a
+              data-counter) with data-within="" (SPEC-THM §3.3)
+    thmch     map counter → those with data-within="chapter", plus
+              "section" when sec2 is 0 (numbered by the chapter rule)
+
   Takes: a page.
-  Returns: dict sidenote figure table listing eq thanks sec2 (ints).
+  Returns: dict sidenote figure table listing eq thanks sec2 (ints), thm
+           thmch (maps).
   Callers: partialCached "tufte/counts.html" $p (or $p.RelPermalink $p.Path)
 */ -}}
 {{- /* Memoized in the page's Store for the current build: see
@@ -92,7 +98,29 @@
   {{- $fig = 0 -}}{{- $tab = 0 -}}{{- $lst = 0 -}}
 {{- end -}}
 {{- $sec2 := len (findRE `<h2[^>]*><span class="tufte-num" data-kind="sec"` $raw) -}}
+{{- /* Theorems (SPEC-THM §3.3): the numbered ones (a data-counter) by
+       counter, from their opening tags (also those turned into spans in
+       a note). A theorem within section on a page with no numbered h2 is
+       numbered by the chapter rule (tufte/labels.html), so it counts
+       there. */ -}}
+{{- $thm := dict -}}
+{{- $thmch := dict -}}
+{{- if strings.Contains $raw `class="tufte-thm ` -}}
+  {{- range findRE `<(?:section|span data-sn="section") class="tufte-thm [^"]*"[^>]*>` $raw -}}
+    {{- $cn := replaceRE `(?s)^.*\sdata-counter="([^"]*)".*$` "$1" . -}}
+    {{- if and $cn (strings.Contains . ` data-counter="`) -}}
+      {{- $w := replaceRE `(?s)^.*\sdata-within="([^"]*)".*$` "$1" . -}}
+      {{- if eq $w "" -}}
+        {{- $thm = merge $thm (dict $cn (add (index $thm $cn | default 0) 1)) -}}
+      {{- else if or (eq $w "chapter") (and (eq $w "section") (eq $sec2 0)) -}}
+        {{- $thmch = merge $thmch (dict $cn (add (index $thmch $cn | default 0) 1)) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
 {{- $memoRes = dict
+  "thm" $thm
+  "thmch" $thmch
   "sec2" $sec2
   "sidenote" $sn
   "figure" $fig

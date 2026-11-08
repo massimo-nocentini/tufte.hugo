@@ -104,3 +104,23 @@ backToText: "Back to text"
 embeddedContent: "Embedded content"
 youtubeVideo: "YouTube video"
 details: "Details"
+# Theorem environments (amsthm): the heading words of the built-in kinds
+# (a site adds thm<Kind> for its own kinds, e.g. thmAxiom), the proof head
+# ({{ .Ref }} is the cross-reference to the theorem, HTML), the punctuation
+# after a head, the accessible name of the QED symbol and the list heading.
+thmTheorem: "Theorem"
+thmLemma: "Lemma"
+thmProposition: "Proposition"
+thmCorollary: "Corollary"
+thmConjecture: "Conjecture"
+thmClaim: "Claim"
+thmDefinition: "Definition"
+thmExample: "Example"
+thmExercise: "Exercise"
+thmRemark: "Remark"
+thmNotation: "Notation"
+thmProof: "Proof"
+thmProofOf: "Proof of {{ .Ref }}"
+thmPunct: "."
+thmQed: "End of proof"
+listOfTheorems: "List of Theorems"

@@ -25,7 +25,10 @@
                            current section number (in a numbered chapter
                            or on a part page, the chapter's or part's
                            outside a numbered section, as after \chapter
-                           or \part), name = section title
+                           or \part), name = section title; in a
+                           theorem's body (data-thm-in = the theorem's
+                           id, tufte/thm/render.html) the theorem's entry
+                           (kind "thm", as below; rank 1 kept)
     span.run-in with id    kind "label" (\paragraph): name = run-in title
                            (its HTML, nested spans balanced, notes removed)
     i.tufte-float          a labelled float without a number (numbered =
@@ -34,6 +37,24 @@
                            data-name (caption HTML, else the alt text);
                            with none of them, display = the current
                            section number and name = section title
+    section.tufte-thm      a theorem (SPEC-THM §3.2, §4.1; also as
+                           span[data-sn="section"] in a note), by its
+                           opening tag: kind data-thm, counter
+                           data-counter ("" = unnumbered), within
+                           data-within. Within "": the counter's start
+                           (tufte/book/thm-offset-map.html "cont", 0
+                           outside a book) + its rank; "chapter": the
+                           "local" start + rank, with the "prefix" ("2.");
+                           "section": reset at each numbered h2, "S.n"
+                           (S = the section number, "0" before the first),
+                           the chapter rule on a page without numbered h2
+                           (tufte-thm-within). Kind "thm": word "",
+                           thmword = the heading word, thm = the kind,
+                           note = the note, name = the note, else
+                           "WORD N", else WORD (plain, math typeset,
+                           xrefs as TUFTEXREF tokens)
+    section.tufte-proof    with an id: kind "proof", name = its heading
+                           ("Proof of Theorem 1.2")
   plus the page's own front-matter `label` (kind chapter, part or page).
 
   Floats are numbered when floats.number is true, or "auto" and the page is
@@ -79,15 +100,16 @@
               \label, run-in heading or textless float ("label",
               "chapter", "appendix", "part"; "" = kind)
               kind ∈ heading figure table listing eq sidenote label
-              chapter appendix part page; name/caption/where are HTML
+              chapter appendix part page thm proof; name/caption/where are HTML
               (a page label's name is its title rendered as inline
               Markdown);
               anchor is the real id ("" for a page entry)
     order     map kind → slice of keys in the order of their numbers
               (document order, with the texts of real footnotes where
-              their list shows them), for figure, table, listing, eq
+              their list shows them), for figure, table, listing, eq;
+              thm: every theorem key (numbered or not), document order
     tokens    map "KIND|KEY" → display of each number token (figure table
-              listing eq sec), first one wins: a token gets its own number
+              listing eq sec thm), first one wins: a token gets its own number
               even when its key lost to another label
     occurrences  map "KIND|KEY" → slice of the entries of every number
               token (figure table listing eq) with that kind and key, in
@@ -191,6 +213,27 @@
        (tufte/name-title.html). */ -}}
 {{- $plainTitle := partial "tufte/name-title.html" (dict "page" $p "title" $p.Title) -}}
 {{- $plainLinkTitle := partial "tufte/name-title.html" (dict "page" $p) -}}
+{{- /* Theorems (SPEC-THM §3.2): the counters' starting values in a book
+       (tufte/book/thm-offset-map.html: "cont" for the counters that are
+       never reset, "local" and "prefix" for those within chapter), and
+       the heads of the theorem and proof sections by opening tag, in
+       order (two theorems with one label share it), each from the end of
+       its opening tag to its thm-punct span. */ -}}
+{{- $thmRE := `<(?:section|span data-sn="section") class="tufte-(?:thm|proof)[ "][^>]*>` -}}
+{{- $hasThm := or (strings.Contains $raw `class="tufte-thm `) (strings.Contains $raw `class="tufte-proof `) -}}
+{{- $thmStart := dict "cont" dict "local" dict "prefix" "" -}}
+{{- $TH := newScratch -}}
+{{- $TH.Set "h" dict -}}
+{{- $TH.Set "n" dict -}}
+{{- if $hasThm -}}
+  {{- with $root -}}
+    {{- with index (partialCached "tufte/book/thm-offset-map.html" . (or .RelPermalink .Path)) (printf "%s|%s" $p.Path (or $p.RelPermalink "")) }}{{ $thmStart = . }}{{ end -}}
+  {{- end -}}
+  {{- range findRE (printf `(?s)%s.*?<span class="thm-punct">` $thmRE) $raw -}}
+    {{- $open := replaceRE `(?s)^(<[^>]*>).*$` "$1" . -}}
+    {{- $TH.SetInMap "h" $open ((index ($TH.Get "h") $open | default slice) | append (strings.TrimSuffix `<span class="thm-punct">` (strings.TrimPrefix $open .))) -}}
+  {{- end -}}
+{{- end -}}
 
 {{- $S := newScratch -}}
 {{- $S.Set "figure" $off.figure -}}
@@ -277,7 +320,7 @@
              heading="") splits here as that <h2> will (or does not, when
              the placeholder is nested in a blockquote, a div…). */ -}}
       {{- $sb := $body -}}
-      {{- range uniq (findRE `<div class="tufte-placeholder" data-what="(?:bibliography|lof|lot|lol|index)"[^>]*></div>` $sb) -}}
+      {{- range uniq (findRE `<div class="tufte-placeholder" data-what="(?:bibliography|lof|lot|lol|index|thmlist)"[^>]*></div>` $sb) -}}
         {{- $noHead := false -}}
         {{- if strings.Contains . `data-opts="` -}}
           {{- range split (replaceRE `(?s)^.*data-opts="([^"]*)".*$` "$1" . | htmlUnescape) ";" -}}
@@ -454,7 +497,8 @@
   {{- $ck := cond (strings.Contains . ` data-tufte-xinner `) "hxcount" "hcount" -}}
   {{- $S.SetInMap $ck $hid (add (int (index ($S.Get $ck) $hid | default 0)) 1) -}}
 {{- end -}}
-{{- $scanRE := `(?s)<h[2-6][^>]*\sid="[^"]+"[^>]*>|<span class="tufte-num"[^>]*></span>|<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>|<(?:span|div) class="tufte-anchor" id="[^"]+"></(?:span|div)>|<span class="run-in" id="[^"]+">|<i class="tufte-float"[^>]*></i>` -}}
+{{- $scanRE := `(?s)<h[2-6][^>]*\sid="[^"]+"[^>]*>|<span class="tufte-num"[^>]*></span>|<label for="[^"]*" class="margin-toggle sidenote-number[^"]*"[^>]*>|<(?:span|div) class="tufte-anchor" id="[^"]+"(?: data-thm-in="[^"]*")?></(?:span|div)>|<span class="run-in" id="[^"]+">|<i class="tufte-float"[^>]*></i>` -}}
+{{- if $hasThm }}{{ $scanRE = printf "%s|%s" $scanRE $thmRE }}{{ end -}}
 {{- range $open := findRE $scanRE $raw -}}
   {{- $m := $open -}}
   {{- if strings.HasPrefix $open "<h" -}}
@@ -717,10 +761,102 @@
       {{- end -}}
       {{- $list = $list | append (dict "key" $k "kind" $kind "display" $disp "word" $word "name" $name "short" $short "caption" $cap "anchor" $k "where" $where "level" 0 "page" $p) -}}
     {{- end -}}
+  {{- else if findRE `^<(?:section|span data-sn="section") class="tufte-` $m 1 -}}
+    {{- /* Theorem or proof (SPEC-THM §3.2, §4.1): its head (see $TH). */ -}}
+    {{- $tn := int (index ($TH.Get "n") $m | default 0) -}}
+    {{- $hd := "" -}}
+    {{- with index ($TH.Get "h") $m }}{{ $hd = index . (cond (lt $tn (len .)) $tn (sub (len .) 1)) }}{{ end -}}
+    {{- $TH.SetInMap "n" $m (add $tn 1) -}}
+    {{- $isProof := strings.Contains $m `class="tufte-proof` -}}
+    {{- $id := "" -}}
+    {{- if strings.Contains $m ` id="` }}{{ $id = replaceRE `(?s)^.*?\sid="([^"]*)".*$` "$1" $m }}{{ end -}}
+    {{- /* The heading word (span.thm-name) and the note (span.thm-note-text)
+           as plain text, the math kept typeset, the xrefs kept as
+           TUFTEXREF tokens (as a heading's title). */ -}}
+    {{- $parts := dict "word" "" "note" "" -}}
+    {{- with findRESubmatch (cond $isProof `(?s)<span class="thm-name">(.*)</span>$` `<span class="thm-name">([^<]*)</span>`) $hd 1 }}{{ $parts = merge $parts (dict "word" (index . 0 1)) }}{{ end -}}
+    {{- if not $isProof -}}
+      {{- with findRESubmatch `(?s)<span class="thm-note-text">(.*)</span>\)</span>$` $hd 1 }}{{ $parts = merge $parts (dict "note" (index . 0 1)) }}{{ end -}}
+    {{- end -}}
+    {{- $plain := dict -}}
+    {{- range $pk, $ph := $parts -}}
+      {{- $t := partial "tufte/strip-notes.html" $ph -}}
+      {{- range findRE `<a class="xref"[^>]*>[^<]*</a>` $t -}}
+        {{- $xt := printf "TUFTEXREF%sEND" (substr (md5 .) 0 16) -}}
+        {{- $X.SetInMap "x" (substr $xt 9 16) . -}}
+        {{- $t = replace $t . $xt -}}
+      {{- end -}}
+      {{- $t = replaceRE `<span class="(index-anchor|tufte-anchor|tufte-num)[^>]*></span>` "" $t -}}
+      {{- $plain = merge $plain (dict $pk (partial "tufte/plain-math.html" (dict "html" $t))) -}}
+    {{- end -}}
+    {{- $tw := $plain.word -}}
+    {{- if $isProof -}}
+      {{- if $id -}}
+        {{- $list = $list | append (dict "key" (partial "tufte/key.html" $id) "kind" "proof" "display" "" "word" "" "thmword" $tw "thm" "proof" "name" $tw "note" "" "short" "" "caption" "" "anchor" $id "where" $where "level" 0 "page" $p) -}}
+      {{- end -}}
+    {{- else -}}
+      {{- $kd := replaceRE `(?s)^.*\sdata-thm="([^"]*)".*$` "$1" $m -}}
+      {{- $cn := "" -}}
+      {{- if strings.Contains $m ` data-counter="` }}{{ $cn = replaceRE `(?s)^.*\sdata-counter="([^"]*)".*$` "$1" $m }}{{ end -}}
+      {{- $w := "" -}}
+      {{- if strings.Contains $m ` data-within="` }}{{ $w = replaceRE `(?s)^.*\sdata-within="([^"]*)".*$` "$1" $m }}{{ end -}}
+      {{- $d := "" -}}
+      {{- if $cn -}}
+        {{- if and (eq $w "section") (eq (int (partialCached "tufte/counts.html" $p (or $p.RelPermalink $p.Path)).sec2) 0) -}}
+          {{- /* \numberwithin{theorem}{section} on a page with no numbered
+                 section would print 0.1, 0.2: the chapter rule instead. */ -}}
+          {{- $w = "chapter" -}}
+          {{- if not ($S.Get "thmWithinWarned") -}}
+            {{- $S.Set "thmWithinWarned" true -}}
+            {{- warnidf "tufte-thm-within" "tufte.hugo: theorems numbered within section (counter %q) in %s, which has no numbered section (headings.number = 0, or only unnumbered ## headings): they are numbered by the chapter rule instead; number the sections (tufte.headings.number = 1) or set within = \"none\" or \"chapter\"" $cn $at -}}
+          {{- end -}}
+        {{- end -}}
+        {{- if eq $w "section" -}}
+          {{- $hk := printf "%d" $h2 -}}
+          {{- if ne ($S.Get (printf "thmsh|%s" $cn) | default "") $hk -}}
+            {{- $S.Set (printf "thmsh|%s" $cn) $hk -}}
+            {{- $S.Set (printf "thms|%s" $cn) 0 -}}
+          {{- end -}}
+          {{- $S.Add (printf "thms|%s" $cn) 1 -}}
+          {{- $d = printf "%s%d.%d" $chPrefix $h2 ($S.Get (printf "thms|%s" $cn)) -}}
+        {{- else if eq $w "chapter" -}}
+          {{- $ck := printf "thmc|%s" $cn -}}
+          {{- if not ($S.Get $ck) }}{{ $S.Set $ck (int (index $thmStart.local $cn | default 0)) }}{{ end -}}
+          {{- $S.Add $ck 1 -}}
+          {{- $d = printf "%s%d" $thmStart.prefix ($S.Get $ck) -}}
+        {{- else -}}
+          {{- $ck := printf "thmn|%s" $cn -}}
+          {{- if not ($S.Get $ck) }}{{ $S.Set $ck (int (index $thmStart.cont $cn | default 0)) }}{{ end -}}
+          {{- $S.Add $ck 1 -}}
+          {{- $d = printf "%d" ($S.Get $ck) -}}
+        {{- end -}}
+      {{- end -}}
+      {{- with $id -}}
+        {{- $k := partial "tufte/key.html" . -}}
+        {{- $tk := printf "thm|%s" $k -}}
+        {{- if and $d (not (isset ($S.Get "tokens") $tk)) }}{{ $S.SetInMap "tokens" $tk $d }}{{ end -}}
+        {{- $S.Add (printf "occ|%s" $tk) 1 -}}
+        {{- $name := $plain.note -}}
+        {{- if not $name }}{{ $name = cond (ne $d "") (printf "%s&nbsp;%s" $tw $d) $tw }}{{ end -}}
+        {{- $list = $list | append (dict "key" $k "kind" "thm" "display" $d "word" "" "thmword" $tw "thm" $kd "name" $name "note" $plain.note "short" "" "caption" "" "anchor" . "where" $where "level" 0 "page" $p "tok" $d "notok" (eq $d "") "occ" (int ($S.Get (printf "occ|%s" $tk)))) -}}
+        {{- if not (isset ($S.Get "thmE" | default dict) .) }}{{ $S.SetInMap "thmE" . (dict "display" $d "thmword" $tw "thm" $kd "name" $name "note" $plain.note) }}{{ end -}}
+        {{- $S.Add "thmorder" (slice $k) -}}
+      {{- end -}}
+    {{- end -}}
   {{- else -}}
-    {{- /* tufte-anchor (\label anywhere). */ -}}
-    {{- $id := replaceRE `(?s)^.*\sid="([^"]+)".*$` "$1" $m -}}
-    {{- $list = $list | append (dict "key" (partial "tufte/key.html" $id) "kind" "label" "display" $secnum "word" $secWord "name" $where "short" "" "caption" "" "anchor" $id "where" $where "level" 0 "page" $p) -}}
+    {{- /* tufte-anchor (\label anywhere). In a theorem's body
+           (data-thm-in, tufte/thm/render.html), the theorem's entry: kind
+           "thm", its number, words and name (\refstepcounter). */ -}}
+    {{- $id := replaceRE `(?s)^.*?\sid="([^"]+)".*$` "$1" $m -}}
+    {{- $te := dict -}}
+    {{- if strings.Contains $m ` data-thm-in="` -}}
+      {{- with index ($S.Get "thmE" | default dict) (replaceRE `(?s)^.*\sdata-thm-in="([^"]*)".*$` "$1" $m) }}{{ $te = . }}{{ end -}}
+    {{- end -}}
+    {{- if $te -}}
+      {{- $list = $list | append (dict "key" (partial "tufte/key.html" $id) "kind" "thm" "display" $te.display "word" "" "thmword" $te.thmword "thm" $te.thm "name" $te.name "note" $te.note "short" "" "caption" "" "anchor" $id "where" $where "level" 0 "page" $p "inlabel" true) -}}
+    {{- else -}}
+      {{- $list = $list | append (dict "key" (partial "tufte/key.html" $id) "kind" "label" "display" $secnum "word" $secWord "name" $where "short" "" "caption" "" "anchor" $id "where" $where "level" 0 "page" $p) -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}
 
@@ -782,12 +918,12 @@
   {{- if $e.key -}}
     {{- $old := index ($E.Get "e") $e.key -}}
     {{- $rank := 2 -}}
-    {{- if eq $e.kind "heading" }}{{ $rank = cond (eq $e.explicit true) 2 0 }}{{ else if eq $e.kind "label" }}{{ $rank = 1 }}{{ else if eq $e.local true }}{{ $rank = -1 }}{{ end -}}
+    {{- if eq $e.kind "heading" }}{{ $rank = cond (eq $e.explicit true) 2 0 }}{{ else if or (eq $e.kind "label") (eq $e.inlabel true) }}{{ $rank = 1 }}{{ else if eq $e.local true }}{{ $rank = -1 }}{{ end -}}
     {{- if not $old -}}
       {{- $E.SetInMap "e" $e.key $e -}}
     {{- else -}}
       {{- $oldRank := 2 -}}
-      {{- if eq $old.kind "heading" }}{{ $oldRank = cond (eq $old.explicit true) 2 0 }}{{ else if eq $old.kind "label" }}{{ $oldRank = 1 }}{{ else if eq $old.local true }}{{ $oldRank = -1 }}{{ end -}}
+      {{- if eq $old.kind "heading" }}{{ $oldRank = cond (eq $old.explicit true) 2 0 }}{{ else if or (eq $old.kind "label") (eq $old.inlabel true) }}{{ $oldRank = 1 }}{{ else if eq $old.local true }}{{ $oldRank = -1 }}{{ end -}}
       {{- if gt $rank $oldRank -}}
         {{- $E.SetInMap "e" $e.key $e -}}
       {{- end -}}
@@ -878,8 +1014,8 @@
 {{- range $tk, $es := $O.Get "occ" -}}
   {{- if gt (len $es) 1 -}}
     {{- $ds := slice -}}
-    {{- range $es }}{{ $ds = $ds | append .tok }}{{ end -}}
-    {{- $O.SetInMap "dup" $tk $ds -}}
+    {{- range $es }}{{ if ne .notok true }}{{ $ds = $ds | append .tok }}{{ end }}{{ end -}}
+    {{- if gt (len $ds) 1 }}{{ $O.SetInMap "dup" $tk $ds }}{{ end -}}
   {{- end -}}
 {{- end -}}
 
@@ -904,6 +1040,7 @@
   "table" ($OR.Get "table")
   "listing" ($OR.Get "listing")
   "eq" ($OR.Get "eq")
+  "thm" ($S.Get "thmorder" | default slice)
 -}}
 {{- $memoRes = dict "numbered" $num "entries" ($E.Get "e") "order" $order "tokens" ($S.Get "tokens") "occurrences" $occs "duptokens" ($O.Get "dup") "renames" $renames "hrenames" ($S.Get "hren") "htoc" ($S.Get "htoc") "xrefs" ($X.Get "x") "chapter" $chap "page" $p -}}
 {{- $p.Store.Set "tufteMemoLabels" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}

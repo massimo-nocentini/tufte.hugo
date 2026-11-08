@@ -132,6 +132,14 @@ document.addEventListener("DOMContentLoaded", function () {
   var nodes = document.querySelectorAll(".math.math-inline, .math.math-display");
   if (nodes.length) {
     nodes.forEach(function (el) {
+      /* A display ending with \qedhere carries the proof's QED span as its
+         last child (tufte/math-render.html): keep it out of the TeX and put
+         it back after katex.render, which replaces the element's children. */
+      var qed = [];
+      Array.prototype.forEach.call(el.children, function (c) {
+        if (c.classList.contains("thm-qed")) { qed.push(c); }
+      });
+      qed.forEach(function (c) { el.removeChild(c); });
       var tex = el.textContent.trim();
       var open = tex.slice(0, 2);
       if (open === "\\(" || open === "\\[") { tex = tex.slice(2, -2); }
@@ -142,6 +150,7 @@ document.addEventListener("DOMContentLoaded", function () {
         el.classList.add("math-error");
         if (window.console) { console.warn("KaTeX:", err); }
       }
+      qed.forEach(function (c) { el.appendChild(c); });
     });
   } else if (typeof renderMathInElement === "function") {
     renderMathInElement(document.querySelector("article") || document.body, Object.assign({}, opts, {

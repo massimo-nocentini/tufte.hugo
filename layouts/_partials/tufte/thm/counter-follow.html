@@ -1,0 +1,53 @@
+{{- /*
+  Follows the explicit counter options of theorem kinds (SPEC-THM §3.1;
+  tufte/thm/kind.html): from kind START, while the kind C reached has a
+  valid theorems.kinds.C.counter = D other than C, go to D. Only options
+  that are set count: the implicit shared counter is not a step.
+
+  Takes a dict:
+    m         the page's options (tufte/opts.html)
+    start     a kind name
+    builtins  the built-in kind names (slice)
+  Returns: dict
+    counter  the name reached (start itself when it sets no counter)
+    end      bool: the name reached is a kind (start counts as one) that
+             sets no counter option (under theorems.shared it numbers
+             with the shared counter)
+    loop     "" or the loop, "a → b → a" (every step an explicit option);
+             counter is then start's own counter option
+*/ -}}
+{{- $m := .m -}}
+{{- $c := .start -}}
+{{- $seen := slice $c -}}
+{{- $loop := "" -}}
+{{- $own := "" -}}
+{{- range $i := seq 12 -}}
+  {{- $e := "" -}}
+  {{- with index $m (printf "theorems.kinds.%s.counter" $c) -}}
+    {{- $cv := lower (strings.TrimSpace (printf "%v" .)) -}}
+    {{- if findRE `^[a-z][a-z0-9_-]*$` $cv 1 }}{{ $e = $cv }}{{ end -}}
+  {{- end -}}
+  {{- if eq $i 1 }}{{ $own = $e }}{{ end -}}
+  {{- if or (not $e) (eq $e $c) }}{{ break }}{{ end -}}
+  {{- if in $seen $e -}}
+    {{- $loop = delimit ($seen | append $e) " → " -}}
+    {{- $c = $own -}}
+    {{- break -}}
+  {{- end -}}
+  {{- $seen = $seen | append $e -}}
+  {{- $c = $e -}}
+{{- end -}}
+{{- $end := false -}}
+{{- if not $loop -}}
+  {{- $isKind := or (eq $c .start) (in .builtins $c) -}}
+  {{- $cpfx := printf "theorems.kinds.%s." $c -}}
+  {{- range $key, $v := $m -}}
+    {{- if and (strings.HasPrefix $key $cpfx) (ne $key (printf "%swithin" $cpfx)) }}{{ $isKind = true }}{{ end -}}
+  {{- end -}}
+  {{- $end = $isKind -}}
+  {{- with index $m (printf "%scounter" $cpfx) -}}
+    {{- $cv := lower (strings.TrimSpace (printf "%v" .)) -}}
+    {{- if findRE `^[a-z][a-z0-9_-]*$` $cv 1 }}{{ $end = false }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "counter" $c "end" $end "loop" $loop) -}}

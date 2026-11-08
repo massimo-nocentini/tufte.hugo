@@ -78,7 +78,7 @@
            code fence, list marker or link definition ("> x", "[a]: b")
            prints as written ("literal" true; not "shortcodes" "run", so
            an escaped shortcode in it stays text). */ -}}
-    {{- $t := partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "literal" true "where" (printf "%s shortcode in %v" $.Name $.Position)) | string | strings.TrimSpace -}}
+    {{- $t := partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "thmInline" true "literal" true "where" (printf "%s shortcode in %v" $.Name $.Position)) | string | strings.TrimSpace -}}
     {{- $t = partial "tufte/note-in-note.html" (dict "page" $p "html" $t "holder" "subfigure caption" "where" $.Position) -}}
     {{- $sub = printf `<span class="subcaption">(%s) %s</span>` (index $letters (mod $i 26)) $t -}}
   {{- end -}}

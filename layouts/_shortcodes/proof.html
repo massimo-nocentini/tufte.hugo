@@ -1,0 +1,17 @@
+{{- /*
+  Proof (block; amsthm \begin{proof}[Heading] … \end{proof}). Put it on its
+  own lines, with a blank line before and after, and close it:
+
+    {{< proof >}}…{{< /proof >}}                           "Proof."
+    {{< proof "Proof of the main theorem" >}}…{{< /proof >}}
+    {{< proof of="thm:pyth" >}}…{{< /proof >}}             "Proof of Theorem 1.2."
+    {{< proof qed="none" >}}…{{< /proof >}}                no end symbol
+
+  Positional: 0 = title. Named: title (inline Markdown, replaces "Proof"),
+  of (an xref key or path#key), qed (openbox | blacksquare | none | any
+  text; default: option theorems.qed), label, class. The end symbol goes at
+  the end of the last paragraph, or on a line of its own after a list,
+  code or display math; {{< qedhere >}} or \qedhere in display TeX puts it
+  there instead. See tufte/thm/render.html.
+*/ -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" (partial "tufte/thm/render.html" (dict "ctx" . "inner" .InnerDeindent "proof" true))) | safeHTML -}}

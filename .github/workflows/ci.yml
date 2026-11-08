@@ -305,6 +305,95 @@ jobs:
           # a summary with a forward xref resolves on the list page
           grep -qE 'class="xref"[^>]*>The cheat sheet<' posts/index.html || fail "posts/index.html: forward xref in the latex-to-hugo summary not resolved"
 
+          # 8. Theorems (amsthm): numbers within sections and on a counter of
+          # their own, cross-references, proof heads, end-of-proof symbols and
+          # the list of theorems (posts/theorems); theorems numbered within the
+          # chapters of the parts demo, across chapters and in print.html.
+          TH=posts/theorems/index.html
+          if need "$TH"; then
+            nums=$(grep -oE '<span class="tufte-num" data-kind="thm" data-key="[^"]*">[^<]+</span>' "$TH" | sed -E 's/.*">([^<]+)<\/span>$/\1/' | tr '\n' ' ')
+            [ "$nums" = "1.1 1.2 1.3 1 2.1 2.2 2.3 2 2.4 " ] || fail "$TH: theorem numbers are '$nums'"
+            grep -q 'class="xref" href="#thm-lagrange">Theorem&nbsp;1.2<' "$TH" || fail "$TH: no full xref to Theorem 1.2"
+            grep -q 'class="xref" href="#thm-lagrange">Lagrange</a>' "$TH" || fail "$TH: no name xref (the note) to Theorem 1.2"
+            grep -q 'class="xref" href="#lem-coset">1.3<' "$TH" || fail "$TH: no number xref to Lemma 1.3"
+            grep -q 'class="xref" href="#rem-u">Remark<' "$TH" || fail "$TH: no xref to the unnumbered remark"
+            grep -q 'class="xref" href="#cor-unit">Corollary&nbsp;2.3<' "$TH" || fail "$TH: no full xref to Corollary 2.3"
+            # the other xref formats (num, eq, page) and a labelled proof's head
+            [ "$(grep -o 'class="xref" href="#lem-coset">1.3</a>' "$TH" | wc -l)" -ge 2 ] || fail "$TH: no num xref to Lemma 1.3 (besides the default one)"
+            grep -q 'class="xref" href="#lem-coset">(1.3)</a>' "$TH" || fail "$TH: no eq xref to Lemma 1.3"
+            grep -q 'class="xref" href="#lem-coset">Groups</a>' "$TH" || fail "$TH: no page xref to Lemma 1.3 (its section)"
+            grep -q 'class="xref" href="#prf-lagrange">Proof of Theorem' "$TH" || fail "$TH: no xref to the labelled proof of Theorem 1.2"
+            # a proposition (title=, numbered=false, style=, class=), a kind
+            # declared in the front matter (principle), an example with qed=,
+            # a list of the conjectures only (kinds=, heading=)
+            grep -q '<section class="tufte-thm thm-definition thm-kind-proposition thm-look-tufte fullwidth" id="[^"]*" data-thm="proposition" data-counter="" data-within="">' "$TH" || fail "$TH: no unnumbered fullwidth proposition in the definition style"
+            grep -q '<span class="thm-note-text">Cayley</span>' "$TH" || fail "$TH: the proposition's title= is not its note"
+            grep -q '<section class="tufte-thm thm-definition thm-kind-principle thm-look-tufte" id="[^"]*" data-thm="principle" data-counter="" data-within=""><p><span class="thm-head"><span class="thm-name">Principle</span>' "$TH" || fail "$TH: the principle kind declared in the front matter is not used"
+            [ "$(tr -d '\n' < "$TH" | grep -cE 'data-thm="example"[^>]*>.*<span class="thm-qed thm-qed-text" role="img" aria-label="[^"]*">◇</span></p></section>')" -gt 0 ] || fail "$TH: the example has no qed= symbol at its end"
+            grep -q '<h2 id="tufte-list-of-theorems-2">Conjectures</h2><ol class="tufte-lof" data-kind="thm"><li>' "$TH" || fail "$TH: no list of the conjectures (kinds=, heading=)"
+            [ "$(tr -d '\n' < "$TH" | grep -oE '<h2 id="tufte-list-of-theorems-2">.*' | sed 's#</ol>.*##' | grep -o '<li>' | wc -l)" -eq 2 ] || fail "$TH: the list of conjectures does not have its 2 entries"
+            grep -q 'Proof of <a class="xref" href="#thm-lagrange">Theorem&nbsp;1.2</a>' "$TH" || fail "$TH: no head 'Proof of Theorem 1.2'"
+            grep -q '<section class="tufte-thm thm-remark thm-kind-remark thm-look-tufte" id="rem-u" data-thm="remark" data-counter="" data-within="">' "$TH" || fail "$TH: the unnumbered remark is not an unnumbered theorem section"
+            [ "$(tr -d '\n' < "$TH" | sed -E 's/.*id="rem-u"[^>]*>//; s#</section>.*##' | grep -c 'class="thm-num"')" -eq 0 ] || fail "$TH: the unnumbered remark has a number"
+            grep -q '<p class="thm-qed-line">' "$TH" || fail "$TH: no end-of-proof symbol on a line of its own"
+            # A proof that ends with a paragraph ends it with its symbol, at the
+            # end of its last line (the proof of Lagrange's theorem, and the one of
+            # the lemma inside a proof).
+            [ "$(tr -d '\n' < "$TH" | grep -oE ' <span class="thm-qed thm-qed-[a-z]+" role="img" aria-label="[^"]*">[^<]*</span></p></section>' | wc -l)" -ge 2 ] || fail "$TH: no end-of-proof symbol inline at the end of a proof's last paragraph"
+            # \qedhere in a display: the claimed symbol is the last child of the
+            # display span. (grep -c reads all its input: with grep -q, tr could
+            # die of SIGPIPE and pipefail would fail the test.)
+            [ "$(tr -d '\n' < "$TH" | grep -cE '</span><span class="thm-qed thm-qed-[a-z]+" role="img" aria-label="[^"]*" data-qedhere="2">[^<]*</span></span>')" -gt 0 ] || fail "$TH: no \\qedhere symbol at the end of a display"
+            grep -q 'data-qedhere="1"' "$TH" && fail "$TH: a \\qedhere symbol was not claimed by its proof"
+            # in a numbered display it follows the equation number
+            grep -q 'data-key="eq-coset" data-labeled="1">1</span>)</span><span class="thm-qed thm-qed-[a-z]*" role="img" aria-label="[^"]*" data-qedhere="2">' "$TH" || fail "$TH: the \\qedhere symbol of a numbered display is not after its number"
+            proofs=$(grep -oE '<(section|span data-sn="section") class="tufte-proof[ "]' "$TH" | wc -l)
+            qeds=$(grep -oE 'class="thm-qed[ "]' "$TH" | wc -l)
+            # (one more: the example's qed= symbol)
+            [ "$proofs" -ge 5 ] && [ "$(( proofs + 1 ))" -eq "$qeds" ] || fail "$TH: $proofs proofs but $qeds end-of-proof symbols"
+            grep -q 'id="tufte-list-of-theorems"' "$TH" || fail "$TH: no list of theorems heading"
+            thms=$(grep -oE '<(section|span data-sn="section") class="tufte-thm[ "]' "$TH" | wc -l)
+            items=$(tr -d '\n' < "$TH" | grep -oE '<ol class="tufte-lof" data-kind="thm">.*' | sed 's#</ol>.*##' | grep -o '<li>' | wc -l)
+            [ "$thms" -ge 10 ] && [ "$items" -eq "$thms" ] || fail "$TH: the list of theorems has $items entries for $thms theorems"
+            grep -q 'thm-look-tufte' "$TH" || fail "$TH: no tufte look"
+            # Every in-page link has its target (theorem ids, labels, notes;
+            # a TOC link escapes the colon of an explicit id).
+            for h in $(grep -o 'href="#[^"]*"' "$TH" | sed 's/^href="#//; s/"$//; s/%3[aA]/:/g' | sort -u); do
+              grep -q " id=\"$h\"" "$TH" || fail "$TH: dangling link #$h"
+            done
+            # The exact head of Theorem 1.2: plain style, number, note, punctuation.
+            grep -q '<section class="tufte-thm thm-plain thm-kind-theorem thm-look-tufte" id="thm-lagrange" data-thm="theorem" data-counter="theorem" data-within="section"><p><span class="thm-head"><span class="thm-name">Theorem</span>&nbsp;<span class="thm-num"><span class="tufte-num" data-kind="thm" data-key="thm-lagrange">1.2</span></span> <span class="thm-note">(<span class="thm-note-text">Lagrange</span>)</span><span class="thm-punct">.</span></span> If ' "$TH" || fail "$TH: the head of Theorem 1.2 is not the documented markup"
+            [ "$(grep -o 'class="tufte-thm thm-plain ' "$TH" | wc -l)" -ge 6 ] || fail "$TH: fewer than 6 theorems in the plain style"
+            grep -q 'class="tufte-thm thm-remark ' "$TH" || fail "$TH: no theorem in the remark style"
+            heads=$(grep -o '<span class="thm-head">' "$TH" | wc -l)
+            [ "$heads" -eq "$(grep -o '<span class="thm-punct">' "$TH" | wc -l)" ] || fail "$TH: a head without its thm-punct span"
+            [ "$(grep -o '<span class="thm-punct">\.</span></span>' "$TH" | wc -l)" -ge "$(( heads - 1 ))" ] || fail "$TH: heads without their period"
+            [ "$(grep -o '<span class="thm-note">' "$TH" | wc -l)" -eq "$(grep -o '<span class="thm-note">(<span class="thm-note-text">' "$TH" | wc -l)" ] || fail "$TH: a note without its parentheses"
+            [ "$(grep -o '<span class="thm-note-text">[^<]*</span>)</span><span class="thm-punct">' "$TH" | wc -l)" -ge 4 ] || fail "$TH: notes not closed before the punctuation"
+            grep -q '<span class="lof-num">Theorem&nbsp;1.2</span> Lagrange</a>' "$TH" || fail "$TH: no list-of-theorems entry 'Theorem 1.2 Lagrange'"
+            [ "$(grep -o '<span class="lof-num"></span>' "$TH" | wc -l)" -eq 0 ] || fail "$TH: an empty number in the list of theorems"
+            # A theorem in a sidenote is set inline: a span, never a block.
+            grep -q '<span class="sidenote"><span data-sn="section" class="tufte-thm ' "$TH" || fail "$TH: the theorem in a sidenote is not set inline"
+            ! grep -qE '<span class="(sidenote|marginnote)">(<label[^>]*>[^<]*</label><input[^>]*>)?<(section|p|div)[ >]' "$TH" || fail "$TH: a block element opens a note"
+            # A label in a theorem's body refers to the theorem (\begin{conjecture}\label{…}).
+            grep -q 'class="xref" href="#conj-goldbach">Conjecture&nbsp;1<' "$TH" || fail "$TH: the label in the conjecture's body does not refer to Conjecture 1"
+            # Margin material at the start of a theorem and at the end of a
+            # proof: the head still runs in, the QED still ends the last line.
+            dg=$(tr -d '\n' < "$TH" | sed -E 's/.*id="def-group"[^>]*>//; s#</section>.*##')
+            case "$dg" in '<label for="'*'<span class="marginnote">'*'</span><p><span class="thm-head"><span class="thm-name">Definition</span>'*) ;; *) fail "$TH: the head of Definition 1.1 does not run in past its margin note";; esac
+            pl=$(tr -d '\n' < "$TH" | sed -E 's/.*id="prf-lagrange"[^>]*>//; s#</section>.*##')
+            case "$pl" in *'aria-label="End of proof">■</span></p><label for="'*'<span class="marginnote">'*) ;; *) fail "$TH: the QED of the proof of Theorem 1.2 does not end its last line before the margin note";; esac
+          fi
+          if [ -d "$PD" ]; then
+            grep -q 'data-kind="thm" data-key="thm-margin-width">1\.1<' "$PD/part-one/margins/index.html" || fail "$PD: Theorem 1.1 not numbered within chapter 1"
+            grep -q 'data-kind="thm" data-key="lem-half-width">1\.2<' "$PD/part-one/margins/index.html" || fail "$PD: Lemma 1.2 not on the shared counter"
+            grep -qE 'data-kind="thm" data-key="[^"]*">2\.1<' "$PD/part-two/graphs/index.html" || fail "$PD: Theorem 2.1 not numbered within chapter 2"
+            grep -q 'data-kind="thm" data-key="def-notation">A\.1<' "$PD/notation/index.html" || fail "$PD: Definition A.1 not numbered within appendix A"
+            grep -q 'class="xref" href="/books/parts-demo/part-one/margins/#thm-margin-width">Theorem&nbsp;1\.1<' "$PD/part-two/graphs/index.html" || fail "$PD: no cross-chapter xref to Theorem 1.1"
+            grep -qE ' id="tufte-c[0-9]+-thm-margin-width"' "$PD/print.html" || fail "$PD/print.html: no print id of Theorem 1.1"
+            grep -qE 'href="#tufte-c[0-9]+-thm-margin-width"' "$PD/print.html" || fail "$PD/print.html: the cross-chapter theorem xref is not an in-document link"
+          fi
+
           [ "$errs" -eq 0 ] && echo "tufte-latex acceptance: all checks passed" || { echo "$errs check(s) failed"; exit 1; }
           TUFTE_LATEX_CHECK
           chmod +x "$RUNNER_TEMP/tufte-latex-check.sh"
@@ -327,6 +416,10 @@ jobs:
           set -euo pipefail
           "$RUNNER_TEMP/tufte-latex-check.sh" public-latex markers
           grep -q 'tufte-style-latex' public-latex/posts/tufte-css/index.html || { echo "::error::style preset not applied"; exit 1; }
+          # The LaTeX preset gives theorems amsthm's bold heads and open box.
+          TH=public-latex/posts/theorems/index.html
+          grep -q 'thm-look-amsthm' "$TH" || { echo "::error::no amsthm look in $TH"; exit 1; }
+          grep -q 'class="thm-qed thm-qed-openbox"' "$TH" || { echo "::error::no open-box end-of-proof symbol in $TH"; exit 1; }
 
       # KaTeX in the browser: the TeX stays in the HTML and the page loads
       # katex.min.js and auto-render of the same release as the stylesheet.
@@ -347,6 +440,15 @@ jobs:
           css=$(grep -oE 'katex@[0-9.]+/dist/katex\.min\.css' "$M" | head -1 | cut -d/ -f1)
           js=$(grep -oE 'katex@[0-9.]+/dist/katex\.min\.js' "$M" | head -1 | cut -d/ -f1)
           [ -n "$css" ] && [ "$css" = "$js" ] || fail "KaTeX stylesheet ($css) and script ($js) differ in $M"
+          # \qedhere in a display: removed from the TeX that KaTeX reads, its
+          # symbol the last child of the display span.
+          TH=public-client/posts/theorems/index.html
+          [ -f "$TH" ] || fail "missing $TH"
+          [ "$(tr -d '\n' < "$TH" | grep -cE 'class="math math-display">[^<]*<span class="thm-qed thm-qed-[a-z]+" role="img" aria-label="[^"]*" data-qedhere="2">[^<]*</span></span>')" -gt 0 ] || fail "no \\qedhere symbol inside a client-side display in $TH"
+          if [ "$(tr -d '\n' < "$TH" | grep -oE 'class="math math-display">[^<]*' | grep -c 'qedhere')" -gt 0 ]; then fail "\\qedhere left in the TeX of a display in $TH"; fi
+          # a numbered display keeps the symbol out of the TeX span, after the
+          # number, as the server engine does
+          grep -q 'data-key="eq-coset" data-labeled="1">1</span>)</span><span class="thm-qed thm-qed-[a-z]*" role="img" aria-label="[^"]*" data-qedhere="2">' "$TH" || fail "the \\qedhere symbol of a numbered client-side display is not after its number in $TH"
           # Book landings have no pager: no /page/N/ copies of print.html.
           if find public-client -path '*/page/*' -name print.html | grep -q .; then fail "paginated copies of print.html"; fi
 
@@ -359,7 +461,13 @@ jobs:
 
       - name: Check tufte-latex markers (A4 paper, nobib, numbered sections)
         shell: bash
-        run: '"$RUNNER_TEMP/tufte-latex-check.sh" public-a4 markers'
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/tufte-latex-check.sh" public-a4 markers
+          # The theorems page sets its own headings.number: its numbers stay.
+          TH=public-a4/posts/theorems/index.html
+          nums=$(grep -oE '<span class="tufte-num" data-kind="thm" data-key="[^"]*">[^<]+</span>' "$TH" | sed -E 's/.*">([^<]+)<\/span>$/\1/' | tr '\n' ' ')
+          [ "$nums" = "1.1 1.2 1.3 1 2.1 2.2 2.3 2 2.4 " ] || { echo "::error::theorem numbers in $TH are '$nums'"; exit 1; }
 
       # uglyURLs: Hugo writes a section's page as books/b/index.html, but
       # still names some list pages x.html (taxonomy terms); without noUgly
@@ -386,8 +494,8 @@ jobs:
           done
 
       # Scale regression: a generated 200-chapter book (html + print), each
-      # chapter with sidenotes, cross-chapter xrefs, labelled figures, cites
-      # and index entries. The theme memoizes its cross-page results in
+      # chapter with sidenotes, cross-chapter xrefs, labelled figures, cites,
+      # a theorem and index entries. The theme memoizes its cross-page results in
       # .Store; when they sat only in partialCached's bounded cache, such a
       # book took minutes instead of seconds. From about 160 chapters up,
       # partialCached also evicts its own entries during the build: the
@@ -437,6 +545,10 @@ jobs:
               printf -- '---\n'
               for r in 3 4 5; do printf 'Also {{< cite "k%d_%d" >}}.\n\n' "$i" "$r"; done
               printf 'As {{< cite keys="k%d_0" mode="text" >}} and {{< cite keys="k%d_1" mode="paren" >}} show {{< cite "k%d_2" >}}, after {{< cite keys="k%d_0" mode="text" >}} {{< cite "k%d_1" >}}.\n\n' "$i" "$i" "$i" "$p" "$p"
+              # A theorem per chapter, numbered through the book
+              # (tufte/book/thm-offset-map.html), and a reference to the
+              # previous chapter's.
+              printf '{{< theorem "Chapter %d" "thm:c%d" >}}\nStatement %d, after {{< xref "thm:c%d" "full" >}}.\n{{< /theorem >}}\n\n' "$i" "$i" "$i" "$p"
             } > "$f"
             for s in 0 1 2 3; do
               printf '## Section %d {#sec:c%d-s%d}\n\n' "$s" "$i" "$s" >> "$f"
@@ -459,6 +571,9 @@ jobs:
           # Chapter N refers to the first figure of chapter N-1: (N-2) × 4 + 1.
           fig=$(( (N - 2) * 4 + 1 ))
           grep -q ">Figure&nbsp;$fig</a>" "$B/public/books/big/ch$L/index.html" || { echo "::error::cross-chapter xref not resolved"; exit 1; }
+          # Chapter N's theorem is Theorem N and refers to Theorem N-1.
+          grep -q "data-key=\"thm-c$N\">$N</span>" "$B/public/books/big/ch$L/index.html" || { echo "::error::the theorems are not numbered through the book"; exit 1; }
+          grep -q "#thm-c$(( N - 1 ))\">Theorem&nbsp;$(( N - 1 ))</a>" "$B/public/books/big/ch$L/index.html" || { echo "::error::cross-chapter theorem xref not resolved"; exit 1; }
           grep -q -- "-fig-c$N-f3\"" "$B/public/books/big/print.html" || { echo "::error::print document incomplete"; exit 1; }
           # The extra labels of a chapter's own entry and of an earlier
           # chapter's, cited author-year in the last chapter, are the ones
@@ -540,6 +655,42 @@ jobs:
           printf -- '---\ntitle: E\ndate: 2024-01-07\n---\n\n{{< details summary="D" >}}\nA side{{< sidenote >}}D{{< /sidenote >}}, a real one[^fn-y] and {{< footnote >}}fn {{< sidenote >}}X{{< /sidenote >}} text{{< /footnote >}} then{{< sidenote >}}Y{{< /sidenote >}} end.\n{{< /details >}}\n\nAfter{{< sidenote label="sn:e" >}}E{{< /sidenote >}} is note {{< xref "sn:e" >}}.\n\n[^fn-y]: Real Y with{{< sidenote label="sn:f" >}}F{{< /sidenote >}}.\n' > e.md
           # KaTeX writes <span></span> in every subscript; a footnote nested
           # in a real footnote must still unnest (tufte/fn-unnest.html).
+          # A linked stand-alone image as the first block of a theorem and the
+          # last block of a proof stays a figure (func/content-raw.html).
+          printf -- '---\ntitle: L\ndate: 2024-01-09\n---\n\n{{< theorem >}}\n[![A curve](/h.svg "Linked caption.")](https://example.org/)\n\nText after.\n{{< /theorem >}}\n\n{{< proof >}}\nText before.\n\n[![A curve](/h.svg)](https://example.org/)\n{{< /proof >}}\n' > l.md
+          # theorems.qed = none: a \qedhere prints nothing, or the symbol of
+          # the proof or kind that holds it (no leftover nest token).
+          cat > q.md <<'QEDNONE'
+          ---
+          title: Q
+          date: 2024-01-10
+          tufte:
+            theorems:
+              qed: none
+              kinds:
+                example: {qed: "◇"}
+          ---
+
+          {{< proof >}}
+          Cases:
+
+          - one
+          - two.{{< qedhere >}}
+          {{< /proof >}}
+
+          {{< proof qed="openbox" >}}
+          We have
+
+          {{< equation >}}a = b. \qedhere{{< /equation >}}
+          {{< /proof >}}
+
+          {{< example >}}
+          Consider
+
+          - one
+          - two{{< qedhere >}}
+          {{< /example >}}
+          QEDNONE
           printf -- '---\ntitle: K\ndate: 2024-01-08\n---\n\nBody with real[^fn-cap] end.\n\n{{< figure src="/h.svg" caption="Cap with real[^fn-cap] end." >}}\n\n{{< listoffigures >}}\n\n[^fn-cap]: Cap real $c_0$.[^fn-deep]\n[^fn-deep]: Deep $d_0$.\n' > k.md
           hugo --source "$N" --destination "$N/public" --panicOnWarning
           cd "$N/public"
@@ -582,6 +733,13 @@ jobs:
           grep -q '<span class="lof-num">1</span> Cap with real end\.</a>' posts/k/index.html || fail "posts/k: list-of-figures entry broken"
           ! grep -q '<p></li>' posts/k/index.html || fail "posts/k: unclosed <p> in the footnote list"
           grep -q '<li id="fn-[^"]*-fn-deep" class="footnote-item"[^>]*><p>Deep ' posts/k/index.html || fail "posts/k: [^fn-deep] item missing"
+          grep -q '<p class="thm-headline">.*</span></p><figure class="tufte-figure" id="[^"]*">' posts/l/index.html || fail "posts/l: the linked image that opens a theorem is not a figure after the head line"
+          grep -q '<span class="caption-text">Linked caption.</span>' posts/l/index.html || fail "posts/l: the linked image's title is not its caption"
+          grep -q '</a></figure><p class="thm-qed-line">' posts/l/index.html || fail "posts/l: the linked image that ends a proof is not a figure before the QED line"
+          grep -q '<li>two\.</li>' posts/q/index.html || fail "posts/q: an unclaimed \\qedhere with theorems.qed = none is not removed"
+          ! grep -q 'thm-qed-none\|thm-qed-line' posts/q/index.html || fail "posts/q: a \\qedhere placeholder or a QED line is left"
+          grep -q 'data-qedhere="2">□</span></span>' posts/q/index.html || fail "posts/q: the proof's qed= symbol does not take the \\qedhere place in the display"
+          grep -q '<li>two<span class="thm-qed thm-qed-text" role="img" aria-label="[^"]*" data-qedhere="2">◇</span></li>' posts/q/index.html || fail "posts/q: the example's symbol does not take the \\qedhere place"
           # Automatic summaries are closed before "Read more".
           for f in index.html posts/index.html; do
             [ "$(grep -o '<span[ >]' "$f" | wc -l)" -eq "$(grep -o '</span>' "$f" | wc -l)" ] || fail "unbalanced <span> in $f"

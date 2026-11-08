@@ -213,13 +213,21 @@
   {{- range seq 4 -}}
     {{- if strings.Contains $html "TUFTENEST" -}}
       {{- range $tok := findRE `TUFTENEST[0-9a-f]{16}END` $html | uniq -}}
-        {{- with index $map (substr $tok 9 16) -}}
-          {{- $html = replace $html (printf "<p>%s</p>" $tok) . -}}
-          {{- $html = replace $html $tok . -}}
+        {{- $h := substr $tok 9 16 -}}
+        {{- if isset $map $h -}}
+          {{- $v := string (index $map $h) -}}
+          {{- $html = replace $html (printf "<p>%s</p>" $tok) $v -}}
+          {{- $html = replace $html $tok $v -}}
         {{- end -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
+{{- end -}}
+{{- /* A \qedhere that no proof claimed, where theorems.qed is none
+       (tufte/thm/qed.html keeps its place as an empty thm-qed-none span
+       for a holder with a symbol of its own): it prints nothing. */ -}}
+{{- if strings.Contains $html `thm-qed-none` -}}
+  {{- $html = replaceRE `<span class="thm-qed thm-qed-none" role="img" aria-label="[^"]*" data-qedhere="1"></span>` "" $html -}}
 {{- end -}}
 
 {{- /* 4a. Deferred alt texts of images and titles of links that held a
@@ -306,6 +314,11 @@
     {{- $capKey := index . 1 -}}
     {{- $cap := index . 2 -}}
     {{- $blk := index . 3 -}}
+    {{- /* A theorem or proof in the title: its inline form (SPEC-THM T13),
+         as in a caption= parameter. */ -}}
+    {{- if strings.Contains $cap `<section class="tufte-` -}}
+      {{- $cap = partial "tufte/thm/inline.html" $cap -}}
+    {{- end -}}
     {{- if strings.Contains $cap `class="margin-toggle` -}}
       {{- $at := $page.RelPermalink -}}
       {{- with $page.File }}{{ $at = .Path }}{{ end -}}

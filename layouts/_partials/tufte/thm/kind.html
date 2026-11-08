@@ -1,0 +1,193 @@
+{{- /*
+  A theorem kind on a page (SPEC-THM §2, §3.1): amsthm's \newtheorem,
+  \newtheorem*, \theoremstyle and the [shared]/[within] arguments, read
+  from the page's options (tufte/opt.html, keys theorems.*).
+
+  Kinds: the built-ins of tufte/defaults.html (theorem lemma proposition
+  corollary conjecture claim definition example exercise remark notation)
+  and every K for which some option theorems.kinds.K.* is set (page →
+  part → book → site, leaf by leaf). Another K is undeclared (amsthm:
+  "Environment undefined"): the caller warns tufte-thm-kind unless the
+  shortcode gives name=.
+
+    style    theorems.kinds.K.style: plain | definition | remark (an
+             unset style of a user kind: plain; an invalid one is
+             reported, tufte-bad-option, and the preset's style is used)
+    word     the heading word: theorems.kinds.K.name, else the i18n key
+             "thm" + K with its first letter upper-cased (thmTheorem,
+             thmConjecture; a site may add thmAxiom), else the theme's
+             English word for a built-in; "" when none (the caller uses
+             `title K`)
+    numbered theorems.kinds.K.numbered (default true; \newtheorem* is
+             false); not a boolean word: reported, true
+    counter  theorems.kinds.K.counter (\newtheorem{K}[C]{…}), else
+             with theorems.shared (the default: amsart's shared counter)
+             the counter the kind theorem resolves to ("theorem", or
+             kinds.theorem.counter followed), else K; an invalid name
+             (^[a-z][a-z0-9_-]*$) is reported and ignored. A C that is
+             a kind numbering with another counter is followed to that
+             counter (lemma → definition → theorem); a loop of counter
+             options is reported and K keeps C. Given whether
+             or not the kind is numbered (numbered=true on an unnumbered
+             kind uses it).
+    within   of that counter (amsthm gives [within] on the \newtheorem
+             that owns the counter): theorems.kinds.C.within if set, else
+             theorems.within; auto none "" chapter section (invalid:
+             reported, auto). Resolved: auto is "chapter" in a book whose
+             page has book.numberChapters on or book.continuous off,
+             else ""; none is ""; chapter outside a book is "". A
+             theorems.kinds.K.within on a kind whose counter is another
+             name is ignored and reported (amsthm forbids [shared] with
+             [within]).
+    qed      theorems.kinds.K.qed (thmtools qed=), "" = none
+    declared bool
+
+  Takes a dict: page, kind (lowercase word).
+  Returns: dict style word numbered counter within qed declared.
+  Callers: partialCached "tufte/thm/kind.html" (dict "page" $p "kind" $k) (or $p.RelPermalink $p.Path) $k
+*/ -}}
+{{- $p := .page -}}
+{{- $k := .kind -}}
+{{- $at := $p.RelPermalink -}}
+{{- with $p.File }}{{ $at = .Path }}{{ end -}}
+{{- $m := partial "tufte/opts.html" $p -}}
+{{- /* Where each option is set (tufte/opts.html), for the warnings: a
+       value set by the site or a book is reported once, not per page. */ -}}
+{{- $from := dict -}}
+{{- with partial "tufte/memo.html" (dict "page" $p "key" "tufteMemoOptsFrom") }}{{ $from = .v }}{{ end -}}
+{{- $pfx := printf "theorems.kinds.%s." $k -}}
+{{- $opt := dict -}}
+{{- range $key, $v := $m -}}
+  {{- if strings.HasPrefix $key $pfx }}{{ $opt = merge $opt (dict (strings.TrimPrefix $pfx $key) $v) }}{{ end -}}
+{{- end -}}
+{{- $builtins := dict
+  "theorem" (dict "style" "plain" "en" "Theorem")
+  "lemma" (dict "style" "plain" "en" "Lemma")
+  "proposition" (dict "style" "plain" "en" "Proposition")
+  "corollary" (dict "style" "plain" "en" "Corollary")
+  "conjecture" (dict "style" "plain" "en" "Conjecture")
+  "claim" (dict "style" "plain" "en" "Claim")
+  "definition" (dict "style" "definition" "en" "Definition")
+  "example" (dict "style" "definition" "en" "Example")
+  "exercise" (dict "style" "definition" "en" "Exercise")
+  "remark" (dict "style" "remark" "en" "Remark")
+  "notation" (dict "style" "remark" "en" "Notation")
+-}}
+{{- $bi := index $builtins $k -}}
+{{- $declared := or (ne $bi nil) (gt (len $opt) 0) -}}
+
+{{- /* style */ -}}
+{{- $defStyle := "plain" -}}
+{{- with $bi }}{{ $defStyle = .style }}{{ end -}}
+{{- $style := $defStyle -}}
+{{- if isset $opt "style" -}}
+  {{- $sv := lower (strings.TrimSpace (printf "%v" (index $opt "style"))) -}}
+  {{- if in (slice "plain" "definition" "remark") $sv -}}
+    {{- $style = $sv -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.theorems.kinds.%s.style must be plain, definition or remark, not %q, in %s; using %s" $k (printf "%v" (index $opt "style")) (index $from (printf "%sstyle" $pfx) | default $at) $defStyle -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* heading word */ -}}
+{{- $word := "" -}}
+{{- with index $opt "name" }}{{ $word = strings.TrimSpace (printf "%v" .) }}{{ end -}}
+{{- if not $word -}}
+  {{- $word = partial "func/t.html" (printf "thm%s%s" (upper (substr $k 0 1)) (substr $k 1)) -}}
+{{- end -}}
+{{- if not $word }}{{ with $bi }}{{ $word = .en }}{{ end }}{{ end -}}
+
+{{- /* numbered (\newtheorem*) */ -}}
+{{- $numbered := true -}}
+{{- if isset $opt "numbered" -}}
+  {{- $nv := index $opt "numbered" -}}
+  {{- $sv := lower (strings.TrimSpace (printf "%v" $nv)) -}}
+  {{- if or (eq (printf "%T" $nv) "bool") (in (slice "true" "false" "yes" "no" "on" "off" "1" "0") $sv) -}}
+    {{- $numbered = partial "tufte/truthy.html" $nv -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.theorems.kinds.%s.numbered must be true or false, not %q, in %s; using true" $k (printf "%v" $nv) (index $from (printf "%snumbered" $pfx) | default $at) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* counter ([shared]) */ -}}
+{{- $shared := partial "tufte/truthy.html" (index $m "theorems.shared") -}}
+{{- $counter := $k -}}
+{{- with index $opt "counter" -}}
+  {{- $cv := lower (strings.TrimSpace (printf "%v" .)) -}}
+  {{- if findRE `^[a-z][a-z0-9_-]*$` $cv 1 -}}
+    {{- $counter = $cv -}}
+  {{- else if $cv -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.theorems.kinds.%s.counter must be a counter name (a lowercase word: letters, digits, _ and -), not %q, in %s; using %s" $k (printf "%v" .) (index $from (printf "%scounter" $pfx) | default $at) $counter -}}
+  {{- end -}}
+{{- end -}}
+{{- /* A counter named after a kind that numbers with another counter
+       (counter = "definition" while the definitions share "theorem"):
+       amsthm has no such counter (\newtheorem{lemma}[definition] after
+       \newtheorem{definition}[theorem] is "No counter 'definition'
+       defined"); the intent, "number with the definitions", is followed to
+       that kind's own counter, step by step (tufte/thm/counter-follow.html:
+       only the counter options that are set are steps). A name is a kind
+       when it is a built-in or has a theorems.kinds.NAME.* option other
+       than within (a name with only within is a plain counter). A kind
+       reached that sets no counter numbers, under theorems.shared, with
+       the shared counter: the one the kind theorem resolves to (amsthm:
+       \newtheorem{lemma}{Lemma} \newtheorem{theorem}[lemma]{Theorem}
+       makes "lemma" the shared counter, kinds.theorem.counter = "lemma"),
+       else with its own. A loop of counter options is reported (it names
+       the option where it starts), and that kind keeps its own counter
+       = value. */ -}}
+{{- $bnames := slice -}}
+{{- range $bk, $_ := $builtins }}{{ $bnames = $bnames | append $bk }}{{ end -}}
+{{- $loopWarn := "tufte.hugo: tufte.theorems.kinds.%s.counter %q leads to a loop of counters (%s), in %s; using the counter %q" -}}
+{{- $sharedC := "theorem" -}}
+{{- if $shared -}}
+  {{- $ft := partial "tufte/thm/counter-follow.html" (dict "m" $m "start" "theorem" "builtins" $bnames) -}}
+  {{- $sharedC = $ft.counter -}}
+  {{- if $ft.loop -}}
+    {{- warnidf "tufte-bad-option" $loopWarn "theorem" $ft.counter $ft.loop (index $from "theorems.kinds.theorem.counter" | default $at) $ft.counter -}}
+  {{- end -}}
+{{- end -}}
+{{- with partial "tufte/thm/counter-follow.html" (dict "m" $m "start" $k "builtins" $bnames) -}}
+  {{- $fk := . -}}
+  {{- if $fk.loop -}}
+    {{- /* (The loop of theorem itself was reported above.) */ -}}
+    {{- if not (and $shared (eq $k "theorem")) -}}
+      {{- warnidf "tufte-bad-option" $loopWarn $k $counter $fk.loop (index $from (printf "%scounter" $pfx) | default $at) $counter -}}
+    {{- end -}}
+  {{- else if and $fk.end $shared -}}
+    {{- $counter = $sharedC -}}
+  {{- else -}}
+    {{- $counter = $fk.counter -}}
+  {{- end -}}
+{{- end -}}
+{{- if and $numbered (ne $counter $k) (isset $opt "within") -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.theorems.kinds.%s.within is ignored: kind %s numbers with the counter %q of another kind, and the within of a shared counter is set on the kind that owns it (theorems.kinds.%s.within; in amsthm \\newtheorem{%s}[%s]{…} takes no [within]), in %s" $k $k $counter $counter $k $counter (index $from (printf "%swithin" $pfx) | default $at) -}}
+{{- end -}}
+
+{{- /* within ([within] of the counter) */ -}}
+{{- $w0 := "auto" -}}
+{{- $wkey := "theorems.within" -}}
+{{- if isset $m (printf "theorems.kinds.%s.within" $counter) }}{{ $wkey = printf "theorems.kinds.%s.within" $counter }}{{ end -}}
+{{- with index $m $wkey -}}
+  {{- $w0 = lower (strings.TrimSpace (printf "%v" .)) -}}
+{{- else -}}
+  {{- if isset $m $wkey }}{{ $w0 = "" }}{{ end -}}
+{{- end -}}
+{{- if not (in (slice "auto" "none" "" "chapter" "section") $w0) -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.%s must be auto, none, chapter or section, not %q, in %s; using auto" $wkey (printf "%v" (index $m $wkey)) (index $from $wkey | default $at) -}}
+  {{- $w0 = "auto" -}}
+{{- end -}}
+{{- $root := partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+{{- $within := $w0 -}}
+{{- if eq $w0 "none" }}{{ $within = "" }}{{ end -}}
+{{- if eq $w0 "auto" -}}
+  {{- $within = "" -}}
+  {{- with $root -}}
+    {{- if or (partial "tufte/truthy.html" (index $m "book.numberchapters")) (not (partial "tufte/truthy.html" (index $m "book.continuous"))) }}{{ $within = "chapter" }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (eq $within "chapter") (not $root) }}{{ $within = "" }}{{ end -}}
+
+{{- $qed := "" -}}
+{{- with index $opt "qed" }}{{ $qed = strings.TrimSpace (printf "%v" .) }}{{ end -}}
+{{- return (dict "style" $style "word" $word "numbered" $numbered "counter" $counter "within" $within "qed" $qed "declared" $declared) -}}

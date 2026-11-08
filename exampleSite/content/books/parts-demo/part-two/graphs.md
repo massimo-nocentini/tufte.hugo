@@ -19,3 +19,13 @@ after it:
 {{< equation label="eq:pythagoras" >}}
 a^2 + b^2 = c^2
 {{< /equation >}}
+
+## A theorem {#sec:graph-theorem}
+
+This chapter's first theorem is 2.1; the width of the margin is
+{{< xref "thm:margin-width" "full" >}}, in the previous chapter.
+
+{{< theorem >}}
+The graph of $y = \sin x$ crosses the $x$-axis exactly at the integer
+multiples of $\pi$.
+{{< /theorem >}}

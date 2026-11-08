@@ -1,0 +1,293 @@
+{{- /*
+  Shared renderer of the theorem environments (SPEC-THM §1, §5, §6):
+  amsthm's \begin{theorem}[Note] … \end{theorem} and
+  \begin{proof}[Heading] … \end{proof}, for the shortcodes theorem, lemma,
+  proposition, corollary, definition, example, remark (kind = the
+  shortcode's name), thm (any kind) and proof.
+
+  A theorem or proof is a nested <section> inside the page's section, so
+  the Tufte CSS rules for section > p, ul, table… apply to its blocks.
+  Its number is an ordinary number token, filled by postprocess from
+  tufte/labels.html, which scans the opening tag (kind, counter and within
+  are its data attributes). The head runs into the first paragraph.
+
+  Output (attribute order fixed; no newline before </section>, which
+  tufte/labels.html and func/content.html split sectionize output on):
+    <section class="tufte-thm thm-STYLE thm-kind-KIND thm-look-LOOK[ CLASSES]" id="KEY" data-thm="KIND" data-counter="COUNTER" data-within="WITHIN"><p>HEAD[CITEBLOCK] first paragraph…</p>…</section>
+    <section class="tufte-proof thm-kind-proof thm-look-LOOK[ CLASSES]"[ id="KEY"]><p>HEAD text… QED</p></section>
+  HEAD:
+    <span class="thm-head"><span class="thm-name">WORD</span>&nbsp;<span class="thm-num"><span class="tufte-num" data-kind="thm" data-key="KEY"></span></span> <span class="thm-note">(<span class="thm-note-text">NOTE</span>)</span><span class="thm-punct">.</span></span>
+    (unnumbered: no thm-num part; no note: no thm-note part; a proof: name
+    and punct only). A body that does not start with a bare <p> gets the
+    head in <p class="thm-headline">HEAD[CITEBLOCK]</p> before it.
+    Margin material (a margin figure, note or anchor, which takes no room
+    in the text column; tufte/thm/margin-split.html) before the first block
+    or after the last one is looked past, for the head and for the QED.
+  CITEBLOCK: the references of cite= as one citation sidenote
+  (tufte/cite-gather.html; nobib: " [n]").
+  QED (proofs, and theorems with a qed symbol; tufte/thm/qed.html): the
+  first \qedhere span of the body (data-qedhere="1") is claimed
+  (data-qedhere="2", in this one's symbol) and later ones are removed; else the symbol ends the last
+  paragraph when the body ends with a bare <p>, or gets a line of its own,
+  <p class="thm-qed-line">QED</p> (a list, code, display math, a nested
+  block at the end).
+
+  Takes a dict:
+    ctx    the shortcode context
+    inner  its .InnerDeindent (the shortcode reads it: Hugo rejects a
+           closing tag otherwise)
+    kind   the kind of a named shortcode (theorem, lemma…); "" for thm
+           (kind= or the first positional argument)
+    proof  bool: the proof environment
+  Returns: string (HTML).
+*/ -}}
+{{- $c := .ctx -}}
+{{- $p := $c.Page -}}
+{{- $proof := eq .proof true -}}
+{{- $generic := not (or $proof .kind) -}}
+{{- $where := printf "%s shortcode in %v" $c.Name $c.Position -}}
+{{- $at := $p.RelPermalink -}}
+{{- with $p.File }}{{ $at = .Path }}{{ end -}}
+
+{{- /* Arguments: positional (built-ins 0 = note, 1 = label; thm 0 = kind,
+       1 = note, 2 = label; proof 0 = title) or named, never mixed. */ -}}
+{{- $get := dict -}}
+{{- if $c.IsNamedParams -}}
+  {{- $get = $c.Params -}}
+  {{- $known := slice "label" "qed" "class" -}}
+  {{- if $proof -}}
+    {{- $known = $known | append (slice "title" "of") -}}
+  {{- else -}}
+    {{- $known = $known | append (slice "note" "title" "numbered" "style" "name" "cite") -}}
+    {{- if $generic }}{{ $known = $known | append "kind" }}{{ end -}}
+  {{- end -}}
+  {{- range $k, $_ := $get -}}
+    {{- if not (in $known $k) -}}
+      {{- warnidf "tufte-bad-option" "%s shortcode: unknown parameter %q, ignored (known: %s) (%s)" $c.Name $k (delimit $known ", ") $c.Position -}}
+    {{- end -}}
+  {{- end -}}
+{{- else if $c.Params -}}
+  {{- $names := slice "note" "label" -}}
+  {{- if $proof }}{{ $names = slice "title" }}{{ else if $generic }}{{ $names = slice "kind" "note" "label" }}{{ end -}}
+  {{- range $i, $v := $c.Params -}}
+    {{- if lt $i (len $names) -}}
+      {{- $get = merge $get (dict (index $names $i) $v) -}}
+    {{- else -}}
+      {{- warnidf "tufte-bad-option" "%s shortcode: at most %d positional arguments (%s), extra %q ignored (%s)" $c.Name (len $names) (delimit $names ", ") (printf "%v" $v) $c.Position -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $str := dict -}}
+{{- range $k, $v := $get }}{{ $str = merge $str (dict $k (strings.TrimSpace (printf "%v" $v))) }}{{ end -}}
+
+{{- /* Look (theorems.look). */ -}}
+{{- $style := lower (printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "style") (or $p.RelPermalink $p.Path) "style")) -}}
+{{- $defLook := cond (eq $style "latex") "amsthm" "tufte" -}}
+{{- $look := lower (strings.TrimSpace (printf "%v" (partialCached "tufte/opt.html" (dict "page" $p "key" "theorems.look") (or $p.RelPermalink $p.Path) "theorems.look"))) -}}
+{{- if not (in (slice "tufte" "amsthm") $look) -}}
+  {{- $lw := $at -}}
+  {{- with partial "tufte/memo.html" (dict "page" $p "key" "tufteMemoOptsFrom") }}{{ with index .v "theorems.look" }}{{ $lw = . }}{{ end }}{{ end -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: tufte.theorems.look must be tufte or amsthm, not %q, in %s; using %s" $look $lw $defLook -}}
+  {{- $look = $defLook -}}
+{{- end -}}
+{{- $classes := "" -}}
+{{- with index $str "class" }}{{ $classes = printf " %s" (htmlEscape .) }}{{ end -}}
+{{- $punct := `<span class="thm-punct">` -}}
+{{- $punct = printf `%s%s</span>` $punct (htmlEscape (partial "func/t.html" "thmPunct" | default ".")) -}}
+
+{{- /* Body: block Markdown (nested shortcodes through their nest tokens). */ -}}
+{{- $inner := strings.TrimSpace (string (.inner | default "")) -}}
+{{- if not $inner -}}
+  {{- warnidf "tufte-empty" "%s shortcode: empty %s; write its text between {{< %s >}} and {{< /%s >}} (%s)" $c.Name (cond $proof "proof" "theorem") $c.Name $c.Name $c.Position -}}
+{{- end -}}
+{{- $body := "" -}}
+{{- with $inner -}}
+  {{- $body = partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "block" "where" $where) | string | strings.TrimSpace -}}
+{{- end -}}
+
+{{- $open := "" -}}
+{{- $head := "" -}}
+{{- $cite := "" -}}
+{{- $qsym := "" -}}
+{{- $key := partial "tufte/label-key.html" (dict "key" (index $str "label" | default "") "where" $where) -}}
+{{- if $proof -}}
+  {{- /* Proof: "Proof", the title, or "Proof of Theorem 1.2" (of=, an xref
+         marker resolved by postprocess). */ -}}
+  {{- $title := index $str "title" | default "" -}}
+  {{- $of := index $str "of" | default "" -}}
+  {{- if and $title $of -}}
+    {{- warnidf "tufte-bad-option" "proof shortcode: title and of both given; title is used (%s)" $c.Position -}}
+    {{- $of = "" -}}
+  {{- end -}}
+  {{- $word := "" -}}
+  {{- if $title -}}
+    {{- $word = partial "tufte/render-inner.html" (dict "page" $p "inner" $title "display" "inline" "shortcodes" "run" "where" $where) | string | strings.TrimSpace -}}
+  {{- else if $of -}}
+    {{- $path := "" -}}
+    {{- $rk := $of -}}
+    {{- with findRESubmatch `^([^#]*)#(.*)$` $of 1 -}}
+      {{- $path = index . 0 1 -}}
+      {{- $rk = index . 0 2 -}}
+    {{- end -}}
+    {{- $rk = partial "tufte/key.html" $rk -}}
+    {{- $dataRef := $rk -}}
+    {{- with $path }}{{ $dataRef = printf "%s#%s" . $rk }}{{ end -}}
+    {{- $ref := printf `<a class="xref" data-ref="%s" data-fmt="full" href="#%s">%s</a>` (htmlEscape $dataRef) (htmlEscape $rk) (htmlEscape $of) -}}
+    {{- $word = partial "func/t.html" (dict "key" "thmProofOf" "data" (dict "Ref" $ref)) -}}
+    {{- if not (strings.Contains $word $ref) }}{{ $word = printf "Proof of %s" $ref }}{{ end -}}
+  {{- else -}}
+    {{- $word = htmlEscape (partial "func/t.html" "thmProof" | default "Proof") -}}
+  {{- end -}}
+  {{- /* amsthm's proof head is \itshape #1\@addpunct{.}: no period after
+         a title that ends in a sentence punctuation (space factor > 1000:
+         . ? ! : ; , also behind a closing ) ] ' " and their curly forms).
+         The empty thm-punct span stays (tufte/labels.html cuts the head at
+         it). */ -}}
+  {{- $pw := strings.TrimRight ")]'\"’”» \u00a0" (strings.TrimSpace (plainify (htmlUnescape $word))) -}}
+  {{- if findRE `[.?!:;,]$` $pw 1 }}{{ $punct = `<span class="thm-punct"></span>` }}{{ end -}}
+  {{- $head = printf `<span class="thm-head"><span class="thm-name">%s</span>%s</span>` $word $punct -}}
+  {{- $idAttr := "" -}}
+  {{- with $key }}{{ $idAttr = printf ` id="%s"` (htmlEscape .) }}{{ end -}}
+  {{- $open = printf `<section class="tufte-proof thm-kind-proof thm-look-%s%s"%s>` $look $classes $idAttr -}}
+  {{- $qsym = partialCached "tufte/opt.html" (dict "page" $p "key" "theorems.qed") (or $p.RelPermalink $p.Path) "theorems.qed" -}}
+{{- else -}}
+  {{- /* Theorem-like: kind, its options (tufte/thm/kind.html). */ -}}
+  {{- $kind := .kind -}}
+  {{- if $generic -}}
+    {{- $kind = lower (index $str "kind" | default "") -}}
+    {{- if not $kind -}}
+      {{- errorf "thm shortcode: a kind is required, e.g. {{< thm \"conjecture\" >}}…{{< /thm >}} or {{< thm kind=\"axiom\" name=\"Axiom\" >}} (%s)" $c.Position -}}
+      {{- $kind = "theorem" -}}
+    {{- else if not (findRE `^[a-z][a-z0-9_-]*$` $kind 1) -}}
+      {{- errorf "thm shortcode: the kind must be a lowercase word (a letter, then letters, digits, _ or -), not %q (%s)" $kind $c.Position -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $k := partialCached "tufte/thm/kind.html" (dict "page" $p "kind" $kind) (or $p.RelPermalink $p.Path) $kind -}}
+  {{- $note := index $str "note" | default "" -}}
+  {{- if and (isset $str "note") (isset $str "title") -}}
+    {{- warnidf "tufte-bad-option" "%s shortcode: note and title both given (title is an alias of note); note is used (%s)" $c.Name $c.Position -}}
+  {{- else if not $note -}}
+    {{- $note = index $str "title" | default "" -}}
+  {{- end -}}
+  {{- $numbered := $k.numbered -}}
+  {{- if isset $get "numbered" -}}
+    {{- $nv := index $get "numbered" -}}
+    {{- if or (eq (printf "%T" $nv) "bool") (in (slice "true" "false" "yes" "no" "on" "off" "1" "0") (lower (strings.TrimSpace (printf "%v" $nv)))) -}}
+      {{- $numbered = partial "tufte/truthy.html" $nv -}}
+    {{- else -}}
+      {{- warnidf "tufte-bad-option" "%s shortcode: numbered must be true or false, not %q; using the kind's default (%v) (%s)" $c.Name (printf "%v" $nv) $numbered $c.Position -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $counter := cond $numbered $k.counter "" -}}
+  {{- $within := cond $numbered $k.within "" -}}
+  {{- $tstyle := $k.style -}}
+  {{- with index $str "style" -}}
+    {{- if in (slice "plain" "definition" "remark") (lower .) -}}
+      {{- $tstyle = lower . -}}
+    {{- else -}}
+      {{- warnidf "tufte-bad-option" "%s shortcode: style must be plain, definition or remark, not %q; using %s (%s)" $c.Name . $tstyle $c.Position -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $word := index $str "name" | default "" -}}
+  {{- if not $word -}}
+    {{- $word = $k.word -}}
+    {{- if not $word -}}
+      {{- $word = title (replace (replace $kind "-" " ") "_" " ") -}}
+      {{- if not $k.declared -}}
+        {{- warnidf "tufte-thm-kind" "tufte.hugo: theorem kind %q is not declared (no built-in kind and no tufte.theorems.kinds.%s option; amsthm: \"Environment undefined\"): it is headed %q and numbered with the counter %q; declare it (theorems.kinds.%s.name = \"…\"), or give name= (%s)" $kind $kind $word $k.counter $kind $c.Position -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $key }}{{ $key = printf "tufte-thm-%s" (partial "func/note-id.html" $p) }}{{ end -}}
+  {{- $ek := htmlEscape $key -}}
+  {{- /* A {{< label >}} in the body (\begin{theorem}\label{x}: the
+         environment \refstepcounter's its counter) refers to this
+         theorem: its anchor is marked with the theorem's id, which
+         tufte/labels.html reads. Anchors of a nested theorem are marked
+         already; a proof marks nothing (in LaTeX a \label there refers to
+         the enclosing section or theorem). */ -}}
+  {{- if strings.Contains $body `<span class="tufte-anchor" id="` -}}
+    {{- $body = replaceRE `<span class="tufte-anchor" id="([^"]+)"></span>` (printf `<span class="tufte-anchor" id="$1" data-thm-in="%s"></span>` (replace $ek "$" "$$")) $body -}}
+  {{- end -}}
+  {{- $num := "" -}}
+  {{- if $numbered -}}
+    {{- $num = printf `&nbsp;<span class="thm-num"><span class="tufte-num" data-kind="thm" data-key="%s"></span></span>` $ek -}}
+  {{- end -}}
+  {{- $noteHTML := "" -}}
+  {{- with $note -}}
+    {{- with partial "tufte/render-inner.html" (dict "page" $p "inner" . "display" "inline" "shortcodes" "run" "where" $where) | string | strings.TrimSpace -}}
+      {{- $noteHTML = printf ` <span class="thm-note">(<span class="thm-note-text">%s</span>)</span>` . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $head = printf `<span class="thm-head"><span class="thm-name">%s</span>%s%s%s</span>` (htmlEscape $word) $num $noteHTML $punct -}}
+  {{- /* cite=: one citation sidenote right after the head
+         (\begin{theorem}[\cite{x}]). */ -}}
+  {{- with index $str "cite" -}}
+    {{- $keys := slice -}}
+    {{- range split . "," }}{{ with strings.TrimSpace . | lower }}{{ $keys = $keys | append . }}{{ end }}{{ end -}}
+    {{- with $keys -}}
+      {{- $b := (partial "tufte/cite-gather.html" (dict "page" $p "html" "" "keys" .)).block -}}
+      {{- if strings.HasPrefix $b `<span class="citation-block">` -}}
+        {{- $id := partial "func/note-id.html" $p -}}
+        {{- $b = printf `<label for="sn-%s" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-%s" class="margin-toggle"/><span class="sidenote citation">%s<i class="sn-end" hidden></i>` $id $id (strings.TrimPrefix `<span class="citation-block">` $b) -}}
+      {{- end -}}
+      {{- $cite = $b -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $open = printf `<section class="tufte-thm thm-%s thm-kind-%s thm-look-%s%s" id="%s" data-thm="%s" data-counter="%s" data-within="%s">` $tstyle (htmlEscape $kind) $look $classes $ek (htmlEscape $kind) (htmlEscape $counter) $within -}}
+  {{- $qsym = $k.qed -}}
+{{- end -}}
+{{- if isset $get "qed" }}{{ $qsym = index $str "qed" }}{{ end -}}
+
+{{- /* QED (§6): claim the body's \qedhere spans, else end the body. */ -}}
+{{- $q := partial "tufte/thm/qed.html" (dict "symbol" $qsym) -}}
+{{- $claimed := false -}}
+{{- $holder := or $proof (ne $q "") -}}
+{{- if and $holder (strings.Contains $body `data-qedhere="1"`) -}}
+  {{- /* amsthm: \qedhere pops the proof's QED (\setQED@elt), so only the
+         first one in document order prints; later ones print nothing. */ -}}
+  {{- $claimed = true -}}
+  {{- $here := partial "tufte/thm/qed.html" (dict "symbol" $qsym "qedhere" "2") -}}
+  {{- $qre := `<span class="thm-qed[^"]*" role="img" aria-label="[^"]*" data-qedhere="1">[^<]*</span>` -}}
+  {{- $body = replaceRE $qre $here $body 1 | replaceRE $qre "" -}}
+{{- end -}}
+{{- /* Margin material before the first block and after the last one
+       (a margin figure, note or anchor on a line of its own) takes no room
+       in the text column: the head and the QED look past it
+       (tufte/thm/margin-split.html). */ -}}
+{{- $split := partial "tufte/thm/margin-split.html" $body -}}
+{{- $lead := $split.lead -}}
+{{- $core := $split.core -}}
+{{- $trail := $split.trail -}}
+{{- $headQ := "" -}}
+{{- if and $q (not $claimed) -}}
+  {{- if not $core -}}
+    {{- $headQ = printf " %s" $q -}}
+  {{- else -}}
+    {{- $lastP := index (last 1 (findRE `<p(?:\s[^>]*)?>` $core) | default (slice "")) 0 -}}
+    {{- /* Not into a paragraph that holds only a linked stand-alone image
+           (tufte-block markers): func/content-raw.html unwraps its figure
+           only while it is alone in its paragraph. */ -}}
+    {{- $tail := index (last 1 (split $core "<p>")) 0 -}}
+    {{- $blockP := findRE `(?s)^\s*<i class="tufte-block" hidden></i>.*<i class="tufte-block-end" hidden></i>\s*</p>$` $tail 1 -}}
+    {{- if and (strings.HasSuffix $core "</p>") (eq $lastP "<p>") (not $blockP) -}}
+      {{- $core = printf "%s %s</p>" (strings.TrimSuffix "</p>" $core) $q -}}
+    {{- else -}}
+      {{- $core = printf `%s<p class="thm-qed-line">%s</p>` $core $q -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* Head (§5.1): into the first paragraph, else a headline. */ -}}
+{{- $firstBlock := false -}}
+{{- if strings.HasPrefix $core "<p>" -}}
+  {{- /* A first paragraph that holds only a linked stand-alone image stays
+         alone (its figure is unwrapped later), as for the QED above. */ -}}
+  {{- $firstBlock = findRE `(?s)^<p>\s*<i class="tufte-block" hidden></i>.*<i class="tufte-block-end" hidden></i>\s*$` (index (split $core "</p>") 0) 1 -}}
+{{- end -}}
+{{- if and (strings.HasPrefix $core "<p>") (not $firstBlock) -}}
+  {{- $body = printf "%s<p>%s%s %s%s" $lead $head $cite (strings.TrimPrefix "<p>" $core) $trail -}}
+{{- else -}}
+  {{- $body = printf `<p class="thm-headline">%s%s%s</p>%s%s%s` $head $cite $headQ $lead $core $trail -}}
+{{- end -}}
+{{- return (printf "%s%s</section>" $open $body) -}}

@@ -11,7 +11,8 @@
       spans included),
     - margin toggles (label: the ⊕ of margin notes) and their checkboxes,
     - heading anchors (a.heading-anchor: "#"), footnote references
-      (sup.footnote-ref), KaTeX output but its TeX (the visual HTML
+      (sup.footnote-ref), end-of-proof symbols (span.thm-qed: decoration,
+      as in a figure's alt text), KaTeX output but its TeX (the visual HTML
       span.katex-html reads in layout order, \frac{a}{b} as "ba"; the
       formula reads $TeX$, from the TeX annotation of span.katex-mathml),
     - embedded media: <video>, <audio>, <iframe> and <object> elements (the
@@ -27,7 +28,7 @@
 */ -}}
 {{- $p := . -}}
 {{- $html := string (partialCached "func/content.html" (dict "page" $p "summary" true) (or $p.RelPermalink $p.Path) true) -}}
-{{- $skipRE := `^<(span|div|label|a|sup)\s[^>]*class="(?:sidenote|marginnote|citation-block|margin-toggle|heading-anchor|footnote-ref|katex-mathml|katex-html)\b` -}}
+{{- $skipRE := `^<(span|div|label|a|sup)\s[^>]*class="(?:sidenote|marginnote|citation-block|margin-toggle|heading-anchor|footnote-ref|katex-mathml|katex-html|thm-qed)\b` -}}
 {{- $out := "" -}}
 {{- $tag := "" -}}
 {{- $skipMath := false -}}

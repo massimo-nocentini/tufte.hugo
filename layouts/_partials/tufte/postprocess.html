@@ -26,7 +26,7 @@
   5c. Block content inside a paragraph (a block shortcode written after
      text) is moved out of it (tufte/unnest-blocks.html), with the warning
      tufte-block-in-paragraph.
-  6. Placeholders (bibliography lof lot lol index toc) are replaced by the
+  6. Placeholders (bibliography lof lot lol thmlist index toc) are replaced by the
      generators' output; in summary mode they are removed.
   7. Handouts: the automatic bibliography is appended when
      bibliography.list is on, the page cites something and has no
@@ -407,6 +407,12 @@
           {{- $genSeq.Add $what 1 -}}
           {{- $out = partial "tufte/lists/render.html" (merge $args (dict "kind" $kind "seq" ($genSeq.Get $what))) -}}
         {{- end -}}
+      {{- else if eq $what "thmlist" -}}
+        {{- /* List of theorems (thmtools \listoftheorems, SPEC-THM §1.4). */ -}}
+        {{- $genSeq.Add $what 1 -}}
+        {{- $targs := dict "kind" "thm" "seq" ($genSeq.Get $what) -}}
+        {{- with index $opts "kinds" }}{{ $targs = merge $targs (dict "kinds" .) }}{{ end -}}
+        {{- $out = partial "tufte/lists/render.html" (merge $args $targs) -}}
       {{- else if eq $what "index" -}}
         {{- if templates.Exists "_partials/tufte/index/render.html" -}}
           {{- $genSeq.Add $what 1 -}}

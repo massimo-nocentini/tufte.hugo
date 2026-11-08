@@ -10,7 +10,7 @@ and five languages.
 It can also do at HTML level what the [Tufte-LaTeX](https://github.com/Tufte-LaTeX/tufte-latex) classes do in
 TeX: numbered figures and tables with captions in the margin, citations in the margin with a bibliography,
 cross-references, multi-chapter books with a title page, contents, lists of figures and tables and an index,
-and a print stylesheet with the LaTeX page geometry (see [tufte-latex parity](#tufte-latex-parity)).
+amsthm's theorems and proofs, and a print stylesheet with the LaTeX page geometry (see [tufte-latex parity](#tufte-latex-parity)).
 
 The theme is organised like [Beautiful Hugo](https://github.com/halogenica/beautifulhugo) and uses the
 Hugo template system introduced in 0.146 (`layouts/baseof.html`, `home.html`, `page.html`, `list.html`, plus
@@ -32,7 +32,7 @@ Hugo template system introduced in 0.146 (`layouts/baseof.html`, `home.html`, `p
 - [Math](#math)
 - [tufte-latex parity](#tufte-latex-parity): [options](#options-paramstufte), [notes](#notes-in-the-margin),
   [floats](#floats-figures-tables-listings), [cross-references](#cross-references-and-labels),
-  [bibliography](#bibliography), [books](#books), [index](#index), [printing](#printing-and-pdf),
+  [theorems](#theorems-and-proofs), [bibliography](#bibliography), [books](#books), [index](#index), [printing](#printing-and-pdf),
   [warnings](#warnings), [LaTeX to Hugo cheat sheet](#latex-to-hugo-cheat-sheet)
 - [Syntax highlighting](#syntax-highlighting)
 - [Pages and layouts](#pages-and-layouts)
@@ -1152,6 +1152,8 @@ pages and `tufte-book` for multi-chapter books. That covers margin material with
 their captions in the margin, citations in the margin with a bibliography, cross-references, book structure
 (front, main and back matter, parts, chapters, appendices), a title page, contents, lists of figures and
 tables, an index, LaTeX-like typographic options and a print stylesheet with the LaTeX page geometry. The
+theorem environments of the `amsthm` package, the usual companion of the classes for mathematics, are covered
+too (see [Theorems and proofs](#theorems-and-proofs)). The
 [cheat sheet](#latex-to-hugo-cheat-sheet) at the end of this section maps every LaTeX feature to its
 counterpart.
 
@@ -1170,7 +1172,9 @@ Hugo removes the `<p>` around a shortcode that stands alone on a line. So:
 - **Block** shortcodes *stand alone*, with a blank line before and after: `figure`, `fig`, `fullwidthfigure`,
   `marginfigure`, `table`, `fullwidthtable`, `margintable`, `marginblock`, `listing`, `subfigures`,
   `equation`, `footnotetext`, `bibliography`, `listoffigures`, `listoftables`, `listoflistings`,
-  `printindex`, `tableofcontents`, `abstract`, `verse`, `clearpage`, `tuftebreak`, `clearmargin`.
+  `printindex`, `tableofcontents`, `abstract`, `verse`, `clearpage`, `tuftebreak`, `clearmargin`, and the
+  theorem shortcodes `theorem`, `lemma`, `proposition`, `corollary`, `definition`, `example`, `remark`, `thm`,
+  `proof` and `listoftheorems` (`qedhere` is inline).
   A block written inside a paragraph (`Text {{< bibliography >}}`) would put block HTML in a `<p>`: the theme
   then splits the paragraph around it (the text before and after it stay paragraphs; emphasis or a link open
   around the block is closed before it and opened again after it; a block inside a block, such as a `details`
@@ -1234,6 +1238,16 @@ write `tufte: {style: latex}` and `headings: {number: 2}`.
 | `book.titlepage` | `true` | `titlepage` / `notitlepage` | Full title page on the landing page. |
 | `print.paper` | `"letter"` | `a4paper`, `b5paper` | Paper of the print stylesheet: `"letter"`, `"a4"`, `"b5"`. |
 | `print.runningHeads` | `false` / `true` | `fancyhdr` | Running heads when printing (Chromium 131 or later). |
+| `theorems.look` | `"tufte"` / `"amsthm"` | — | Theorem heads: `tufte` (small capitals, no bold) or `amsthm` (bold, as amsthm sets them). See [Theorems and proofs](#theorems-and-proofs). |
+| `theorems.within` | `"auto"` | `\newtheorem{…}{…}[section]`, `\numberwithin` | Default `within` of every theorem counter that does not set its own: `auto` (per chapter in a book with `numberChapters` or `continuous = false`, else through the page or the book), `none` (or `""`), `chapter`, `section`. |
+| `theorems.shared` | `true` | `\newtheorem{lemma}[theorem]{Lemma}` | Kinds without a `counter` share the counter `theorem` (as the AMS templates do); `false`: each kind has its own counter (amsthm's default). |
+| `theorems.qed` | `"blacksquare"` / `"openbox"` | `\qedsymbol` | End-of-proof symbol: `blacksquare` (■), `openbox` (□), `none` (or `""`), or any text (`"∎"`, `"Q.E.D."`). |
+| `theorems.kinds.K.name` | — | `\newtheorem{K}{Name}` | Heading word of kind `K` (else the i18n key `thm` + `K` capitalised, e.g. `thmAxiom`). Declares the kind. |
+| `theorems.kinds.K.style` | `plain`; `definition` for definition, example, exercise; `remark` for remark, notation | `\theoremstyle` | `plain` (italic body), `definition` (upright body) or `remark` (upright body, italic head). |
+| `theorems.kinds.K.counter` | — | `\newtheorem{K}[C]{…}` | Counter of kind `K` (a lowercase word); unset: `theorem` with `shared`, else `K`. A `C` that is a kind numbering with another counter is followed to that counter. |
+| `theorems.kinds.K.within` | — | `\newtheorem{K}{…}[within]` | `within` of the counter named `K` (same values as `theorems.within`); on a numbered kind that numbers with another counter (and so on the kinds that follow it there) it is ignored (`tufte-bad-option`). |
+| `theorems.kinds.K.numbered` | `true` | `\newtheorem*` | `false`: kind `K` is unnumbered. |
+| `theorems.kinds.K.qed` | `""` | thmtools `qed=` | End symbol of kind `K`, with the values of `theorems.qed` (`""`: none). |
 | `debug` | `false` | `debug` | Outlines the layout and prints extra warnings. |
 | `innerHTML` | `false` | — | `true`: keep HTML tags in the inner text of the theme's shortcodes even with `unsafe = false` (for third-party shortcodes nested in them; trusted content only). |
 
@@ -1477,6 +1491,225 @@ read, so a `\label` in a comment neither numbers the display nor replaces its re
 own, the counter does not step (the next labelled equation is still (1)), and `{{< eqref "eq:star" >}}`
 prints “(⋆)” (`xref` with `num` or `auto` gives “⋆”). `\tag*{A.1}` is the same without the parentheses
 in the display. The same holds for the `equation` shortcode.
+
+### Theorems and proofs
+
+The theorem environments of LaTeX's `amsthm` package (with the usual thmtools and cleveref conveniences) are
+block shortcodes: `theorem`, `lemma`, `proposition`, `corollary`, `definition`, `example`, `remark`, `proof`,
+and `thm` for any other kind. Like every block shortcode they stand on their own lines, with a blank line
+before and after, and they must be closed (`{{< lemma >}}…{{< /lemma >}}`; a self-closed one shows its head
+alone and prints `tufte-empty`). The example site's [Theorems and Proofs](exampleSite/content/posts/theorems.md)
+page shows all of it, except the options that would change its numbers (`theorems.shared`, `theorems.within`
+on its own, `theorems.look` and `theorems.qed`, shown in the configuration examples below).
+
+```markdown
+{{< definition label="def:group" >}}
+A *group* is a set $G$ with an associative operation, an identity and inverses.
+{{< /definition >}}
+
+{{< theorem "Lagrange" "thm:lagrange" >}}
+If $H$ is a subgroup of a finite group $G$, then $|H|$ divides $|G|$.
+{{< /theorem >}}
+
+{{< proof of="thm:lagrange" >}}
+The cosets of $H$ partition $G$ and have $|H|$ elements each.
+{{< /proof >}}
+
+{{< thm "conjecture" "Goldbach" "conj:goldbach" >}}
+Every even integer greater than $2$ is the sum of two primes.
+{{< /thm >}}
+
+{{< lemma note="Zorn" label="lem:zorn" >}}
+Every nonempty partially ordered set in which every chain has an upper bound has a maximal element.
+{{< /lemma >}}
+
+{{< thm kind="axiom" name="Axiom" style="definition" >}}
+There is a set with no elements.
+{{< /thm >}}
+```
+
+This gives “Definition 1. A *group* is…”, “Theorem 2 (Lagrange). *If H is…*”, “*Proof of Theorem 2.* The
+cosets… ■”, “Conjecture 3 (Goldbach). …”, “Lemma 4 (Zorn). …” and “Axiom 5. …” (a kind used with `name=` needs
+no declaration, and shares the counter `theorem`): the head runs into the first paragraph, as amsthm sets
+it (a body that starts with a list, a display or code has the head on a line of its own). The body is block
+Markdown: paragraphs, lists, display and labelled equations, tables, code, figures, sidenotes, margin notes,
+citations, footnotes and nested shortcodes all work in it.
+
+**Parameters.** Positional: `0` = note, `1` = label (`thm`: `0` = kind, `1` = note, `2` = label). Never mix
+positional and named parameters in one call.
+
+| Parameter | amsthm | Meaning |
+|---|---|---|
+| `kind` | the environment | `thm` only, required: a lowercase word (`^[a-z][a-z0-9_-]*$`); a missing or invalid kind stops the build. |
+| `note` (alias `title`) | `\begin{theorem}[note]` | The note in parentheses after the number: inline Markdown with math and shortcodes. |
+| `label` | `\label` | The cross-reference key; it becomes the theorem's `id`. Any key works; the kind, not the prefix, decides the word `xref` prints (`thm:`, `lem:`, `def:`… are only a convention). A `{{< label "k" >}}` anywhere in the body (`\begin{theorem}\label{k}`, also in a proof nested in it) refers to the theorem too, as in LaTeX: “Theorem 2” with `full`, “2” by default; the link goes to that anchor. In a proof on its own, `{{< label >}}` refers to the enclosing section, as `\label` there does. |
+| `numbered` | `\newtheorem*` | `false`: no number, the counter does not step. `true` numbers one of an unnumbered kind. Another word (not `true`/`false`/`yes`/`no`/`on`/`off`/`1`/`0`) warns `tufte-bad-option` and keeps the kind's default. |
+| `style` | `\theoremstyle` | `plain`, `definition` or `remark`, for this one theorem. |
+| `name` | the word of `\newtheorem` | The heading word of this one theorem (`name="Main Theorem"`). |
+| `cite` | `[\cite{x}]` in the note | Citation keys (`"a,b"`), one citation sidenote right after the head. |
+| `qed` | thmtools `qed=` | An end symbol for this theorem (none by default): see QED below. |
+| `class` | — | Extra classes on the theorem's `<section>`. |
+
+`{{< proof >}}…{{< /proof >}}` is amsthm's `proof`: “*Proof.*” in italics, an upright body and an end-of-proof
+symbol. `{{< proof "Sketch" >}}` (or `title="…"`, inline Markdown) replaces the word, as
+`\begin{proof}[Sketch]`, followed by a period unless the title already ends with one or with `?`, `!`, `:`, `;` or
+`,` (amsthm's `\@addpunct`: `{{< proof "Sketch." >}}` reads “*Sketch.*”); `of="thm:x"` (or `path#key`) says “*Proof of Theorem 2.*”,
+with a link to the theorem; `qed=` changes the symbol of this proof; `label` gives it an anchor (`xref` then
+prints its head). A theorem in a proof, a proof in a theorem and a theorem in a theorem all work: each sets
+its own body style. Theorems also work in list items, quotes, `details`, `fullwidth`, `marginblock` and the
+`footnote` shortcode; in a `sidenote`, `marginnote` or caption they are set inline in the note, numbered like
+the others.
+
+**Kinds.** The built-in kinds, all numbered and all on the counter `theorem`:
+
+| Kind | Shortcode | Style | i18n key |
+|---|---|---|---|
+| theorem, lemma, proposition, corollary | `theorem`, `lemma`, `proposition`, `corollary` | plain (italic body) | `thmTheorem`, `thmLemma`, `thmProposition`, `thmCorollary` |
+| conjecture, claim | `thm "conjecture"`, `thm "claim"` | plain | `thmConjecture`, `thmClaim` |
+| definition, example | `definition`, `example` | definition (upright body) | `thmDefinition`, `thmExample` |
+| exercise | `thm "exercise"` | definition | `thmExercise` |
+| remark | `remark` | remark (upright body, italic head) | `thmRemark` |
+| notation | `thm "notation"` | remark | `thmNotation` |
+| (proof) | `proof` | italic head, upright body, never numbered | `thmProof`, `thmProofOf` |
+
+Declare a kind of your own (`\newtheorem`) under `theorems.kinds` in the options, in the site configuration
+or in front matter:
+
+```toml
+[params.tufte.theorems]
+  shared = false                          # amsthm's default: one counter per kind
+  [params.tufte.theorems.kinds.theorem]
+    within = "section"                    # \newtheorem{theorem}{Theorem}[section]
+  [params.tufte.theorems.kinds.lemma]
+    counter = "theorem"                   # \newtheorem{lemma}[theorem]{Lemma}
+  [params.tufte.theorems.kinds.axiom]     # \theoremstyle{definition}\newtheorem*{axiom}{Axiom}
+    name = "Axiom"
+    style = "definition"
+    numbered = false
+```
+
+```yaml
+tufte:
+  theorems: {kinds: {conjecture: {counter: conjecture}}}   # merged key by key: the rest stays
+```
+
+The heading word of a kind is, in this order: the shortcode's `name=`, `theorems.kinds.K.name`, the i18n key
+`thm` + the kind with a capital (`thmAxiom`: add it to your site's `i18n/<lang>.yaml` to translate a kind of
+your own), the English word of a built-in kind, and last the kind itself, capitalised (“Axiom”). A `thm` of a
+kind that is neither built in nor declared (no `theorems.kinds.K.*` key) and has no `name=` is the
+“Environment undefined” of LaTeX: it is shown with that last word and prints `tufte-thm-kind`.
+
+**Numbering.** amsthm semantics, with the AMS templates' choice as the default:
+
+- **Counters.** Every kind without its own `counter` uses the counter `theorem` (`theorems.shared = true`), so a
+  lemma after Theorem 2.3 is Lemma 2.4, as in `amsart.template` and `amsbook.template`. `theorems.shared =
+  false` gives each kind its own counter, as a bare `\newtheorem{lemma}{Lemma}` does; `kinds.K.counter = "C"`
+  is `\newtheorem{K}[C]{…}`. When `C` is a kind that itself numbers with another counter (`lemma: {counter:
+  definition}` while the definitions share `theorem`), the lemmas follow it to that counter, so they number
+  with the definitions (amsthm would stop with “No counter 'definition' defined”). The shared counter is the
+  one the kind `theorem` resolves to: `kinds.theorem.counter = "lemma"` (`\newtheorem{lemma}{Lemma}`
+  `\newtheorem{theorem}[lemma]{Theorem}`) puts every kind without a `counter` on `lemma`, one sequence. A loop
+  of `counter` options (`theorem → lemma → theorem`) warns `tufte-bad-option`, naming the options set.
+- **Within.** `within` belongs to a counter, as amsthm's `[within]` belongs to the `\newtheorem` that defines
+  the counter: `kinds.C.within` for the counter `C` (on a kind that shares another kind's counter it is
+  ignored, with `tufte-bad-option`, since amsthm does not allow `[shared]` and `[within]` together), else
+  `theorems.within`. Values: `auto` (default), `none` (or `""`), `chapter`, `section`. `auto` numbers within the
+  chapter in a book whose chapters are numbered (`book.numberChapters`) or whose numbering is per chapter
+  (`book.continuous = false`), and through the page or the book otherwise.
+- **Sections.** `within = "section"` gives 1.1, 1.2, 2.1… on a page with numbered `##` sections
+  (`headings.number`); unnumbered sections (`{.unnumbered}`) do not reset the counter, as `\section*`. On a
+  page without numbered sections the chapter rule is used instead, and `tufte-thm-within` is printed.
+- **Books.** Within `none`, a counter runs through the whole book in reading order, whatever
+  `book.continuous` says (a LaTeX counter that is never reset). Within `chapter`, in a book with
+  `numberChapters`, it restarts in each numbered chapter and is prefixed with the chapter's number or letter:
+  Theorem 2.1 in chapter 2, Definition A.1 in appendix A; a chapter that is not numbered there (`unnumbered:
+  true`, front or back matter) continues the previous chapter's numbers. In a book **without**
+  `numberChapters`, within `chapter` (also `auto` with `continuous = false`) restarts in every chapter at 1,
+  with no prefix, as the floats do with `continuous = false`: equal numbers recur in different chapters
+  (Theorem 1 in each), so a cross-chapter `xref` prints the same text as a local one; use `within = "none"`
+  for unique numbers through the book. Labels are global within a book,
+  so `xref` reaches a theorem of another chapter. In `print.html` the ids are those of the print document
+  (`tufte-c3-thm-x`).
+- A lemma inside a proof is numbered in document order, after the theorem being proved, as in LaTeX.
+
+**Cross-references.** A theorem's label works with every `xref` format:
+
+| `xref` format | LaTeX | Theorem | Proof |
+|---|---|---|---|
+| (default), `auto` | `\ref` | the number (“2.3”); the word for an unnumbered theorem (“Remark”) | its head |
+| `full` | cleveref `\cref` | “Lemma 2.3”, with a non-breaking space; the name of an unnumbered one | its head |
+| `name` | `\nameref` | the note (“Lagrange”), else “Lemma 2.3” | its head |
+| `num` | — | the number, `??` when there is none | `??` |
+| `page` | `\pageref` | the enclosing section, or the chapter in another chapter of a book | the same |
+| `eq` | — | the number in parentheses | `(??)` |
+
+An unknown key prints `??` and `tufte-undefined-ref`, also in `proof of=`. A key defined twice prints
+`tufte-duplicate-label`, and each theorem still shows its own number. An unlabelled theorem gets the id
+`tufte-thm-…`; an unlabelled proof gets none.
+
+**QED.** A proof ends with the end-of-proof symbol at the right end of its last line, or on a line of its own
+when it ends with a list, a display, code, a table or a nested block (as amsthm does after a display without
+`\qedhere`). Margin material at the start or end of a body (a margin figure, note or table, a `marginblock`, a
+`label` on its own line) takes no room in the text column, so the head still runs into the first paragraph and
+the symbol still ends the last one. `{{< qedhere >}}` (inline) puts the symbol where it stands, such as at the end of the last list
+item, and `\qedhere` written inside display math (`$$ … \qedhere $$`, `\[ … \]`, the `equation` shortcode) puts it
+at the right end of that display (after its number when it is numbered, with either math engine); the proof
+then prints no symbol at its end. Only the first `\qedhere` of a
+proof prints the symbol, as in amsthm (it uses up the proof's symbol): later ones print nothing. Outside a proof, `{{< qedhere >}}`
+simply prints the symbol (`\qed`). A `\qedhere` takes the symbol of the proof (or theorem) that holds it, so
+it still works where `theorems.qed = "none"` and a proof sets `qed=` (or a kind its `qed`); with no symbol at
+all it prints nothing. The symbol is `theorems.qed` for proofs, `theorems.kinds.K.qed` for a kind
+(none by default; thmtools' `qed=`, e.g. examples that end with `◊`), and `qed=` on one shortcode:
+`blacksquare` (■, the default with `style = "css"`), `openbox` (□, amsthm's `\openbox`, the default with
+`style = "latex"`), `none` (or `""`), or any text (`qed="Q.E.D."`, `"∎"`). The two boxes are drawn with CSS,
+so they look the same in every font. The symbol is no float: it sits at the right end of its line whatever the
+notes beside the paragraph, and when the line is full it moves to a new line of the paragraph with room for a
+box (1.6em; for a text symbol the estimate `--thm-qed-room-text`, 5em, which `customCSS` may change). It is left
+out of the page's meta description. Equation numbers and `eqref` (`span.eqref`) stay upright in an italic
+theorem, as `\eqref` (`\textup`) does.
+
+**List of theorems.** `{{< listoftheorems >}}` (standalone) is thmtools' `\listoftheorems`: every theorem of
+the book inside a book, or of the page (proofs are never listed), as “Theorem 1.2 Lagrange”, with the
+heading “List of Theorems” (`id="tufte-list-of-theorems"`). `kinds="theorem,lemma"` lists only those kinds;
+`heading="…"` changes the heading and `heading=""` removes it.
+
+**Looks.** `theorems.look = "tufte"` (the default with `style = "css"`) sets the heads in small capitals,
+without bold, in the spirit of Tufte's books; `"amsthm"` (the default with `style = "latex"`) sets them in bold,
+as amsthm does. Remark and proof heads are italic in both looks; the note is upright.
+
+**Markup and classes.** For `customCSS`, a theorem is a nested `<section>` (so Tufte CSS's widths apply to its
+paragraphs):
+
+```html
+<section class="tufte-thm thm-plain thm-kind-theorem thm-look-tufte" id="thm-lagrange" data-thm="theorem" data-counter="theorem" data-within="section"><p><span class="thm-head"><span class="thm-name">Theorem</span>&nbsp;<span class="thm-num"><span class="tufte-num" data-kind="thm" data-key="thm-lagrange">1.2</span></span> <span class="thm-note">(<span class="thm-note-text">Lagrange</span>)</span><span class="thm-punct">.</span></span> If …</p></section>
+<section class="tufte-proof thm-kind-proof thm-look-tufte"><p><span class="thm-head"><span class="thm-name">Proof</span><span class="thm-punct">.</span></span> … <span class="thm-qed thm-qed-blacksquare" role="img" aria-label="End of proof">■</span></p></section>
+```
+
+The classes are `tufte-thm`, `tufte-proof`, the styles `thm-plain`, `thm-definition`, `thm-remark`, the kind
+`thm-kind-K` (one per kind, e.g. `thm-kind-lemma`: style one kind with it), the looks `thm-look-tufte` and
+`thm-look-amsthm`, the head parts `thm-head`, `thm-name`, `thm-num`, `thm-note`, `thm-note-text`, `thm-punct`,
+`p.thm-headline` (a head on a line of its own), the QED symbol `thm-qed` with `thm-qed-openbox`,
+`thm-qed-blacksquare` or `thm-qed-text`, `p.thm-qed-line` (the symbol on its own line) and the attribute
+`data-qedhere` (`thm-qed-none` marks, in the content pipeline only, a `\qedhere` with no symbol yet; it never
+reaches the page). A `label` anchor in a theorem's body carries `data-thm-in="ID"`, the theorem's id. In a note, a theorem is a `span[data-sn="section"].tufte-thm` (or `.tufte-proof`); the list
+of theorems is `ol.tufte-lof[data-kind="thm"]`, with `lof-num` and `lof-where` as in the lists of figures.
+
+**Limitations.**
+
+- `\swapnumbers`, `\newtheoremstyle` (custom head fonts and spacing: use `thm-kind-K` and `customCSS`), thmtools'
+  `restatable` and `\setcounter` on a theorem counter are not supported, nor `within` a subsection.
+- One key per `xref`: cleveref's `\cref{a,b}` (“Theorems 1 and 2”) is not supported.
+- A theorem cannot be wrapped in an inline shortcode other than a note (`sans`, `newthought`, `smallcaps`, `sc`,
+  `allcaps`, `textls`, `nohyphens`, `verse`, a `details` summary…): it is shown as an inline block in that style
+  and warned `tufte-block-in-note`. Only a `sidenote`, `marginnote`, `footnotetext` or caption sets it inline
+  without a warning; a `marginblock` or `footnote` holds it as a block.
+- A theorem inside a Markdown footnote definition (`[^1]: {{< lemma >}}…`) is not supported; in a real
+  footnote's text, theorem numbers follow the document order, not the order of the footnote list.
+- `\qedhere` in a display of several rows (`aligned`) puts the symbol at the end of the whole display, not of
+  the row. `\qedhere` in inline math (`$…$`) is not removed (KaTeX reports it).
+- A site shortcode named `theorem`, `example`… replaces the theme's (Hugo: the site wins).
+- The heads are set when the page is rendered: the word is translated in the page's language, and changing
+  `theorems.look` changes no number.
 
 ### Bibliography
 
@@ -1848,11 +2081,13 @@ build and cannot be ignored.
 | `tufte-heading-id` | A `##` or `###` heading without an id (the site sets `markup.goldmark.parser.autoHeadingID = false` and the heading has no `{#id}`): it is left out of section numbering and of the names `xref` gives to labels, and its entry in the page's table of contents is plain text, without a link. |
 | `tufte-unlabeled-float` | A numbered float without a label (only with `debug`). |
 | `tufte-bad-offset` | An invalid `offset`. |
-| `tufte-bad-option` | An unknown or invalid value of an option or parameter: `tufte.*` options (an enum word not in the list, a boolean that is not `true`/`false`/`yes`/`no`/`on`/`off`/`1`/`0`, `headings.number` outside 0–2; the default is used instead; a `tufte` value that is not a table, such as `tufte: latex`, or a single value in place of an option group, such as `headings: 2` for `headings: {number: 2}`, is ignored), `sections`, `params.math.engine`, `strict` and `macros`, a missing `customCSS` file or a `customCSS` that is neither a list nor a string, partial `params.giscus` settings, an `iframe` `ratio` or `video` `type`, `epigraph` parameters ignored by its block-quote form, a `label=` key without a letter or digit, a second `\label` in one display equation, an `index` entry deeper than three levels, with an empty level (`Yahoo!`: quote it, `Yahoo"!`) or with a page format other than `see`, `seealso`, `(` and `)` (`|textbf` has no effect), and the like. |
-| `tufte-empty` | A shortcode with nothing to show: an empty `sidenote`, `marginnote`, `footnote`, `footnotetext` or `equation`, a `nocite` without a key, `subfigures` without images, a `table`, `margintable` or `fullwidthtable` with no table, or a `listing` with no code block, in its body (it keeps its caption, number and any text; a Markdown table written on one line with its tags, `{{< margintable >}} \| a \| b \| {{< /margintable >}}`, is a paragraph of pipes, not a table: put each row on its own line). |
+| `tufte-bad-option` | An unknown or invalid value of an option or parameter: `tufte.*` options (an enum word not in the list, a boolean that is not `true`/`false`/`yes`/`no`/`on`/`off`/`1`/`0`, `headings.number` outside 0–2; the default is used instead; a `tufte` value that is not a table, such as `tufte: latex`, or a single value in place of an option group, such as `headings: 2` for `headings: {number: 2}`, is ignored), `sections`, `params.math.engine`, `strict` and `macros`, a missing `customCSS` file or a `customCSS` that is neither a list nor a string, partial `params.giscus` settings, an `iframe` `ratio` or `video` `type`, `epigraph` parameters ignored by its block-quote form, a theorem's invalid `style`, `numbered`, `counter` name, `theorems.look` or `within` value, both `note` and `title` (or `title` and `of` on a `proof`), a `within` on a kind that shares another kind's counter, a loop of theorem counters, a `label=` key without a letter or digit, a second `\label` in one display equation, an `index` entry deeper than three levels, with an empty level (`Yahoo!`: quote it, `Yahoo"!`) or with a page format other than `see`, `seealso`, `(` and `)` (`|textbf` has no effect), and the like. |
+| `tufte-empty` | A shortcode with nothing to show: an empty `sidenote`, `marginnote`, `footnote`, `footnotetext` or `equation`, a theorem shortcode (`theorem`, `lemma`, `proof`, `thm`…) with no body, a `nocite` without a key, `subfigures` without images, a `table`, `margintable` or `fullwidthtable` with no table, or a `listing` with no code block, in its body (it keeps its caption, number and any text; a Markdown table written on one line with its tags, `{{< margintable >}} \| a \| b \| {{< /margintable >}}`, is a paragraph of pipes, not a table: put each row on its own line). |
 | `tufte-math-error` | KaTeX could not render an expression (server engine); the source is shown as `<code class="math-error">`. |
 | `tufte-raw-html` | Hand-written HTML in a shortcode's text was dropped (`unsafe = false`; see `innerHTML`). |
-| `tufte-block-in-note` | A list, code block, quote or table in a sidenote, margin note or caption (or in a Markdown footnote turned sidenote, or in HTML kept by `innerHTML`), shown as inline blocks; or a float or block shortcode (`figure`, `table`, `listing`, `iframe`, `epigraph`…) nested in one, shown as a plain image with its caption, or as inline blocks, unnumbered. |
+| `tufte-block-in-note` | A list, code block, quote or table in a sidenote, margin note or caption (or in a Markdown footnote turned sidenote, or in HTML kept by `innerHTML`), shown as inline blocks; or a float or block shortcode (`figure`, `table`, `listing`, `iframe`, `epigraph`…) nested in one, shown as a plain image with its caption, or as inline blocks, unnumbered. A theorem or proof in a note or caption is set inline without this warning (a list, code block or table in its body still gets it); in another inline shortcode (`sans`, `newthought`, `verse`…) it is warned. |
+| `tufte-thm-kind` | A `thm` of a kind that is neither built in nor declared (`theorems.kinds.K.*`) and has no `name=`: shown with the kind capitalised as its word, on a counter of its own unless `theorems.shared` (LaTeX: “Environment undefined”). |
+| `tufte-thm-within` | `within = "section"` for a theorem counter on a page with no numbered `##` section (`headings.number = 0`, or only unnumbered sections): numbered within the chapter instead (or through the page outside a book). |
 | `tufte-block-in-paragraph` | A block shortcode (figure, margin block, bibliography, list of figures, contents, index…) written inside a paragraph instead of on its own lines; the paragraph is split around it. Inside emphasis or a link in a tight list item, table cell or definition, the emphasis or link is closed before it and opened again after it. Inside an unclosed raw-HTML `<span>` it is left in place (the warning says so). |
 | `tufte-footnote-labels` | Some Markdown footnotes of a page could not be matched with Goldmark's rendered footnotes, so their `fn-`/`sn-` label prefix is ignored (the message names them; please report it). |
 | `tufte-no-bibliography` | Numbered citations (`bibliography.margin = false`) with no reference list to link to: a book without a `{{< bibliography >}}` chapter, or a handout with `bibliography.list = false` and no `{{< bibliography >}}`. The numbers are printed unlinked. |
@@ -1868,7 +2103,8 @@ One row per feature of the tufte-latex classes. **must** and **should** features
 **could** features are extras, **wont** rows say why a LaTeX feature has no HTML counterpart. Option names
 such as `tufte.justified` are keys of `[params.tufte]` (or of the `tufte:` front matter map). The example site
 has the same table with live examples ([From LaTeX to Hugo](exampleSite/content/posts/latex-to-hugo.md)), a
-port of `sample-handout.tex` and a port of `sample-book.tex`.
+port of `sample-handout.tex` and a port of `sample-book.tex`. Rows 107–117 are the theorem environments of the `amsthm`
+package, which the classes do not define but mathematical texts load with them.
 
 | # | tufte-latex | tufte.hugo | Status | Notes |
 |--:|:--|:--|:--|:--|
@@ -1979,6 +2215,17 @@ port of `sample-handout.tex` and a port of `sample-book.tex`.
 | 104 | setspace `doublespace` | — | **wont** | loaded by `tufte-common.def`, but it is a general line-spacing package, not a class feature: set the leading with CSS (`line-height`) through `customCSS` |
 | 105 | doc macros (`\doccmd`…), text shortcuts (`\TL`, `\monthyear`) | inline code, your own shortcodes | **wont** | not class features |
 | 106 | TeX machinery (`\morefloats`, engine detection, `\TufteRecalculate`, other paper options) | — | **wont** | no meaning in HTML |
+| 107 | amsthm `\newtheorem{k}{Word}` | `{{< theorem >}}…{{< /theorem >}}`, `lemma`, `proposition`, `corollary`, `definition`, `example`, `remark`; any kind with `{{< thm "k" >}}…{{< /thm >}}`; `tufte.theorems.kinds.k.name` | should | the amsthm package, not a class feature; see [Theorems and proofs](#theorems-and-proofs) |
+| 108 | amsthm `\newtheorem*{k}{Word}` | `tufte.theorems.kinds.k.numbered = false`; `numbered=false` on one theorem | should |  |
+| 109 | amsthm `\newtheorem{k}[c]{Word}` (shared counter) | `tufte.theorems.kinds.k.counter = "c"` | should | every kind shares `theorem` by default (`tufte.theorems.shared`), as in `amsart.template` |
+| 110 | amsthm `\newtheorem{k}{Word}[section]`, `\numberwithin` | `tufte.theorems.kinds.c.within`, `tufte.theorems.within`: `"section"`, `"chapter"`, `"none"`, `"auto"` | should | `auto`: per chapter in a book with numbered chapters or `book.continuous = false` (without `numberChapters` every chapter restarts at 1, no prefix), else through the page or the book |
+| 111 | amsthm `\theoremstyle{plain\|definition\|remark}` | `tufte.theorems.kinds.k.style`; `style=` on one theorem | should |  |
+| 112 | `\begin{theorem}[note]` + `\label` | `{{< theorem "note" "thm:x" >}}…{{< /theorem >}}`, `{{< lemma note="…" label="lem:x" >}}` | should | the note in parentheses after the number; a `{{< label "thm:x" >}}` in the body refers to the theorem too |
+| 113 | amsthm `proof`, `\begin{proof}[Head]` | `{{< proof >}}…{{< /proof >}}`, `{{< proof "Head" >}}`, `{{< proof of="thm:x" >}}` | should | “Proof of Theorem 2.1.” |
+| 114 | `\qedhere`, `\qedsymbol` | `{{< qedhere >}}`, `\qedhere` in display math; `tufte.theorems.qed`, `qed=` | should | `blacksquare` ■ (`css`), `openbox` □ (`latex`), `none` or any text |
+| 115 | `\ref`, cleveref `\cref`, `\nameref` to a theorem | `{{< xref "thm:x" >}}`, `{{< xref "thm:x" "full" >}}`, `{{< xref "thm:x" "name" >}}` | should | “2.1”, “Theorem 2.1”, the note |
+| 116 | thmtools `\listoftheorems` | `{{< listoftheorems >}}` (standalone) | should | `kinds="theorem,lemma"`, `heading=""` |
+| 117 | `\swapnumbers`, `\newtheoremstyle`, thmtools `restatable` | — | **wont** | heads come in two looks (`tufte.theorems.look`: `tufte`, `amsthm`); restyle one kind with `thm-kind-k` in `customCSS` |
 
 ## Syntax highlighting
 
@@ -2146,6 +2393,13 @@ German “S.”) and `bibNamesLast`, the join before the last of three or more n
 Italian `"{{ .Names }} e {{ .Last }}"` has none). `edition` is a template with `{{ .Edition }}`, which is a
 plain number (“2”) in every language but English, where it is the ordinal (“2nd”); a non-numeric edition
 does not use the language's template but the English phrase (Bibliography, Format).
+The theorem environments use `thmTheorem`, `thmLemma`, `thmProposition`, `thmCorollary`, `thmConjecture`,
+`thmClaim`, `thmDefinition`, `thmExample`, `thmExercise`, `thmRemark`, `thmNotation` and `thmProof` for their
+words (a kind of your own reads `thm` + its name capitalised, such as `thmAxiom`, from your `i18n/<lang>.yaml`),
+`thmProofOf` for the head of `proof of=`, a template with `{{ .Ref }}` (the reference to the theorem; Italian,
+French and Spanish put it in parentheses, “Dimostrazione (Teorema 2)”, since the article would depend on the
+kind), `thmPunct` for the period after a head, `thmQed` for the spoken name of the end-of-proof symbol and
+`listOfTheorems` for the heading of `listoftheorems`.
 
 Titles that Hugo writes in English are translated too: the 404 page (`pageNotFound`, also in `<title>` and the
 social titles), a taxonomy page whose title is Hugo's default, the title-cased plural (no content `_index.md`
@@ -2185,8 +2439,9 @@ link of a summary uses `←` (the forward arrow in that reading direction, at th
 `exampleSite/` contains a complete demo, including a full Markdown port of the Tufte CSS demo page, a port
 of Tufte-LaTeX's `sample-handout.tex` (`posts/sample-handout/`, with its bibliography in
 `data/bibliography.yaml`), a port of `sample-book.tex` as a multi-chapter book (`books/sample-book/`), a
-small book with parts and numbered chapters (`books/parts-demo/`) and the LaTeX to Hugo cheat sheet with
-live examples (`posts/latex-to-hugo.md`). From the theme's root directory, run:
+small book with parts and numbered chapters (`books/parts-demo/`, with theorems numbered within chapters),
+the LaTeX to Hugo cheat sheet with live examples (`posts/latex-to-hugo.md`) and the theorem environments
+(`posts/theorems.md`). From the theme's root directory, run:
 
 ```sh
 hugo server -s exampleSite
@@ -2206,9 +2461,14 @@ The example site sets `theme = "tufte.hugo"` and `themesDir = "../.."`, so the t
   `print.html`), the numbering of the handout's floats, continuous numbering and cross-references across
   the book's chapters, the lists, the bibliography, the index, the parts demo (numbered chapters, parts, a
   `.bib` bundle resource, the frontispiece) and the cheat-sheet page;
+- theorems: the numbers of `posts/theorems` (within sections, a counter of its own, a nested lemma), its
+  cross-references, proof heads, end-of-proof symbols (inline, on a line of their own, `\qedhere` in a display)
+  and list of theorems; theorems numbered within the chapters of `books/parts-demo` (Theorem 1.1,
+  Definition A.1), a cross-chapter reference to a theorem and its link in `print.html`; the `amsthm` look and
+  open box with `tufte.style = "latex"`, and `\qedhere` with KaTeX in the browser;
 - variant builds with `tufte.style = "latex"`, with `math.engine = "client"` (KaTeX in the browser, with a
   script and stylesheet of the same version) and with A4 paper, numbered sections and `nobib` citations;
-- performance: a generated 200-chapter book (with `print.html`, cross-chapter references, figures, citations,
+- performance: a generated 200-chapter book (with `print.html`, cross-chapter references, figures, theorems, citations,
   chapters with their own `references` cited author-year and from other chapters, a list of figures, a
   bibliography and an index) must build with `--panicOnWarning` within 240 seconds, with its cross-chapter
   numbers, extra labels (2000a, 2000b…) and print document correct, and without computing a page's cached

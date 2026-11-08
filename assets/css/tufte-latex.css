@@ -5,7 +5,7 @@
  * after theme.css in the same bundle, see _partials/css.html).
  *
  *   1. Variables         7. Title block, thanks, abstract
- *   2. Notes             8. Equations
+ *   2. Notes             8. Equations       8b. Theorems (amsthm)
  *   3. Floats            9. Bibliography, lists of floats, index
  *   4. Labels, xrefs    9b. Footnotes  10. Book views
  *   5. Typography       11. Small screens (screen and max-width: 760px)
@@ -277,6 +277,14 @@ sup.footnote-sep {
     font-weight: 400;
 }
 
+/* The marks are upright too, in italic text (an \emph, a plain-style
+   theorem's body): \@makefnmark is \normalfont. */
+.sidenote-number::after,
+sup.footnote-ref,
+sup.footnote-sep {
+    font-style: normal;
+}
+
 /* \footnotemark … \footnotetext: the text sits in its own paragraph. */
 p.footnotetext-anchor {
     margin: 0;
@@ -445,57 +453,68 @@ div.tufte-anchor {
    Desktop screens only: print places them with --pw/--pl (§12), phones
    with the toggle rules. Alerts have their own geometry (theme.css). */
 @media screen and (width > 760px) {
-    :is(section, div.epigraph) > blockquote:not(.alert) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) {
         margin-left: 40px;
         margin-right: 40px;
     }
 
-    :is(section, div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl) ,
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol, dl) {
         width: 50%;
         -webkit-padding-start: 5%;
         padding-inline-start: 5%;
     }
 
-    div.open-epigraph > blockquote:not(.alert) > :is(ul, ol, dl) {
+    div.open-epigraph > blockquote:not(.alert) > :is(ul, ol, dl) ,
+    div.open-epigraph > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol, dl) {
         width: 85%;
     }
 
-    :is(section, div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl) p {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl) p ,
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol, dl) p {
         width: auto;
         margin-right: 0;
     }
 
-    :is(section, div.epigraph) > blockquote:not(.alert) > dl > dd {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > dl > dd ,
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd {
         margin-inline-start: 2.1rem;
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote),
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote) ,
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 22px);
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 30.4px);
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote) ,
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 1.155rem + 22px);
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem - 30.4px);
     }
 
     div.open-epigraph > blockquote > :is(ul, ol) > li :is(.sidenote, .marginnote),
-    div.open-epigraph > blockquote > dl > dt :is(.sidenote, .marginnote) {
+    div.open-epigraph > blockquote > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote),
+    div.open-epigraph > blockquote > dl > dt :is(.sidenote, .marginnote) ,
+    div.open-epigraph > blockquote > section:is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc((100% + var(--tufte-nest, 0px)) * 0.32353 + 22px);
         margin-right: calc((100% + var(--tufte-nest, 0px)) * 0.02353 - 30.4px);
     }
 
-    div.open-epigraph > blockquote > dl > dd :is(.sidenote, .marginnote) {
+    div.open-epigraph > blockquote > dl > dd :is(.sidenote, .marginnote) ,
+    div.open-epigraph > blockquote > section:is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc((100% + var(--tufte-nest, 0px)) * 0.32353 + 0.679rem + 22px);
         margin-right: calc((100% + var(--tufte-nest, 0px)) * 0.02353 + 0.049rem - 30.4px);
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(p, footer) :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc(50% + 22px);
         margin-right: calc(-60% - 30.4px);
@@ -507,7 +526,7 @@ div.tufte-anchor {
         margin-right: calc(2.222% - 30.4px);
     }
 
-    :is(section, div.epigraph) > blockquote:not(.alert) > .marginnote {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > .marginnote {
         min-width: 0;
         width: calc(27.5% + 22px);
         margin-right: calc(12% - 30.4px);
@@ -535,53 +554,71 @@ div.tufte-anchor {
        width 50% + 44px,  margin-right -(60% + 60.8px).
    Print measures the quote with --pw/--pl (§12). The real footnotes'
    list keeps its note-size quotes (1em indents, theme.css). */
-:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(p, footer, .math-display, div.table-wrapper) {
+:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(p, footer, .math-display, div.table-wrapper),
+:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(p, footer, .math-display, div.table-wrapper),
+:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(p, footer, .math-display, div.table-wrapper) {
     width: auto;
     margin-right: 0;
 }
 
 :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > div.highlight > :is(pre, div),
-:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > pre > code {
+:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > pre > code,
+:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > div.highlight > :is(pre, div),
+:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > div.highlight > :is(pre, div),
+:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > pre > code,
+:is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > pre > code {
     width: auto;
     margin-left: 0;
 }
 
 @media screen and (width > 760px) {
     :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert),
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) {
         margin-left: 40px;
         margin-right: 40px;
     }
 
-    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote) {
+    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(p, footer) :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc(55% + 44px);
         margin-right: calc(-66% - 92.8px);
     }
 
-    section > dl > dd > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote) {
+    section > dl > dd > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    section > dl > dd > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    section > dl > dd > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(p, footer) :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc(55% + 1.155rem + 44px);
         margin-right: calc(-66% - 1.386rem - 92.8px);
     }
 
-    section > details > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote) {
+    section > details > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    section > details > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    section > details > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(p, footer) :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc(50% + 40px);
         margin-right: calc(-60% - 88px);
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(p, footer) :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc(50% + 44px);
         margin-right: calc(-60% - 60.8px);
     }
 
-    html[dir="rtl"] section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote) {
+    html[dir="rtl"] section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    html[dir="rtl"] section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    html[dir="rtl"] section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(p, footer) :is(.sidenote, .marginnote) {
         margin-right: calc(-76% - 100.8px);
     }
 
-    html[dir="rtl"] section > dl > dd > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote) {
+    html[dir="rtl"] section > dl > dd > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    html[dir="rtl"] section > dl > dd > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(p, footer) :is(.sidenote, .marginnote),
+    html[dir="rtl"] section > dl > dd > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(p, footer) :is(.sidenote, .marginnote) {
         margin-right: calc(-76% - 3.696rem - 100.8px);
     }
 }
@@ -653,7 +690,8 @@ span.tufte-anchor[id],
 span.index-anchor[id],
 span.run-in[id],
 label.sidenote-number[id],
-.math-display[id] {
+.math-display[id],
+:is(section, span[data-sn="section"]):is(.tufte-thm, .tufte-proof)[id] {
     scroll-margin-top: 1.5rem;
 }
 
@@ -1303,7 +1341,8 @@ section.abstract {
     padding-top: 0;
 }
 
-section.abstract > p {
+section.abstract > p,
+section.abstract > section:is(.tufte-thm, .tufte-proof) > p {
     width: 55%;
     box-sizing: border-box;
     padding: 0 2rem;
@@ -1317,7 +1356,8 @@ section.abstract > p {
    edge 60% of C + 2.4rem past C, plus the 2rem right indent. Desktop
    screens; print measures the indents in % (§12), phones toggle. */
 @media screen and (width > 760px) {
-    section.abstract > p :is(.sidenote, .marginnote) {
+    section.abstract > p :is(.sidenote, .marginnote),
+    section.abstract > section:is(.tufte-thm, .tufte-proof) > p :is(.sidenote, .marginnote) {
         min-width: 0;
         width: calc(50% + 2rem);
         margin-right: calc(-60% - 4.4rem);
@@ -1393,6 +1433,370 @@ body.tufte-sf section.abstract {
 }
 
 /* ------------------------------------------------------------------ */
+/* 8b. Theorems (amsthm)                                               */
+/* ------------------------------------------------------------------ */
+
+/* theorem, lemma, …, thm and proof (tufte/thm/): a section nested in the
+   page's section, so every section > X rule (text column, notes, print
+   geometry, phones, justification, indent) applies to its paragraphs,
+   lists, tables and displays unchanged. The section adds no box of its
+   own: no padding (tufte.css pads a section 1rem), and its children's
+   margins collapse through it, so a theorem is set off by a paragraph
+   skip, as amsthm's \topsep. It is never positioned either: a note
+   placed absolutely (in a table cell, a run-in h4) measures the page's
+   section, whatever holds the theorem. */
+section:is(.tufte-thm, .tufte-proof) {
+    padding: 0;
+}
+
+section:is(.tufte-thm, .tufte-proof):is(:has(div.table-wrapper :is(td, th) :is(.sidenote, .marginnote)), :has(> h4.run-in :is(.sidenote, .marginnote))) {
+    position: static;
+}
+
+/* \theoremstyle: plain sets the body in italics; definition, remark and
+   proof upright. On the section itself, so that a theorem nested in
+   another sets its own body. \emph turns upright in an italic body and
+   italic in an upright one (--thm-em, the closest theorem's). */
+.thm-plain {
+    font-style: italic;
+    --thm-em: normal;
+}
+
+.thm-definition,
+.thm-remark,
+.tufte-proof {
+    font-style: normal;
+    --thm-em: italic;
+}
+
+:is(.tufte-thm, .tufte-proof) :is(em, i, cite, dfn) {
+    font-style: var(--thm-em, italic);
+}
+
+/* What is not running text keeps its shape in an italic body, as in
+   LaTeX: notes, captions and citations are set in \@tufte@marginfont
+   (their own --tufte-*-style, already explicit), floats reset the font
+   (\@floatboxreset), verbatim text and listings use \verbatim@font
+   (\normalfont\ttfamily). Their \emph is italic again. Math sets its own
+   fonts (KaTeX); an equation's number is \normalfont (\@eqnnum,
+   amsmath's \maketag@@@), and \eqref is \textup everywhere (span.eqref
+   round an eq-format xref, tufte/resolve-refs.html). */
+:is(.tufte-thm, .tufte-proof) :is(.sidenote, .marginnote, figcaption, .citation-block) {
+    --thm-em: italic;
+}
+
+:is(.tufte-thm, .tufte-proof) :is(figure, div.table-wrapper, table, pre, code, kbd, samp, .eq-number) {
+    font-style: normal;
+    --thm-em: italic;
+}
+
+.eqref {
+    font-style: normal;
+}
+
+/* The head (§5.1): amsthm's run-in "Theorem 1.2 (Note)." Two looks, a
+   class on each theorem (theorems.look): tufte, upright small caps
+   letterspaced as \smallcaps (none with nols) and no bold, in the
+   spirit of the handout's headings; amsthm, the bold head of plain and
+   definition. In both a remark's and a proof's head is italic (amsthm's
+   \th@remark and proof). The head reads the variables of its own
+   theorem (its closest section), so nested theorems keep their own. The
+   note (\thm@notefont) is upright and of normal weight in every style.
+   The markup space after the head is widened to about amsthm's 5pt. */
+.thm-look-tufte {
+    --thm-head-weight: 400;
+    --thm-head-caps: small-caps;
+    --thm-head-ls: var(--tufte-smallcaps-ls);
+}
+
+.thm-look-amsthm {
+    --thm-head-weight: 700;
+    --thm-head-caps: normal;
+    --thm-head-ls: normal;
+}
+
+.thm-plain,
+.thm-definition {
+    --thm-head-style: normal;
+    --thm-head-em: italic;
+}
+
+:is(.thm-look-tufte, .thm-look-amsthm):is(.thm-remark, .tufte-proof) {
+    --thm-head-style: italic;
+    --thm-head-em: normal;
+    --thm-head-weight: 400;
+    --thm-head-caps: normal;
+    --thm-head-ls: normal;
+}
+
+.thm-head {
+    font-style: var(--thm-head-style, normal);
+    font-weight: var(--thm-head-weight, 700);
+    font-variant-caps: var(--thm-head-caps, normal);
+    letter-spacing: var(--thm-head-ls, normal);
+    margin-inline-end: 0.2em;
+    --thm-em: var(--thm-head-em, italic);
+}
+
+.thm-head .thm-note {
+    font-style: normal;
+    font-weight: 400;
+    font-variant-caps: normal;
+    letter-spacing: normal;
+    --thm-em: italic;
+}
+
+/* A theorem whose body does not start with a paragraph (a list, a
+   display, a nested theorem): the head stands on its own line, the body
+   follows on the next (amsthm's run-in head before a list). */
+p.thm-headline {
+    margin-bottom: 0;
+}
+
+/* QED (§5.4, §6): at the inline end of the last line, inside the text
+   column. It is no float (a float may not rise above an earlier float, so
+   the notes of the paragraph or before it would drag it down, and a float
+   that drops to a new line hangs out of its paragraph): it is placed
+   against the inline end of its paragraph (or list item…), at its static
+   block position, the line where it stands. Its room is kept by the
+   paragraph's ::after, a spacer joined to it by a word joiner (U+2060),
+   so a last line too full for both moves them together to a new line of
+   the same paragraph, as \qed's \hfill\quad does. The room is that of
+   a drawn box (0.6em) plus the 1em gap; a literal symbol (thm-qed-text)
+   gets --thm-qed-room-text, an estimate (a customCSS may set it). Its own
+   line (p.thm-qed-line, after a list, a display without \qedhere or a
+   code block) is flush with the inline end and follows the block without
+   a paragraph skip. In a display (\qedhere) it ends the display line,
+   after the equation number, on the baseline of the last row. */
+.thm-qed {
+    font-style: normal;
+    font-weight: 400;
+    font-variant-caps: normal;
+    letter-spacing: normal;
+    text-indent: 0;
+}
+
+:not(.thm-qed-line, .math-display):has(> .thm-qed) {
+    position: relative;
+}
+
+:not(.thm-qed-line, .math-display) > .thm-qed {
+    position: absolute;
+    inset-inline-end: 0;
+}
+
+:not(.thm-qed-line, .math-display):has(> .thm-qed)::after {
+    content: "\2060";
+    padding-inline-start: var(--thm-qed-room, 1.6em);
+}
+
+:not(.thm-qed-line, .math-display):has(> .thm-qed-text)::after {
+    padding-inline-start: var(--thm-qed-room-text, 5em);
+}
+
+.thm-qed-line {
+    text-align: end;
+    text-indent: 0;
+}
+
+body:is(.tufte-indent, .tufte-justified, *) section > p.thm-qed-line {
+    margin-top: 0;
+    text-align: end;
+    text-indent: 0;
+}
+
+.math-display:has(> .thm-qed) {
+    display: flex;
+    align-items: center;
+}
+
+.math-display:has(> .thm-qed) > :is(.katex-display, .katex, .math) {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-self: center;
+    align-self: last baseline;
+}
+
+.math-display > .thm-qed {
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 1rem;
+    align-self: center;
+    align-self: last baseline;
+}
+
+/* After the number the two stay together (on paper, where a display too
+   wide for the column wraps, they drop to the next line as a pair). */
+.math-display > .eq-number + .thm-qed {
+    margin-left: 0;
+}
+
+/* \openbox and \blacksquare are drawn, so they look the same in every
+   font (ET Book has neither glyph): a 0.6em square on the baseline, a
+   rule or solid (with borders, which print without the background
+   option). The glyph stays in the markup for feeds and text browsers,
+   transparent and out of the box, clipped (overflow: clip, which is not
+   a scroll container: the box keeps the baseline of its line, and the
+   glyph adds no scrollable overflow to a scrolling .math-display that
+   ends with \qedhere; a browser without clip leaves it visible). The ink is the text colour
+   token (dark mode and paper follow it), not currentColor, which the
+   hidden glyph makes transparent. A literal symbol (thm-qed-text) is
+   the text as is. */
+.thm-qed-openbox,
+.thm-qed-blacksquare {
+    display: inline-block;
+    width: 0.6em;
+    white-space: nowrap;
+    color: transparent;
+    overflow: clip;
+    vertical-align: baseline;
+}
+
+.thm-qed-openbox::before,
+.thm-qed-blacksquare::before {
+    content: "";
+    display: inline-block;
+    box-sizing: border-box;
+    width: 0.6em;
+    height: 0.6em;
+    vertical-align: baseline;
+    border: max(1px, 0.06em) solid var(--tufte-fg, #111);
+}
+
+.thm-qed-blacksquare::before {
+    border-width: 0.3em;
+}
+
+@media (forced-colors: active) {
+    .thm-qed-openbox,
+    .thm-qed-blacksquare {
+        forced-color-adjust: none;
+    }
+
+    .thm-qed-openbox::before,
+    .thm-qed-blacksquare::before {
+        border-color: CanvasText;
+    }
+}
+
+/* Right to left: the inline end is on the left (the text column stays
+   on the left of the page, theme.css; inset-inline-end above follows
+   it). A display is left to right, so the symbol moves before the
+   equation. */
+html[dir="rtl"] .math-display > .thm-qed {
+    order: -1;
+    margin-left: 0;
+    margin-right: auto;
+    padding-left: 0;
+    padding-right: 1rem;
+}
+
+/* Following a link to a theorem (an xref, the list of theorems) marks
+   it with a bar left of the text column (right to left too: the column
+   stays on the left), in the highlight token of the colour scheme
+   (theme.css defines it for prefers-color-scheme and data-theme). */
+:is(section, span[data-sn="section"]):is(.tufte-thm, .tufte-proof):target {
+    box-shadow: -0.6rem 0 0 -0.2rem var(--tufte-mark, #fff1a8);
+}
+
+/* A theorem in a sidenote, margin note or caption (span[data-sn],
+   §2): a block in the note's font and size, set off by the note's
+   small block skip. */
+span[data-sn="section"]:is(.tufte-thm, .tufte-proof) {
+    margin: 0.2rem 0;
+}
+
+/* A theorem in a list item, a dd, the details or fullwidth shortcode
+   (or a theorem with the fullwidth class): its blocks take the
+   container's width, as the container's own blocks do, not 55% of it
+   (section > p), so their notes keep the container's note geometry (§2,
+   §9b; the item and dd rules measure any descendant). Its lists are
+   nested lists of an item or dd (the browser's 40px and --tufte-nest,
+   §9b). In a plain quote its paragraphs are already the quote's (55%,
+   tufte.css), in a margin block the block's (§2); in the abstract they
+   take the abstract's (§7). Print: --pw/--pl of the container (§12). */
+:is(li, dd, details, div.fullwidth) section:is(.tufte-thm, .tufte-proof) > :is(p, footer, table, .math-display, div.table-wrapper, details, .iframe-wrapper),
+section.fullwidth:is(.tufte-thm, .tufte-proof) > :is(p, footer, table, .math-display, div.table-wrapper, details, .iframe-wrapper) {
+    width: auto;
+    max-width: none;
+}
+
+:is(li, dd, details, div.fullwidth) section:is(.tufte-thm, .tufte-proof) > :is(ul, ol, dl),
+section.fullwidth:is(.tufte-thm, .tufte-proof) > :is(ul, ol, dl) {
+    width: auto;
+    max-width: none;
+}
+
+/* Its dl has the container's own dl indent (none: tufte.css's 5% is for
+   a section-level dl), its dds the 2.1rem of §5. */
+:is(li, dd, details, div.fullwidth, blockquote.alert) section:is(.tufte-thm, .tufte-proof) > dl,
+section.fullwidth:is(.tufte-thm, .tufte-proof) > dl {
+    -webkit-padding-start: 0;
+    padding-inline-start: 0;
+}
+
+:is(li, dd) section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) {
+    -webkit-padding-start: 40px;
+    padding-inline-start: 40px;
+    --tufte-nest-in: calc(var(--tufte-nest, 0px) + 40px);
+}
+
+/* --tufte-nest counts the indents from the outer item (§9b): in a dd
+   that is also the dd's 2.1rem (a dd is an item 2.1rem in, so the item
+   rules measure a section-level item, as the dd rules do), and a dd of
+   the theorem's dl is 2.1rem in from the container. */
+dd > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) {
+    --tufte-nest-in: calc(var(--tufte-nest, 0px) + 40px + 2.1rem);
+}
+
+:is(li, dd) > section:is(.tufte-thm, .tufte-proof) > dl {
+    --tufte-nest-in: calc(var(--tufte-nest, 0px) + 2.1rem);
+}
+
+:is(li, dd) section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li,
+:is(li, dd) > section:is(.tufte-thm, .tufte-proof) > dl > dd {
+    --tufte-nest: var(--tufte-nest-in);
+}
+
+:is(details, div.fullwidth) section:is(.tufte-thm, .tufte-proof) > :is(ul, ol),
+section.fullwidth:is(.tufte-thm, .tufte-proof) > :is(ul, ol) {
+    -webkit-padding-start: 5%;
+    padding-inline-start: 5%;
+}
+
+:is(li, dd, details, div.fullwidth) section:is(.tufte-thm, .tufte-proof) > div.highlight > :is(pre, div),
+section.fullwidth:is(.tufte-thm, .tufte-proof) > div.highlight > :is(pre, div) {
+    width: auto;
+    max-width: none;
+}
+
+/* A fence without a language (pre > code): as the container's own
+   (theme.css: li, dd, details, div.fullwidth > pre > code). */
+:is(li, dd, details, div.fullwidth) section:is(.tufte-thm, .tufte-proof) > pre > code,
+section.fullwidth:is(.tufte-thm, .tufte-proof) > pre > code {
+    width: auto;
+    max-width: none;
+    margin-left: 0;
+}
+
+/* Its figures fill the container too, as the container's own (§3, §9b:
+   their captions then take the container's note geometry), except in
+   the fullwidth shortcode, where a figure is the text column (55/90 of
+   the div). Desktop screens, as those rules; print: §12. */
+@media screen and (width > 760px) {
+    :is(li, dd, details) section:is(.tufte-thm, .tufte-proof) > figure:not(.fullwidth, .iframe-wrapper) {
+        max-width: 100%;
+    }
+
+    :is(div.fullwidth > section, section.fullwidth):is(.tufte-thm, .tufte-proof) > figure:not(.fullwidth, .iframe-wrapper) {
+        max-width: 61.111%;
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* 9. Bibliography, lists of floats, index                             */
 /* ------------------------------------------------------------------ */
 
@@ -1456,6 +1860,13 @@ ol.tufte-lof .lof-num {
     display: inline-block;
     min-width: 2em;
     text-indent: 0;
+}
+
+/* thmtools' \listoftheorems: the number box holds the kind's name too
+   ("Proposition 12.3"), so the notes after it line up. */
+ol.tufte-lof[data-kind="thm"] .lof-num {
+    min-width: 8em;
+    padding-inline-end: 0.5em;
 }
 
 ol.tufte-lof .lof-where {
@@ -1777,20 +2188,24 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
     }
 
     div.fullwidth > :is(p, footer) :is(.sidenote, .marginnote):not(figure *),
+    :is(div.fullwidth > section, section.fullwidth):is(.tufte-thm, .tufte-proof) > :is(p, footer) :is(.sidenote, .marginnote):not(figure *),
     div.fullwidth > dl > dt :is(.sidenote, .marginnote):not(figure *),
+    :is(div.fullwidth > section, section.fullwidth):is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote):not(figure *),
     div.fullwidth > .margin-block {
         width: 30.556%;
         min-width: 0;
         margin-right: 2.222%;
     }
 
-    div.fullwidth > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *) {
+    div.fullwidth > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    :is(div.fullwidth > section, section.fullwidth):is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *) {
         width: calc((100% + var(--tufte-nest, 0px)) * 0.32164);
         min-width: 0;
         margin-right: calc((100% + var(--tufte-nest, 0px)) * 0.02339);
     }
 
-    div.fullwidth > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+    div.fullwidth > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    :is(div.fullwidth > section, section.fullwidth):is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
         width: calc(30.556% + 0.642rem);
         min-width: 0;
         margin-right: calc(2.222% + 0.047rem);
@@ -1827,6 +2242,7 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
 
 @media screen and (width > 760px) {
     :is(section > details, blockquote.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    :is(section > details, blockquote.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
     :is(section > details, blockquote.alert) > :is(ul, ol) li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         min-width: 0;
         width: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-ae, 0px)) * var(--tufte-ak, 1) * 0.5);
@@ -1834,6 +2250,7 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
     }
 
     :is(section > details, blockquote.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    :is(section > details, blockquote.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote):not(figure *),
     :is(section > details, blockquote.alert) > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
     :is(section > details, blockquote.alert) > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         min-width: 0;
@@ -1858,12 +2275,20 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
         margin-right: 0;
     }
 
+    section > details > section:is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] section > details > section:is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
+        width: 50%;
+        margin-right: -60%;
+    }
+
     html[dir="rtl"] :is(section > details, blockquote.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > details, blockquote.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
     html[dir="rtl"] :is(section > details, blockquote.alert) > :is(ul, ol) li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         margin-right: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px) - (100% + var(--tufte-nest, 0px)) * 0.05263 - var(--tufte-nest, 0px));
     }
 
     html[dir="rtl"] :is(section > details, blockquote.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > details, blockquote.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote):not(figure *),
     html[dir="rtl"] :is(section > details, blockquote.alert) > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
     html[dir="rtl"] :is(section > details, blockquote.alert) > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         margin-right: calc((100% + var(--tufte-nest, 0px) + 2.1rem + var(--tufte-ae, 0px)) * (var(--tufte-ak, 1) * -0.6 - var(--tufte-ar, 0)) - var(--tufte-an, 0px) - 2.1rem - var(--tufte-nest, 0px));
@@ -1921,13 +2346,13 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
     /* A figure in a plain quote is P = 0.55 (S - 80px) wide and 40px in,
        as a quote paragraph: its caption takes the paragraph correction of
        §2 (50% + 22px, -(60% + 30.4px)). */
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         min-width: 0;
         width: calc(50% + 22px);
         margin-right: calc(-60% - 30.4px);
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         right: calc(-60% - 30.4px);
         margin-right: 0;
     }
@@ -1938,13 +2363,14 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
        as wide as the container. The section dd rule leaves figures out,
        so the caption gets it here. The same holds for an item of a list
        nested in them (--tufte-nest, §9b). */
-    :is(section > dl > dd, :is(section, div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl) > :is(li, dd)) > figure:not(.fullwidth, .iframe-wrapper),
-    :is(section > dl > dd, :is(section, div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl)) li > figure:not(.fullwidth, .iframe-wrapper) {
+    :is(section > dl > dd, :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl) > :is(li, dd)) > figure:not(.fullwidth, .iframe-wrapper),
+    :is(section > dl > dd, :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > :is(ul, ol, dl)) li > figure:not(.fullwidth, .iframe-wrapper) {
         max-width: 100%;
     }
 
     section > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
-    section > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+    section > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    section > dl > dd section:is(.tufte-thm, .tufte-proof) > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 1.155rem);
         min-width: 0;
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem);
@@ -1956,13 +2382,13 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
         margin-right: 0;
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 30.4px);
         margin-right: 0;
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem - 30.4px);
         margin-right: 0;
     }
@@ -2008,7 +2434,8 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
 
     html[dir="rtl"] section > dl > dd :is(.sidenote, .marginnote):not(figure *),
     html[dir="rtl"] section > dl > dd > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
-    html[dir="rtl"] section > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+    html[dir="rtl"] section > dl > dd li > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    html[dir="rtl"] section > dl > dd section:is(.tufte-thm, .tufte-proof) > figure:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 3.696rem - var(--tufte-nest, 0px));
     }
 
@@ -2018,28 +2445,32 @@ div.fullwidth > :is(ul, ol):not(.index-list) {
         margin-right: 0;
     }
 
-    html[dir="rtl"] div.fullwidth > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *) {
+    html[dir="rtl"] div.fullwidth > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(div.fullwidth > section, section.fullwidth):is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *) {
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.02924 - var(--tufte-nest, 0px));
     }
 
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote),
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote) {
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote),
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote),
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote) ,
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote) {
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 30.4px - var(--tufte-nest, 0px));
     }
 
     /* A dd of a quote list, its 2.1rem indent on the right, ends 2.1rem
        short of the item edge: 76% of D + 3.696rem + 30.4px. */
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote) {
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote) ,
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote) {
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 3.696rem - 30.4px - var(--tufte-nest, 0px));
     }
 
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 30.4px - var(--tufte-nest, 0px));
         margin-right: 0;
     }
 
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote,
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) > span.marginnote {
         right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 3.696rem - 30.4px - var(--tufte-nest, 0px));
         margin-right: 0;
     }
@@ -2159,98 +2590,128 @@ blockquote.alert {
    (-(76% of D + 3.696rem + 60.8px)). Desktop screens: print measures the
    lists with --pw/--pl (§12), phones toggle. */
 @media screen and (width > 760px) {
-    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol, dl) {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol, dl),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(ul, ol, dl),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol, dl) {
         width: auto;
         -webkit-padding-start: 5%;
         padding-inline-start: 5%;
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(ul, ol, dl) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(ul, ol, dl),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol, dl) {
         width: 50%;
         -webkit-padding-start: 5%;
         padding-inline-start: 5%;
     }
 
-    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > blockquote:not(.alert) > :is(ul, ol, dl) p {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > blockquote:not(.alert) > :is(ul, ol, dl) p,
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(ul, ol, dl) p,
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol, dl) p {
         width: auto;
         margin-right: 0;
     }
 
-    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > blockquote:not(.alert) > dl > dd {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > blockquote:not(.alert) > dl > dd,
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > dl > dd,
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details, :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert)) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd {
         margin-inline-start: 2.1rem;
     }
 
-    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) {
+    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert),
+    section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) {
         --tufte-qe: 80px;
         --tufte-qk: 1.1;
         --tufte-qd: 40px;
         --tufte-qr: 0;
     }
 
-    section > dl > dd > blockquote:not(.alert) {
+    section > dl > dd > blockquote:not(.alert),
+    section > dl > dd > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) {
         --tufte-qe: calc(80px + 2.1rem);
         --tufte-qk: 1.1;
         --tufte-qd: 40px;
         --tufte-qr: 0;
     }
 
-    section > details > blockquote:not(.alert) {
+    section > details > blockquote:not(.alert),
+    section > details > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) {
         --tufte-qe: 80px;
         --tufte-qk: 1;
         --tufte-qd: 40px;
         --tufte-qr: 0;
     }
 
-    html[dir="rtl"] section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert) {
+    html[dir="rtl"] section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > blockquote:not(.alert),
+    html[dir="rtl"] section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) {
         --tufte-qr: 0.1;
     }
 
-    html[dir="rtl"] section > dl > dd > blockquote:not(.alert) {
+    html[dir="rtl"] section > dl > dd > blockquote:not(.alert),
+    html[dir="rtl"] section > dl > dd > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) {
         --tufte-qr: 0.1;
         --tufte-qd: calc(40px + 2.1rem);
     }
 
     :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
-    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
         min-width: 0;
         width: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-qe, 0px)) * var(--tufte-qk, 1) * 0.5);
         margin-right: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-qe, 0px)) * (var(--tufte-qk, 1) * -0.6 - var(--tufte-qr, 0)) - var(--tufte-qd, 0px));
     }
 
-    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
         min-width: 0;
         width: calc(((100% + var(--tufte-nest, 0px) + 2.1rem) * 1.05263 + var(--tufte-qe, 0px)) * var(--tufte-qk, 1) * 0.5);
         margin-right: calc(((100% + var(--tufte-nest, 0px) + 2.1rem) * 1.05263 + var(--tufte-qe, 0px)) * (var(--tufte-qk, 1) * -0.6 - var(--tufte-qr, 0)) - var(--tufte-qd, 0px));
     }
 
     html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
-    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
         margin-right: calc(((100% + var(--tufte-nest, 0px)) * 1.05263 + var(--tufte-qe, 0px)) * (var(--tufte-qk, 1) * -0.6 - var(--tufte-qr, 0)) - var(--tufte-qd, 0px) - (100% + var(--tufte-nest, 0px)) * 0.05263 - var(--tufte-nest, 0px));
     }
 
-    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
         margin-right: calc(((100% + var(--tufte-nest, 0px) + 2.1rem) * 1.05263 + var(--tufte-qe, 0px)) * (var(--tufte-qk, 1) * -0.6 - var(--tufte-qr, 0)) - var(--tufte-qd, 0px) - (100% + var(--tufte-nest, 0px) + 2.1rem) * 0.05263 - 2.1rem - var(--tufte-nest, 0px));
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
         min-width: 0;
         width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 44px);
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 60.8px);
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
         min-width: 0;
         width: calc((100% + var(--tufte-nest, 0px)) * 0.55 + 1.155rem + 44px);
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.66 - 1.386rem - 60.8px);
     }
 
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dt :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) > li :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dt :is(.sidenote, .marginnote):not(figure *) {
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 60.8px - var(--tufte-nest, 0px));
     }
 
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > dl > dd :is(.sidenote, .marginnote):not(figure *),
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd :is(.sidenote, .marginnote):not(figure *) {
         margin-right: calc((100% + var(--tufte-nest, 0px)) * -0.76 - 3.696rem - 60.8px - var(--tufte-nest, 0px));
     }
 }
@@ -2319,17 +2780,17 @@ blockquote.alert {
         right: calc(-66% - 1.386rem);
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
         width: calc(50% + 22px);
         right: calc(-60% - 30.4px);
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
         width: calc(55% + 22px);
         right: calc(-66% - 30.4px);
     }
 
-    :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
         width: calc(55% + 1.155rem + 22px);
         right: calc(-66% - 1.386rem - 30.4px);
     }
@@ -2352,11 +2813,11 @@ blockquote.alert {
         right: calc(-76% - 3.696rem);
     }
 
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > :is(ul, ol) > li > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
         right: calc(-76% - 30.4px);
     }
 
-    html[dir="rtl"] :is(section, div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
+    html[dir="rtl"] :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph:not(.open-epigraph)) > blockquote:not(.alert) > dl > dd > figure.caption-bottom:not(.fullwidth, .iframe-wrapper) div.table-wrapper :is(td, th) :is(.sidenote, .marginnote) {
         right: calc(-76% - 3.696rem - 30.4px);
     }
 }
@@ -2699,7 +3160,8 @@ nav.book-nav .next {
         width: 100%;
     }
 
-    section.abstract > p {
+    section.abstract > p,
+    section.abstract > section:is(.tufte-thm, .tufte-proof) > p {
         width: 100%;
         padding: 0 1rem;
     }
@@ -2940,7 +3402,8 @@ nav.book-nav .next {
     blockquote p,
     blockquote footer,
     blockquote:not(.alert) > .math-display,
-    blockquote:not(.alert) > div.table-wrapper {
+    blockquote:not(.alert) > div.table-wrapper,
+    blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(.math-display, div.table-wrapper) {
         width: calc((var(--pt) - 7) * 1%);
         margin-left: 3.5%;
         margin-right: 0;
@@ -3058,12 +3521,15 @@ nav.book-nav .next {
        shortcode (§2): its blocks 5% of the quote in on both sides,
        measured from the container's --pw/--pl (kept as --qw/--ql, since
        --pw cannot refer to itself). */
-    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) {
         --qw: var(--pw);
         --ql: var(--pl);
     }
 
-    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(p, footer, .math-display, div.table-wrapper, div.highlight, pre) {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(p, footer, .math-display, div.table-wrapper, div.highlight, pre),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(p, footer, .math-display, div.table-wrapper, div.highlight, pre),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(p, footer, .math-display, div.table-wrapper, div.highlight, pre) {
         width: auto;
         max-width: none;
         margin-left: 5%;
@@ -3076,7 +3542,9 @@ nav.book-nav .next {
        items 5% of the quote further in, its dds 5% of the list further
        still (as a list in a section-level quote, measured from the
        container instead of the text column). */
-    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol, dl) {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > :is(ul, ol, dl),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > :is(ul, ol, dl),
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol, dl) {
         width: auto;
         max-width: none;
         margin-left: 5%;
@@ -3089,14 +3557,18 @@ nav.book-nav .next {
         --pl: calc(var(--ql) + var(--qw) * 0.1);
     }
 
-    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dd {
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > dl > dd,
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > section:is(.tufte-thm, .tufte-proof) > blockquote:not(.alert) > dl > dd,
+    :is(section > :is(ul, ol):not(.bibliography-list, .tufte-lof, .book-toc-chapters, .footnotes-list) > li, section > dl > dd, section > details) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > dl > dd {
         --pw: calc(var(--qw) * 0.8075);
         --pl: calc(var(--ql) + var(--qw) * 0.1425);
     }
 
     /* The abstract (a quotation in tufte-handout): its indents in % of
        the page, as the quotations above, so the notes can measure them. */
-    section.abstract > p {
+    section.abstract > p,
+    section.abstract > section:is(.tufte-thm, .tufte-proof) > p {
+        width: calc(var(--pt) * 1%);
         padding: 0 3.5%;
         --pw: calc(var(--pt) - 7);
         --pl: 3.5;
@@ -3153,15 +3625,120 @@ nav.book-nav .next {
         margin-left: 5%;
     }
 
+    /* Theorems (§8b). In a list item, a dd, the details or fullwidth
+       shortcode, a theorem's blocks fill the container and keep its
+       --pw/--pl, its lists are nested lists of the container (5% in, as
+       above, the details' and fullwidth's own lists). A theorem with the
+       fullwidth class spans the text and margin columns. Its head line
+       stays with the body, the QED line with the end of the proof; the
+       drawn QED is black and a followed link leaves no mark. */
+    :is(li, dd, details, div.fullwidth) section:is(.tufte-thm, .tufte-proof) > :is(p, footer, table, .math-display, div.table-wrapper, details, .iframe-wrapper, dl),
+    section.fullwidth:is(.tufte-thm, .tufte-proof) > :is(p, footer, table, .math-display, div.table-wrapper, details, .iframe-wrapper, dl) {
+        width: auto;
+        max-width: none;
+        margin-left: 0;
+        --pw: inherit;
+        --pl: inherit;
+    }
+
+    :is(li, dd, details, div.fullwidth) section:is(.tufte-thm, .tufte-proof) > :is(ul, ol),
+    section.fullwidth:is(.tufte-thm, .tufte-proof) > :is(ul, ol) {
+        width: auto;
+        max-width: none;
+        margin-left: 0;
+    }
+
+    :is(li, dd, details) section:is(.tufte-thm, .tufte-proof) > figure:not(.fullwidth) {
+        width: auto;
+        --pw: inherit;
+        --pl: inherit;
+    }
+
+    :is(li, dd) section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) {
+        padding-left: 5%;
+        -webkit-padding-start: 5%;
+        padding-inline-start: 5%;
+        padding-right: 0;
+        --pw: calc(var(--lw) * 0.95);
+        --pl: calc(var(--ll) + var(--lw) * 0.05);
+    }
+
+    /* Its dl: no indent, as the container's own (the dl keeps the
+       container's --pw/--pl, above, kept as --tw/--tl); its dds 5% of
+       it in (3% in the fullwidth shortcode, as div.fullwidth > dl > dd),
+       not section > dl > dd's page-level values. */
+    :is(li, dd, details, div.fullwidth, blockquote.alert) section:is(.tufte-thm, .tufte-proof) > dl,
+    section.fullwidth:is(.tufte-thm, .tufte-proof) > dl {
+        padding-left: 0;
+        -webkit-padding-start: 0;
+        padding-inline-start: 0;
+        --tw: var(--pw);
+        --tl: var(--pl);
+    }
+
+    :is(li, dd, details, div.fullwidth, blockquote.alert) section:is(.tufte-thm, .tufte-proof) > dl > dd {
+        margin-left: 5%;
+        margin-right: 0;
+        --pw: calc(var(--tw) * 0.95);
+        --pl: calc(var(--tl) + var(--tw) * 0.05);
+    }
+
+    :is(div.fullwidth > section, section.fullwidth):is(.tufte-thm, .tufte-proof) > dl > dd {
+        margin-left: 3%;
+        --pw: calc(var(--tw) * 0.97);
+        --pl: calc(var(--tl) + var(--tw) * 0.03);
+    }
+
+    section > details > section:is(.tufte-thm, .tufte-proof) > :is(ul, ol) {
+        padding-left: 5%;
+        padding-right: 0;
+        --pw: calc(var(--aw) * 0.95);
+        --pl: calc(var(--al) + var(--aw) * 0.05);
+    }
+
+    :is(div.fullwidth > section, section.fullwidth):is(.tufte-thm, .tufte-proof) > :is(ul, ol) {
+        padding-left: 5%;
+        padding-right: 0;
+        --pw: 95;
+        --pl: 5;
+    }
+
+    section.fullwidth:is(.tufte-thm, .tufte-proof) {
+        width: 100%;
+        max-width: 100%;
+        --pw: 100;
+        --pl: 0;
+    }
+
+    p.thm-headline {
+        break-after: avoid;
+    }
+
+    p.thm-qed-line {
+        break-before: avoid;
+    }
+
+    .thm-qed-openbox::before,
+    .thm-qed-blacksquare::before {
+        border-color: #000;
+    }
+
+    :is(section, span[data-sn="section"]):is(.tufte-thm, .tufte-proof):target {
+        box-shadow: none;
+    }
+
     /* Paper cannot scroll (theme.css): a numbered display shows in full
        as well. Wider than the column it runs into the margin and its
        number drops to the next line, flush right (amsmath's placement of
-       a tag that does not fit; above the display under leqno). */
-    .math-display.numbered {
+       a tag that does not fit; above the display under leqno). So does
+       a display that ends a proof (\qedhere), with its QED. */
+    .math-display.numbered,
+    .math-display:has(> .thm-qed) {
         flex-wrap: wrap;
     }
 
-    .math-display.numbered > :is(.katex-display, .katex, .math) {
+    .math-display.numbered > :is(.katex-display, .katex, .math),
+    .math-display:has(> .thm-qed) > :is(.katex-display, .katex, .math) {
         min-width: auto;
         overflow: visible;
     }
@@ -3211,8 +3788,10 @@ nav.book-nav .next {
        list item theme.css's li pre > code fills the item. */
     blockquote:not(.alert) > div.highlight > pre,
     blockquote:not(.alert) > div.highlight > div,
-    :is(section, div.epigraph) > blockquote:not(.alert) > pre > code,
-    :is(section, div.epigraph) > blockquote:not(.alert) > blockquote:not(.alert) > pre > code {
+    blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > div.highlight > :is(pre, div),
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > pre > code,
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > section:is(.tufte-thm, .tufte-proof) > pre > code,
+    :is(section:not(:where(li, dd, details, div.fullwidth) *), div.epigraph) > blockquote:not(.alert) > blockquote:not(.alert) > pre > code {
         width: calc((var(--pt) - 9.5) * 1%);
         margin-left: 6%;
     }
@@ -3512,6 +4091,12 @@ body.tufte-debug section {
         transparent 55%, transparent 60.5%,
         rgba(0, 160, 0, 0.06) 60.5%, rgba(0, 160, 0, 0.06) 88%,
         transparent 88%);
+}
+
+/* A theorem's section (§8b) is not a page section: its columns are the
+   page section's, drawn once (here and on paper). */
+body.tufte-debug section:is(.tufte-thm, .tufte-proof) {
+    background-image: none;
 }
 
 body.tufte-debug .tufte-anchor::before,

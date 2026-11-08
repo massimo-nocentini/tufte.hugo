@@ -1,0 +1,64 @@
+{{- /*
+  Splits a theorem's or proof's rendered body (SPEC-THM §5.1, §6) into a
+  leading run of margin material, the core and a trailing run, so that the
+  head runs into the first paragraph and the QED ends the last one past a
+  marginal float or anchor (amsthm: \marginpar, \marginnote and \label
+  start no paragraph). Margin material is what takes no room in the text
+  column (tufte-latex.css, the indent rules that look through it): at the
+  top level of the body,
+    p.margin-figure-anchor, p.footnotetext-anchor, span|div.tufte-anchor,
+    the label.margin-toggle / input.margin-toggle pair and the
+    span|div.marginnote it opens (marginnote, marginblock, margintable),
+    div.page-break, div.clear-margin, hidden <i> markers,
+  and white space between them.
+
+  Takes: the body HTML (string).
+  Returns: dict "lead" "core" "trail" (lead + core + trail = the body; the
+  core starts and ends with a node that is not margin material, or is "").
+  Fast path: a body that starts with <p> and ends with a bare <p>'s </p>
+  is returned as the core, untokenised.
+*/ -}}
+{{- $html := . -}}
+{{- $marginRE := `^<(?:p class="(?:margin-figure-anchor|footnotetext-anchor)[" ]|(?:span|div) class="(?:tufte-anchor|marginnote)[" ]|span id="[^"]*" class="tufte-anchor"|label for="[^"]*" class="margin-toggle"|input type="checkbox" id="[^"]*" class="margin-toggle"|div class="(?:page-break|clear-margin)[" ]|i class="[^"]*"[^>]* hidden>)` -}}
+{{- $leadMaybe := findRE $marginRE $html 1 -}}
+{{- $trailMaybe := false -}}
+{{- if or (strings.HasSuffix $html "</span>") (strings.HasSuffix $html "</div>") (strings.HasSuffix $html "/>") (strings.HasSuffix $html "</i>") -}}
+  {{- $trailMaybe = true -}}
+{{- else if strings.HasSuffix $html "</p>" -}}
+  {{- $lastP := index (last 1 (findRE `<p(?:\s[^>]*)?>` $html) | default (slice "")) 0 -}}
+  {{- $trailMaybe = findRE `^<p class="(?:margin-figure-anchor|footnotetext-anchor)[" ]` $lastP 1 -}}
+{{- end -}}
+{{- $res := dict "lead" "" "core" $html "trail" "" -}}
+{{- if or $leadMaybe $trailMaybe -}}
+  {{- $toks := findRE `<[^>]*>|[^<]+` $html -}}
+  {{- $depth := 0 -}}
+  {{- $first := -1 -}}
+  {{- $lastEnd := -1 -}}
+  {{- $nodeMargin := true -}}
+  {{- range $i, $t := $toks -}}
+    {{- if eq $depth 0 -}}
+      {{- if strings.HasPrefix $t "<" -}}
+        {{- $nodeMargin = gt (len (findRE $marginRE $t 1)) 0 -}}
+      {{- else -}}
+        {{- $nodeMargin = eq (strings.TrimSpace $t) "" -}}
+      {{- end -}}
+      {{- if and (not $nodeMargin) (lt $first 0) }}{{ $first = $i }}{{ end -}}
+    {{- end -}}
+    {{- if strings.HasPrefix $t "</" -}}
+      {{- if gt $depth 0 }}{{ $depth = sub $depth 1 }}{{ end -}}
+    {{- else if and (strings.HasPrefix $t "<") (not (strings.HasSuffix $t "/>")) (not (findRE `^<(?:!|(?i:input|br|img|hr|wbr|source|col|embed|area|track|meta|link|base|param)[\s>])` $t 1)) -}}
+      {{- $depth = add $depth 1 -}}
+    {{- end -}}
+    {{- if and (eq $depth 0) (not $nodeMargin) }}{{ $lastEnd = add $i 1 }}{{ end -}}
+  {{- end -}}
+  {{- if lt $first 0 -}}
+    {{- $res = dict "lead" $html "core" "" "trail" "" -}}
+  {{- else -}}
+    {{- $res = dict
+      "lead" (delimit (first $first $toks) "")
+      "core" (delimit (first (sub $lastEnd $first) (after $first $toks)) "")
+      "trail" (delimit (after $lastEnd $toks) "")
+    -}}
+  {{- end -}}
+{{- end -}}
+{{- return $res -}}

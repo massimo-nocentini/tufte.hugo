@@ -133,7 +133,9 @@
          and replaced by the preset's default. The other enum options are
          checked where they are read (titleBlock, numerals, marginals,
          *.align, *.font, print.paper, bibliography.style, book.tocDepth,
-         footnotes, footnoteStyle, footnotePlacement; citeAs is checked
+         footnotes, footnoteStyle, footnotePlacement, theorems.look,
+         theorems.within and the theorems.kinds.K.* keys, in
+         tufte/thm/kind.html and tufte/thm/render.html; citeAs is checked
          above). */ -}}
   {{- /* The option groups (headings, book, print…: the prefixes of the
          dotted keys of the defaults): a scalar written in place of a
@@ -143,7 +145,7 @@
   {{- range $k, $_ := $defs -}}
     {{- if strings.Contains $k "." }}{{ $g := index (split $k ".") 0 }}{{ if not (in $groups $g) }}{{ $groups = $groups | append $g }}{{ end }}{{ end -}}
   {{- end -}}
-  {{- $bools := slice "justified" "hyphenate" "indent" "sfsidenotes" "letterspacing" "debug" "innerhtml" "headings.strict" "bibliography.list" "bibliography.margin" "book.numberchapters" "book.continuous" "book.toc" "book.titlepage" "print.runningheads" -}}
+  {{- $bools := slice "justified" "hyphenate" "indent" "sfsidenotes" "letterspacing" "debug" "innerhtml" "headings.strict" "bibliography.list" "bibliography.margin" "book.numberchapters" "book.continuous" "book.toc" "book.titlepage" "print.runningheads" "theorems.shared" -}}
   {{- $boolWords := slice "true" "false" "yes" "no" "on" "off" "1" "0" -}}
   {{- range $k, $v := $m -}}
     {{- $bad := "" -}}
@@ -177,6 +179,9 @@
     {{- end -}}
   {{- end -}}
   {{- $res = $S.Get "m" -}}
+  {{- /* Where each value is set (tufte/thm/kind.html names it in its
+         warnings, once per site or book, as here). */ -}}
+  {{- $page.Store.Set "tufteMemoOptsFrom" (dict "v" $from "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
   {{- $page.Store.Set $memoKey (dict "v" $res "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}
 {{- return $res -}}

@@ -1,0 +1,55 @@
+{{- /*
+  The inline form of the theorems and proofs in a piece of HTML that goes
+  into inline text (a sidenote, margin note or caption: a <span>), SPEC-THM
+  §5.3 and T13: each <section class="tufte-thm …"> / "tufte-proof …"
+  becomes <span data-sn="section" …> (attributes kept, in order), every
+  paragraph inside it <span data-sn="p"[ ATTRS]>, laid out as blocks by
+  tufte-latex.css. Other sections and paragraphs, and the blocks of a
+  theorem's body (a list, code…), are left alone: the caller flattens them
+  (tufte/inline-blocks.html) and warns tufte-block-in-note for those only.
+
+  Callers: tufte/inline-nested.html (a nested shortcode's HTML),
+  tufte/render-inner.html step 3 (a theorem in a caption= parameter, run
+  inside RenderString), func/content-raw.html step 5 (a theorem in a
+  Markdown image title).
+
+  Takes: the HTML (string or template.HTML).
+  Returns: the HTML string (unchanged when it holds no theorem).
+*/ -}}
+{{- $html := string . -}}
+{{- if findRE `<section class="tufte-(?:thm|proof)[ "]` $html 1 -}}
+  {{- $out := "" -}}
+  {{- $secs := slice -}}
+  {{- $ps := slice -}}
+  {{- $depth := 0 -}}
+  {{- range $t := findRE `(?i)</?(?:section|p)(?:\s[^>]*)?>|<|[^<]+` $html -}}
+    {{- $lt := lower $t -}}
+    {{- if or (strings.HasPrefix $lt "<section ") (eq $lt "<section>") -}}
+      {{- $isThm := findRE `^<section class="tufte-(?:thm|proof)[ "]` $t 1 -}}
+      {{- $secs = $secs | append (cond (gt (len $isThm) 0) "t" "o") -}}
+      {{- if $isThm -}}
+        {{- $depth = add $depth 1 -}}
+        {{- $t = printf `<span data-sn="section"%s` (strings.TrimPrefix "<section" $t) -}}
+      {{- end -}}
+    {{- else if eq $lt "</section>" -}}
+      {{- if $secs -}}
+        {{- if eq (index $secs (sub (len $secs) 1)) "t" -}}
+          {{- $depth = sub $depth 1 -}}
+          {{- $t = "</span>" -}}
+        {{- end -}}
+        {{- $secs = first (sub (len $secs) 1) $secs -}}
+      {{- end -}}
+    {{- else if or (strings.HasPrefix $lt "<p ") (eq $lt "<p>") -}}
+      {{- $ps = $ps | append (cond (gt $depth 0) "t" "o") -}}
+      {{- if gt $depth 0 }}{{ $t = printf `<span data-sn="p"%s` (substr $t 2) }}{{ end -}}
+    {{- else if eq $lt "</p>" -}}
+      {{- if $ps -}}
+        {{- if eq (index $ps (sub (len $ps) 1)) "t" }}{{ $t = "</span>" }}{{ end -}}
+        {{- $ps = first (sub (len $ps) 1) $ps -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $out = printf "%s%s" $out $t -}}
+  {{- end -}}
+  {{- $html = $out -}}
+{{- end -}}
+{{- return $html -}}

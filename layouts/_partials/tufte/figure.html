@@ -147,7 +147,7 @@
   {{- $raw = strings.TrimSpace (printf "%s %s" $raw $a) -}}
 {{- end -}}
 {{- with $raw -}}
-  {{- $html := partial "tufte/render-inner.html" (dict "page" $page "inner" . "text" . "display" "inline" "shortcodes" "run") | string -}}
+  {{- $html := partial "tufte/render-inner.html" (dict "page" $page "inner" . "text" . "display" "inline" "thmInline" true "shortcodes" "run") | string -}}
   {{- $html = partial "func/flatten-p.html" $html | strings.TrimSpace -}}
   {{- /* A cite written in a caption= parameter runs without a parent, so it
          made a citation sidenote: turn it into a nested citation, gathered

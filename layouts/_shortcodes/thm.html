@@ -1,0 +1,17 @@
+{{- /*
+  A theorem of any kind (block; amsthm \newtheorem plus \begin{KIND}).
+  Put it on its own lines, with a blank line before and after, and close it:
+
+    {{< thm "conjecture" >}}…{{< /thm >}}
+    {{< thm "conjecture" "Goldbach" "conj:goldbach" >}}…{{< /thm >}}
+    {{< thm kind="axiom" name="Axiom" style="definition" >}}…{{< /thm >}}
+
+  Positional: 0 = kind, 1 = note, 2 = label. Named: kind (required: a
+  lowercase word), note (alias title), label, numbered, style (plain |
+  definition | remark), name, cite, qed, class. A kind is declared by the
+  built-ins (theorem lemma proposition corollary conjecture claim
+  definition example exercise remark notation) or by any option
+  tufte.theorems.kinds.KIND.*; an undeclared kind without name= is warned
+  (tufte-thm-kind). See tufte/thm/render.html, tufte/thm/kind.html.
+*/ -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" (partial "tufte/thm/render.html" (dict "ctx" . "inner" .InnerDeindent "kind" ""))) | safeHTML -}}

@@ -1,0 +1,15 @@
+{{- /*
+  Example (block; amsthm \begin{example}[Note] … \end{example}). Put it on its own
+  lines, with a blank line before and after, and close it:
+
+    {{< example >}}…{{< /example >}}
+    {{< example "Note" >}}…{{< /example >}}                 \begin{example}[Note]
+    {{< example "Note" "exa:x" >}}…{{< /example >}}         … plus \label{exa:x}
+    {{< example note="Note" label="exa:x" >}}…{{< /example >}}
+
+  Positional: 0 = note, 1 = label. Named: note (alias title), label,
+  numbered, style (plain | definition | remark), name, cite, qed, class.
+  Numbering, options and markup: tufte/thm/render.html, tufte/thm/kind.html
+  (README, "Theorems and proofs").
+*/ -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" (partial "tufte/thm/render.html" (dict "ctx" . "inner" .InnerDeindent "kind" "example"))) | safeHTML -}}

@@ -20,6 +20,11 @@
   where KATEX is the KaTeX display HTML (server) or
   <span class="math math-display">\[TeX\]</span> (client).
   Invalid TeX: warning plus <code class="math-error">TeX</code>.
+  \qedhere (block only): removed from the TeX; the end-of-proof symbol
+  <span class="thm-qed …" … data-qedhere="1">…</span> (tufte/thm/qed.html,
+  symbol theorems.qed; an empty thm-qed-none span when that is none, for a
+  holder with its own symbol to claim) is the last child of
+  span.math-display (server) or of span.math.math-display (client).
 */ -}}
 {{- $page := .page -}}
 {{- $inner := printf "%v" .inner -}}
@@ -28,6 +33,16 @@
 {{- $position := .position | default "" -}}
 {{- $m := partial "func/math-options.html" (dict "Page" $page "Display" $block) -}}
 {{- $page.Store.Set "hasMath" true -}}
+{{- /* amsthm's \qedhere in display math (SPEC-THM §6): KaTeX does not
+       know it, so it is removed (the formula is otherwise unchanged) and
+       the end-of-proof symbol becomes the last child of the display span,
+       marked data-qedhere="1" for the enclosing proof to claim
+       (tufte/thm/render.html). */ -}}
+{{- $qed := "" -}}
+{{- if and $block (strings.Contains $inner `\qedhere`) (findRE `\\qedhere(?:[^A-Za-z]|$)` $inner 1) -}}
+  {{- $inner = replaceRE `\\qedhere([^A-Za-z]|$)` "$1" $inner -}}
+  {{- $qed = partial "tufte/thm/qed.html" (dict "symbol" (partialCached "tufte/opt.html" (dict "page" $page "key" "theorems.qed") (or $page.RelPermalink $page.Path) "theorems.qed") "qedhere" "1") -}}
+{{- end -}}
 {{- $out := "" -}}
 {{- $failed := false -}}
 {{- if eq $m.engine "client" -}}
@@ -101,6 +116,13 @@
     {{- end -}}
   {{- end -}}
 {{- end -}}
+{{- /* The \qedhere symbol: in the client engine's span (after the TeX
+       text, which KaTeX's auto-render replaces); with the server engine
+       at the end of the display span (after the equation number). */ -}}
+{{- if and $qed (eq $m.engine "client") (not $label) (strings.HasPrefix $out `<span class="math math-display">`) -}}
+  {{- $out = printf "%s%s</span>" (strings.TrimSuffix "</span>" $out) $qed -}}
+  {{- $qed = "" -}}
+{{- end -}}
 {{- if $block -}}
   {{- if $tagged -}}
     {{- $k := htmlEscape $label -}}
@@ -112,6 +134,9 @@
     {{- $out = printf `<span class="math-display numbered%s" id="%s">%s<span class="eq-number">(<span class="tufte-num" data-kind="eq" data-key="%s" data-labeled="1"></span>)</span></span>` (cond (eq $m.client.leqno true) " leqno" "") $k $out $k -}}
   {{- else if or (ne $m.engine "client") (strings.HasPrefix $out "<code") -}}
     {{- $out = printf `<span class="math-display">%s</span>` $out -}}
+  {{- end -}}
+  {{- if and $qed (strings.HasSuffix $out "</span>") -}}
+    {{- $out = printf "%s%s</span>" (strings.TrimSuffix "</span>" $out) $qed -}}
   {{- end -}}
 {{- end -}}
 {{- return $out -}}

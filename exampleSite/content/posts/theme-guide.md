@@ -247,3 +247,35 @@ LaTeX command to its shortcode, with live examples; the
 [handout]({{< relref "posts/sample-handout/index.md" >}}) and the
 [book]({{< relref "books/sample-book/_index.md" >}}) are ports of the two
 Tufte-LaTeX samples.
+
+## Theorems and proofs
+
+The theorem environments of LaTeX's `amsthm` are block shortcodes:
+`theorem`, `lemma`, `proposition`, `corollary`, `definition`, `example`,
+`remark`, `thm` for any other kind, and `proof`. The note and the label are
+the two positional arguments, and `{{</* proof of="thm:x" */>}}` names the
+theorem it proves:
+
+```markdown
+{{</* lemma "Bézout" "lem:bezout" */>}}
+For integers $a$ and $b$ there are integers $x$ and $y$ with $ax + by = \gcd(a, b)$.
+{{</* /lemma */>}}
+```
+
+{{< lemma "Bézout" "lem:bezout" >}}
+For integers $a$ and $b$ there are integers $x$ and $y$ with
+$ax + by = \gcd(a, b)$.
+{{< /lemma >}}
+
+{{< proof of="lem:bezout" >}}
+If $a = b = 0$, take $x = y = 0$. Otherwise the set of the integers
+$ax + by$ has a smallest positive element $d$; it divides $a$ and $b$ (the
+remainder of $a$ divided by $d$ is again of that form and smaller than $d$, so it is $0$),
+and every common divisor of $a$ and $b$ divides $d$.
+{{< /proof >}}
+
+All kinds share one counter, as in the AMS templates; the options
+`tufte.theorems.*` declare new kinds and change counters, numbering within
+sections or chapters, the look of the heads and the end-of-proof symbol.
+[Theorems and Proofs]({{< relref "posts/theorems.md" >}}) shows them all,
+with cross-references and a list of theorems.

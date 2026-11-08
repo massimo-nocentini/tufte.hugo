@@ -1,10 +1,14 @@
 {{- /*
   Lists of figures, tables and listings (SPEC-LATEX §3.6):
-  \listoffigures, \listoftables, \listoflistings.
+  \listoffigures, \listoftables, \listoflistings; and of theorems
+  (thmtools \listoftheorems, SPEC-THM §5.5: kind "thm", every theorem-like
+  environment, numbered or not, never proofs, in document order).
 
   Takes: dict
     "page"     the page that shows the list
-    "kind"     "figure" | "table" | "listing" (also "lof" | "lot" | "lol")
+    "kind"     "figure" | "table" | "listing" | "thm" (also "lof" | "lot" | "lol" | "thmlist")
+    "kinds"    optional, kind "thm": comma-separated theorem kinds to list
+               (default all)
     "heading"  optional string: the h2 text; when present and empty, no h2
                (the page title already says it). When absent: i18n
                listOfFigures / listOfTables / listOfListings.
@@ -22,6 +26,9 @@
     <ol class="tufte-lof" data-kind="figure">
       <li><a href="REL#ANCHOR"><span class="lof-num">3</span> TEXT</a>[<span class="lof-where">CHAPTER</span>]</li>
     </ol>
+  (theorems: <span class="lof-num">Lemma&nbsp;2.3</span> NOTE, or
+  <span class="lof-num">Remark</span> unnumbered; id tufte-list-of-theorems,
+  i18n listOfTheorems, data-kind="thm")
   TEXT is the short caption, else the caption with its cross-references
   resolved (tufte/resolve-refs.html, as plain text) and its margin material
   (sidenotes, margin notes, citation blocks), toggles, ids, index anchors
@@ -30,14 +37,20 @@
 */ -}}
 {{- $p := .page -}}
 {{- $kind := lower (printf "%v" (.kind | default "figure")) -}}
-{{- $kind = index (dict "lof" "figure" "figures" "figure" "lot" "table" "tables" "table" "lol" "listing" "listings" "listing") $kind | default $kind -}}
+{{- $kind = index (dict "lof" "figure" "figures" "figure" "lot" "table" "tables" "table" "lol" "listing" "listings" "listing" "thmlist" "thm" "theorems" "thm") $kind | default $kind -}}
 {{- $meta := index (dict
   "figure" (dict "id" "tufte-list-of-figures" "i18n" "listOfFigures" "def" "List of Figures")
   "table" (dict "id" "tufte-list-of-tables" "i18n" "listOfTables" "def" "List of Tables")
-  "listing" (dict "id" "tufte-list-of-listings" "i18n" "listOfListings" "def" "List of Listings")) $kind -}}
+  "listing" (dict "id" "tufte-list-of-listings" "i18n" "listOfListings" "def" "List of Listings")
+  "thm" (dict "id" "tufte-list-of-theorems" "i18n" "listOfTheorems" "def" "List of Theorems")) $kind -}}
+{{- /* Theorems: only these kinds (kinds="theorem,lemma"; default all). */ -}}
+{{- $kinds := slice -}}
+{{- if eq $kind "thm" -}}
+  {{- range split (printf "%v" (.kinds | default "")) "," }}{{ with strings.TrimSpace . | lower }}{{ $kinds = $kinds | append . }}{{ end }}{{ end -}}
+{{- end -}}
 {{- $out := "" -}}
 {{- if not $meta -}}
-  {{- warnidf "tufte-bad-option" "tufte.hugo: unknown list kind %q (use figure, table or listing)" $kind -}}
+  {{- warnidf "tufte-bad-option" "tufte.hugo: unknown list kind %q (use figure, table, listing or thm)" $kind -}}
 {{- else -}}
 
 {{- /* heading */ -}}
@@ -74,6 +87,28 @@
     {{- end -}}
     {{- if not $e }}{{ $e = index $entries . }}{{ end -}}
     {{- if not $e }}{{ continue }}{{ end -}}
+    {{- /* A theorem: "Lemma 2.3" (its heading word and number) then its
+           note, plain text already (tufte/labels.html). */ -}}
+    {{- if eq $kind "thm" -}}
+      {{- if and $kinds (not (in $kinds $e.thm)) }}{{ continue }}{{ end -}}
+      {{- $tnum := $e.thmword -}}
+      {{- with $e.display }}{{ $tnum = printf "%s&nbsp;%s" $tnum . }}{{ end -}}
+      {{- $ttext := $e.note | default "" -}}
+      {{- if strings.Contains $ttext "TUFTEXREF" -}}
+        {{- $xm := $L.xrefs | default dict -}}
+        {{- range $tok := findRE `TUFTEXREF[0-9a-f]{16}END` $ttext | uniq -}}
+          {{- $r := "??" -}}
+          {{- with index $xm (substr $tok 9 16) -}}
+            {{- $r = partial "tufte/plain-math.html" (dict "html" (partial "tufte/resolve-refs.html" (dict "page" $c "html" . "quiet" true "depth" 1))) -}}
+          {{- end -}}
+          {{- $ttext = replace $ttext $tok $r -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $whereT := "" -}}
+      {{- if $root }}{{ $whereT = printf `<span class="lof-where">%s</span>` (partial "tufte/name-title.html" (dict "page" $c)) }}{{ end -}}
+      {{- $lis = $lis | append (printf `<li>%s%s</li>` (partial "tufte/page-link.html" (dict "page" $c "anchor" ($e.anchor | default "") "html" (strings.TrimSpace (printf `<span class="lof-num">%s</span> %s` $tnum $ttext)) "book" $root)) $whereT) -}}
+      {{- continue -}}
+    {{- end -}}
     {{- $text := printf "%s" ($e.name | default "") -}}
     {{- /* The caption is phase-1 HTML: resolve its cross-references and
            number tokens against its own page (a \ref in a \caption prints

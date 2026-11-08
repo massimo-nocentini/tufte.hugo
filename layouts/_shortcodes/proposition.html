@@ -1,0 +1,15 @@
+{{- /*
+  Proposition (block; amsthm \begin{proposition}[Note] … \end{proposition}). Put it on its own
+  lines, with a blank line before and after, and close it:
+
+    {{< proposition >}}…{{< /proposition >}}
+    {{< proposition "Note" >}}…{{< /proposition >}}                 \begin{proposition}[Note]
+    {{< proposition "Note" "pro:x" >}}…{{< /proposition >}}         … plus \label{pro:x}
+    {{< proposition note="Note" label="pro:x" >}}…{{< /proposition >}}
+
+  Positional: 0 = note, 1 = label. Named: note (alias title), label,
+  numbered, style (plain | definition | remark), name, cite, qed, class.
+  Numbering, options and markup: tufte/thm/render.html, tufte/thm/kind.html
+  (README, "Theorems and proofs").
+*/ -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" (partial "tufte/thm/render.html" (dict "ctx" . "inner" .InnerDeindent "kind" "proposition"))) | safeHTML -}}

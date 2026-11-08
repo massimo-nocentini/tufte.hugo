@@ -18,7 +18,10 @@
   3. <span class="tufte-num" …></span> get their display number (missing
      key: left empty, CSS shows "?").
   4. <a class="xref" data-ref data-fmt …>REF</a> become plain links with
-     the formatted text (auto num full name page eq). A marker copied,
+     the formatted text (auto num full name page eq; a theorem, kind
+     thm: auto = its number, else its name; full = "Lemma&nbsp;2.3" with
+     its own heading word; name = its note, else "Lemma 2.3"; a proof,
+     kind proof: its heading text). A marker copied,
      HTML-escaped, into an attribute (a figure's alt text derived from its
      caption, tufte/figure.html) becomes the plain text, escaped.
 */ -}}
@@ -77,6 +80,28 @@
       {{- with $d -}}
         {{- $html = replace $html $tok (replace $tok "></span>" (printf ">%s</span>" .)) -}}
       {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* 3a. The escaped copy of a theorem's number token in an attribute (a
+       figure's alt text derived from a caption holding a theorem,
+       tufte/plain-caption.html): its plain number, escaped; none (an
+       unnumbered key): the token goes, with the no-break space before it. */ -}}
+{{- if strings.Contains $html `&lt;span class=&#34;tufte-num&#34; data-kind=&#34;thm&#34;` -}}
+  {{- range $esc := findRE `&lt;span class=&#34;tufte-num&#34; data-kind=&#34;thm&#34; data-key=&#34;.*?&#34;&gt;&lt;/span&gt;` $html | uniq -}}
+    {{- $k := partial "tufte/key.html" (replaceRE `^.*data-key=&#34;(.*?)&#34;.*$` "$1" $esc | htmlUnescape) -}}
+    {{- $d := "" -}}
+    {{- with $L.tokens -}}
+      {{- $d = index . (printf "thm|%s" $k) | default "" -}}
+    {{- else -}}
+      {{- with index $L.entries $k }}{{ $d = .display }}{{ end -}}
+    {{- end -}}
+    {{- if $d -}}
+      {{- $html = replace $html $esc (htmlEscape (plainify (htmlUnescape (printf "%v" $d)))) -}}
+    {{- else -}}
+      {{- $html = replace $html (printf "\u00a0%s" $esc) "" -}}
+      {{- $html = replace $html $esc "" -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
@@ -180,7 +205,11 @@
       {{- if eq $fmt "num" -}}
         {{- $text = $d | default "??" -}}
       {{- else if eq $fmt "full" -}}
-        {{- if $d -}}
+        {{- if and $d (eq $e.kind "thm") -}}
+          {{- /* cleveref's \cref: the theorem's own heading word ("Lemma 2.3"),
+                 plain text already (tufte/labels.html). */ -}}
+          {{- $text = printf "%s&nbsp;%s" $e.thmword $d -}}
+        {{- else if $d -}}
           {{- $text = printf "%s&nbsp;%s" (htmlEscape (index $words ($e.word | default $e.kind) | default "")) $d -}}
         {{- else -}}
           {{- $text = $name -}}
@@ -243,6 +272,9 @@
         {{- with $e.anchor }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
         {{- $out = printf `<a class="xref" href="%s">%s</a>` (htmlEscape $href) $text -}}
       {{- end -}}
+      {{- /* \eqref is \textup{(\ref{…})} (amsmath): upright also in an
+             italic text (a plain theorem), tufte-latex.css span.eqref. */ -}}
+      {{- if eq $fmt "eq" }}{{ $out = printf `<span class="eqref">%s</span>` $out }}{{ end -}}
     {{- else if $summary -}}
       {{- /* As on the page ("??"), but no link and no warning. */ -}}
       {{- $out = `<span class="xref xref-missing">??</span>` -}}

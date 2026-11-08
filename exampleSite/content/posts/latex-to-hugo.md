@@ -28,7 +28,9 @@ The status column says how complete the counterpart is: **must** and
 **should** features are implemented, **could** features are extras, and
 **wont** rows explain why a LaTeX feature has no web counterpart. Option
 names such as `tufte.justified` are keys of `[params.tufte]` in the site
-configuration, or of the `tufte:` map in a page's front matter.
+configuration, or of the `tufte:` map in a page's front matter. Rows
+107–117 are the theorem environments of the `amsthm` package, which the
+classes do not define but mathematical texts load with them.
 
 {{< marginnote >}}**Placement rule.** *Inline* shortcodes (`sidenote`, `marginnote`, `footnote`, `cite`, `xref`, `eqref`, `label`, `index`, `footnotemark`, `newthought`, `sans`, `allcaps`, `smallcaps`, `sc`, `textls`, `nohyphens`, `paragraph`, `bibentry`, `nocite`, and `marginfigure` with `inline="true"`) are written inside a paragraph. *Block* shortcodes (`figure`, `fig`, `table`, `marginblock`, `equation`, `footnotetext`, `bibliography`, `printindex`…) stand alone, with blank lines around them.{{< /marginnote >}}
 
@@ -141,6 +143,17 @@ configuration, or of the `tufte:` map in a page's front matter.
 | 104 | setspace `doublespace` | — | **wont** | loaded by `tufte-common.def`, but it is a general line-spacing package, not a class feature: set the leading with CSS (`line-height`) through `customCSS` |
 | 105 | doc macros (`\doccmd`…), text shortcuts (`\TL`, `\monthyear`) | inline code, your own shortcodes | **wont** | not class features |
 | 106 | TeX machinery (`\morefloats`, engine detection, `\TufteRecalculate`, other paper options) | — | **wont** | no meaning in HTML |
+| 107 | amsthm `\newtheorem{k}{Word}` | `{{</* theorem */>}}…{{</* /theorem */>}}`, `lemma`, `proposition`, `corollary`, `definition`, `example`, `remark`; any kind with `{{</* thm "k" */>}}…{{</* /thm */>}}`; `tufte.theorems.kinds.k.name` | should | the amsthm package, not a class feature; see [Theorems and proofs](https://github.com/massimo-nocentini/tufte.hugo#theorems-and-proofs) |
+| 108 | amsthm `\newtheorem*{k}{Word}` | `tufte.theorems.kinds.k.numbered = false`; `numbered=false` on one theorem | should |  |
+| 109 | amsthm `\newtheorem{k}[c]{Word}` (shared counter) | `tufte.theorems.kinds.k.counter = "c"` | should | every kind shares `theorem` by default (`tufte.theorems.shared`), as in `amsart.template` |
+| 110 | amsthm `\newtheorem{k}{Word}[section]`, `\numberwithin` | `tufte.theorems.kinds.c.within`, `tufte.theorems.within`: `"section"`, `"chapter"`, `"none"`, `"auto"` | should | `auto`: per chapter in a book with numbered chapters or `book.continuous = false` (without `numberChapters` every chapter restarts at 1, no prefix), else through the page or the book |
+| 111 | amsthm `\theoremstyle{plain\|definition\|remark}` | `tufte.theorems.kinds.k.style`; `style=` on one theorem | should |  |
+| 112 | `\begin{theorem}[note]` + `\label` | `{{</* theorem "note" "thm:x" */>}}…{{</* /theorem */>}}`, `{{</* lemma note="…" label="lem:x" */>}}` | should | the note in parentheses after the number; a `{{</* label "thm:x" */>}}` in the body refers to the theorem too |
+| 113 | amsthm `proof`, `\begin{proof}[Head]` | `{{</* proof */>}}…{{</* /proof */>}}`, `{{</* proof "Head" */>}}`, `{{</* proof of="thm:x" */>}}` | should | “Proof of Theorem 2.1.” |
+| 114 | `\qedhere`, `\qedsymbol` | `{{</* qedhere */>}}`, `\qedhere` in display math; `tufte.theorems.qed`, `qed=` | should | `blacksquare` ■ (`css`), `openbox` □ (`latex`), `none` or any text |
+| 115 | `\ref`, cleveref `\cref`, `\nameref` to a theorem | `{{</* xref "thm:x" */>}}`, `{{</* xref "thm:x" "full" */>}}`, `{{</* xref "thm:x" "name" */>}}` | should | “2.1”, “Theorem 2.1”, the note |
+| 116 | thmtools `\listoftheorems` | `{{</* listoftheorems */>}}` (standalone) | should | `kinds="theorem,lemma"`, `heading=""` |
+| 117 | `\swapnumbers`, `\newtheoremstyle`, thmtools `restatable` | — | **wont** | heads come in two looks (`tufte.theorems.look`: `tufte`, `amsthm`); restyle one kind with `thm-kind-k` in `customCSS` |
 {.fullwidth}
 
 ## Notes {#sec:notes}
@@ -282,6 +295,30 @@ e^{i\pi} + 1 = 0
 {{< /equation >}}
 
 Equations {{< eqref "eq:demo-gauss" >}} and {{< eqref "eq:demo-euler" >}} share one counter.
+
+## Theorems {#sec:theorems-demo}
+
+The theorem environments of `amsthm` are block shortcodes, written
+`{{</* theorem "Euler" "thm:demo-euler" */>}}` (the note, then the label) and
+`{{</* proof */>}}`:
+
+{{< theorem "Euler" "thm:demo-euler" >}}
+For every real $x$, $e^{ix} = \cos x + i \sin x$.
+{{< /theorem >}}
+
+{{< proof >}}
+Split the power series of $e^{ix}$ into its even and odd terms:
+
+$$
+e^{ix} = \sum_{n \ge 0} \frac{(ix)^n}{n!} = \sum_{k \ge 0} \frac{(-1)^k x^{2k}}{(2k)!} + i \sum_{k \ge 0} \frac{(-1)^k x^{2k+1}}{(2k+1)!}. \qedhere
+$$
+{{< /proof >}}
+
+At $x = \pi$, {{< xref "thm:demo-euler" "full" >}} gives
+{{< eqref "eq:demo-euler" >}}. The `\qedhere` in the display puts the
+end-of-proof symbol at its right end. [Theorems and Proofs]({{< relref "posts/theorems.md" >}})
+shows the other kinds, shared counters, numbering within sections and the
+list of theorems.
 
 ## Typography {#sec:typography-demo}
 

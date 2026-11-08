@@ -1,0 +1,43 @@
+{{- /*
+  The end-of-proof symbol (SPEC-THM §5.4; amsthm \qedsymbol, \qed).
+
+    openbox      □ (U+25A1, amsthm's \openbox)
+    blacksquare  ■ (U+25A0, the Halmos tombstone)
+    none, ""     no element at all, except for a \qedhere not yet claimed
+                 (qedhere "1"): its position is kept as an empty span of
+                 class "thm-qed thm-qed-none", so that the holder can
+                 claim it in its own symbol (tufte/thm/render.html); an
+                 unclaimed one is removed by func/content-raw.html
+    other text   the text as is (escaped): "∎", "Q.E.D."
+
+  tufte-latex.css draws the two boxes (ET Book has neither glyph), the
+  glyph stays for feeds and readers.
+
+  Takes a dict:
+    symbol   the symbol (option theorems.qed, a kind's qed, qed=)
+    qedhere  optional "1" (a \qedhere not yet claimed) | "2" (claimed by
+             its proof, tufte/thm/render.html)
+  Returns: string
+    <span class="thm-qed thm-qed-SYMBOL" role="img" aria-label="ENDOFPROOF"[ data-qedhere="N"]>GLYPH</span>
+    (a literal text: class="thm-qed thm-qed-text"; ENDOFPROOF = i18n thmQed;
+    symbol none with qedhere "1": class="thm-qed thm-qed-none", no GLYPH)
+*/ -}}
+{{- $s := strings.TrimSpace (printf "%v" (.symbol | default "")) -}}
+{{- $out := "" -}}
+{{- if and (or (not $s) (eq (lower $s) "none")) (eq (printf "%v" .qedhere) "1") -}}
+  {{- $aria := partial "func/t.html" "thmQed" | default "End of proof" -}}
+  {{- $out = printf `<span class="thm-qed thm-qed-none" role="img" aria-label="%s" data-qedhere="1"></span>` (htmlEscape $aria) -}}
+{{- else if and $s (ne (lower $s) "none") -}}
+  {{- $cls := "thm-qed thm-qed-text" -}}
+  {{- $glyph := htmlEscape $s -}}
+  {{- if eq (lower $s) "openbox" -}}
+    {{- $cls = "thm-qed thm-qed-openbox" -}}{{- $glyph = "□" -}}
+  {{- else if eq (lower $s) "blacksquare" -}}
+    {{- $cls = "thm-qed thm-qed-blacksquare" -}}{{- $glyph = "■" -}}
+  {{- end -}}
+  {{- $aria := partial "func/t.html" "thmQed" | default "End of proof" -}}
+  {{- $qh := "" -}}
+  {{- with .qedhere }}{{ $qh = printf ` data-qedhere="%v" ` . | strings.TrimRight " " }}{{ end -}}
+  {{- $out = printf `<span class="%s" role="img" aria-label="%s"%s>%s</span>` $cls (htmlEscape $aria) $qh $glyph -}}
+{{- end -}}
+{{- return $out -}}

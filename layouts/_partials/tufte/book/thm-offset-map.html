@@ -1,0 +1,65 @@
+{{- /*
+  Theorem counter offsets of the pages of a book (SPEC-THM §3.3, for
+  tufte/labels.html), in one pass over the print order (the landing, then
+  tufte/book/sequence.html), as tufte/book/offset-map.html and
+  tufte/book/local-offset-map.html do for the floats.
+
+  Per counter C (theorem, or the counter of a kind of its own):
+    cont    within "" (amsthm \newtheorem{K}{…} without [within]): the
+            counter is never reset, so it runs through the whole book: the
+            numbered theorems of C with data-within="" on the pages
+            printed before this one (sums of tufte/counts.html "thm"),
+            whatever book.continuous says.
+    local   within "chapter" (\newtheorem{K}{…}[chapter], amsbook): reset
+            when the chapter counter steps, with the walk of
+            tufte/book/local-offset-map.html: a numbered chapter starts
+            every counter at 0 with the prefix "<Display>."; a page that
+            does not step the chapter counter (a part page, an unnumbered,
+            front- or back-matter chapter) continues the last numbered
+            chapter's counters and prefix; the landing and the front matter
+            before the first numbered chapter share one bare sequence; a
+            page with book.numberChapters off gets zeros and "" (sums of
+            tufte/counts.html "thmch").
+  The landing itself gets empty maps and "" (it comes first).
+
+  Takes: the book root page.
+  Returns: map page key → dict cont (map C → int) local (map C → int)
+           prefix (string, "" or "N."); page key = printf "%s|%s" .Path
+           (or .RelPermalink "").
+  Callers: partialCached "tufte/book/thm-offset-map.html" $root (or $root.RelPermalink $root.Path)
+*/ -}}
+{{- /* Memoized in the root's Store for the current build: see tufte/opts.html. */ -}}
+{{- $memoRes := dict -}}
+{{- with partial "tufte/memo.html" (dict "page" . "key" "tufteMemoThmOffsetMap") -}}
+  {{- $memoRes = .v -}}
+{{- else -}}
+{{- $root := . -}}
+{{- $M := newScratch -}}
+{{- $M.Set "m" dict -}}
+{{- $M.SetInMap "m" (printf "%s|%s" $root.Path (or $root.RelPermalink "")) (dict "cont" dict "local" dict "prefix" "") -}}
+{{- $c0 := partialCached "tufte/counts.html" $root (or $root.RelPermalink $root.Path) -}}
+{{- $cont := $c0.thm | default dict -}}
+{{- $local := $c0.thmch | default dict -}}
+{{- $pre := "" -}}
+{{- range partialCached "tufte/book/sequence.html" $root (or $root.RelPermalink $root.Path) -}}
+  {{- $p := .Page -}}
+  {{- $k := printf "%s|%s" $p.Path (or $p.RelPermalink "") -}}
+  {{- $c := partialCached "tufte/counts.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- $numbered := false -}}
+  {{- with .Chapter }}{{ $numbered = .Numbered }}{{ end -}}
+  {{- if $numbered -}}
+    {{- $pre = printf "%s." .Chapter.Display -}}
+    {{- $local = dict -}}
+  {{- end -}}
+  {{- if or $numbered (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $p "key" "book.numberchapters") (or $p.RelPermalink $p.Path) "book.numberchapters")) -}}
+    {{- $M.SetInMap "m" $k (dict "cont" $cont "local" $local "prefix" $pre) -}}
+    {{- range $cn, $n := $c.thmch | default dict }}{{ $local = merge $local (dict $cn (add (index $local $cn | default 0) $n)) }}{{ end -}}
+  {{- else -}}
+    {{- $M.SetInMap "m" $k (dict "cont" $cont "local" dict "prefix" "") -}}
+  {{- end -}}
+  {{- range $cn, $n := $c.thm | default dict }}{{ $cont = merge $cont (dict $cn (add (index $cont $cn | default 0) $n)) }}{{ end -}}
+{{- end -}}
+{{- $memoRes = $M.Get "m" -}}
+{{- $root.Store.Set "tufteMemoThmOffsetMap" (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
+{{- end -}}
+{{- return $memoRes -}}

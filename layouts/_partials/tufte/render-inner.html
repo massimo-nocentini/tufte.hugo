@@ -76,6 +76,13 @@
              a heading or a rule marker is (step 1b)
     tips    optional: "keep" leaves the marked titles of images (below)
              as they are (the subfigures shortcode makes them subcaptions)
+    thmInline  optional bool, inline mode: the holder is a note or a
+             caption (sidenote, marginnote, footnotetext, a title note,
+             a figure or table caption): a theorem or proof in the text
+             takes its inline form without a warning (SPEC-THM T13). In
+             any other inline holder (sans, newthought, smallcaps, verse,
+             a details summary…) it takes the same form, but is warned
+             tufte-block-in-note: a theorem is a block
 
   An image whose title holds a nested shortcode (a nest token) has its
   title marked after the img by render-image.html, with the token kept
@@ -112,6 +119,8 @@
 {{- $isBlock := eq $display "block" -}}
 {{- $where := .where | default "" -}}
 {{- $keepBlocks := eq .blocks "keep" -}}
+{{- $thmInline := partial "tufte/truthy.html" (.thmInline | default false) -}}
+{{- $thmFlat := false -}}
 {{- $at := "" -}}
 {{- with $page.File }}{{ $at = .Path }}{{ else }}{{ $at = $page.RelPermalink }}{{ end -}}
 {{- with $where }}{{ $at = printf "%s (%s)" $at . }}{{ end -}}
@@ -605,6 +614,14 @@
 {{- /* 3. Inline: no figures, no paragraphs (only the Markdown output is
        touched; the HTML of nested shortcodes is restored below). */ -}}
 {{- if not $isBlock -}}
+  {{- /* A theorem or proof that ran in this text (a caption= parameter,
+         "shortcodes" "run": no nest token) takes its inline form first
+         (SPEC-THM T13), so that only the blocks of its body warn below. */ -}}
+  {{- if and (not $keepBlocks) (strings.Contains $html `<section class="tufte-`) -}}
+    {{- $t := partial "tufte/thm/inline.html" $html -}}
+    {{- if and (ne $t $html) (not $thmInline) }}{{ $thmFlat = true }}{{ end -}}
+    {{- $html = $t -}}
+  {{- end -}}
   {{- $html = partial "func/inline-figures.html" $html -}}
   {{- $html = partial "func/flatten-p.html" $html | strings.TrimSpace -}}
   {{- if not $keepBlocks -}}
@@ -629,7 +646,9 @@
   {{- $tok := printf "TUFTEHTML%dEND" $i -}}
   {{- if and (not $isBlock) (not $keepBlocks) (strings.Contains $html $tok) -}}
     {{- $r := partial "tufte/inline-nested.html" $h -}}
-    {{- if $r.changed }}{{ $h = $r.html }}{{ $rawFlat = true }}{{ end -}}
+    {{- if or $r.changed $r.thm }}{{ $h = $r.html }}{{ end -}}
+    {{- if $r.changed }}{{ $rawFlat = true }}{{ end -}}
+    {{- if and $r.thm (not $thmInline) }}{{ $thmFlat = true }}{{ end -}}
   {{- end -}}
   {{- if in $blockTags (replaceRE $nameRE "$1" $h | lower) -}}
     {{- $html = replace $html (printf "<p>%s</p>" $tok) $h -}}
@@ -658,11 +677,17 @@
     {{- if strings.Contains $html "TUFTENEST" -}}
       {{- range $tok := findRE `TUFTENEST[0-9a-f]{16}END` $html | uniq -}}
         {{- $h := substr $tok 9 16 -}}
-        {{- with index $map $h -}}
-          {{- $v := string . -}}
+        {{- /* (isset, not with: a shortcode whose HTML is empty still
+               stored it, and its token must go.) */ -}}
+        {{- if isset $map $h -}}
+          {{- $v := string (index $map $h) -}}
           {{- if and (not $isBlock) (not $keepBlocks) -}}
             {{- $r := partial "tufte/inline-nested.html" $v -}}
-            {{- if $r.changed }}{{ $v = $r.html }}{{ $nestFlat = true }}{{ end -}}
+            {{- /* (A theorem's inline form, SPEC-THM T13, is not a change
+                   in a note or caption: its HTML differs, no warning.) */ -}}
+            {{- $v = $r.html -}}
+            {{- if $r.changed }}{{ $nestFlat = true }}{{ end -}}
+            {{- if and $r.thm (not $thmInline) }}{{ $thmFlat = true }}{{ end -}}
           {{- end -}}
           {{- $html = replace $html (printf "<p>%s</p>" $tok) $v -}}
           {{- $html = replace $html $tok $v -}}
@@ -673,6 +698,9 @@
   {{- if $nestFlat -}}
     {{- warnidf "tufte-block-in-note" "tufte.hugo: a block shortcode (figure, fig, fullwidthfigure, table, listing, iframe, youtube, video, epigraph…) in inline text in %s: a note or caption is a <span> and cannot hold a float (in LaTeX: \"Float(s) lost\"), so a figure is shown as its plain image with its caption as text, unnumbered, and other blocks as inline blocks; put the float before or after the paragraph, or use marginfigure, margintable or marginblock in the text" $at -}}
   {{- end -}}
+{{- end -}}
+{{- if $thmFlat -}}
+  {{- warnidf "tufte-block-in-note" "tufte.hugo: a theorem or proof in inline text in %s: it is a block, and an inline shortcode (sans, newthought, smallcaps, sc, allcaps, textls, nohyphens, verse, a details summary…) is a <span>, so it is shown as an inline block in that style; put the theorem on lines of its own, outside the inline shortcode (only a sidenote, margin note or caption holds a theorem in its inline form)" $at -}}
 {{- end -}}
 {{- /* Deferred alt texts and link titles (tufte/attr-marks.html), then
        marked image titles, now that their shortcodes' HTML is in place

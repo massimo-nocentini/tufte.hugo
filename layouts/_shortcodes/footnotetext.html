@@ -34,7 +34,7 @@
 {{- end -}}
 {{- $html := "" -}}
 {{- with $text -}}
-  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "shortcodes" (cond (eq (strings.TrimSpace $.InnerDeindent) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
+  {{- $html = partial "tufte/render-inner.html" (dict "page" $p "inner" . "text" . "display" "inline" "thmInline" true "shortcodes" (cond (eq (strings.TrimSpace $.InnerDeindent) "") "run" "") "where" (printf "%s shortcode in %v" $.Name $.Position)) | string -}}
   {{- /* A sidenote or margin note nested in it cannot float. */ -}}
   {{- $html = partial "tufte/note-in-note.html" (dict "page" $p "html" $html "holder" (printf "%s shortcode" $.Name) "where" $.Position) -}}
   {{- $html = partial "func/flatten-p.html" $html | strings.TrimSpace -}}

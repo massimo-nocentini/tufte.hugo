@@ -32,17 +32,31 @@ script (written by the step "Write the tufte-latex acceptance script") greps eve
 `bib-missing`) and duplicate ids, and checks the handout (`posts/sample-handout`: figures 1–3, table 1,
 bibliography), the book (`books/sample-book`: continuous numbering, cross-chapter xrefs, lists, index,
 `print.html`), `books/parts-demo` (camelCase `numberChapters`, the frontispiece) and `posts/latex-to-hugo`
-(including real footnotes and the list of listings). Variant builds run it
+(including real footnotes and the list of listings); its block "8. Theorems" checks `posts/theorems` (the
+golden numbers `1.1 1.2 1.3 1 2.1 2.2 2.3 2 2.4`, theorem xrefs in every format (auto, num, full, name, page,
+eq, and a labelled proof's head), `Proof of Theorem 1.2`, the unnumbered remark, the unnumbered fullwidth
+proposition, the `principle` kind declared in its front matter, one QED symbol per proof plus the example's
+`qed=`, inline QEDs at the end of a last paragraph, `p.thm-qed-line`, a claimed `\qedhere` symbol at the end of a
+display and after the number of a numbered one, the list of theorems with one entry per theorem and the
+`kinds=`/`heading=` list of conjectures; also no dangling `#` link, the exact head markup of Theorem 1.2, the
+plain style, a `thm-punct` per head, notes in parentheses, `lof-num` texts, a theorem in a sidenote set inline,
+a `label` in a theorem's body referring to the theorem, and a head and a QED that look past a margin note) and
+the parts-demo theorems (1.1, 1.2, 2.1, A.1, the
+cross-chapter xref and its `print.html` link). Variant builds run it
 in `markers` mode with `HUGO_PARAMS_TUFTE_STYLE=latex`, with `HUGO_PARAMS_MATH_ENGINE=client` (which also checks
-that the KaTeX script and stylesheet have the same version) and with A4 paper, `nobib` and numbered sections.
+that the KaTeX script and stylesheet have the same version, and the `\qedhere` symbol inside a client display,
+or after the number of a numbered one)
+and with A4 paper, `nobib` and numbered sections (the theorem golden numbers stay); the latex build also checks
+`thm-look-amsthm` and `thm-qed-openbox` on `posts/theorems`.
 An `HUGO_UGLYURLS=true` build checks that each book's landing and `print.html` stay separate files (the `print`
 output format needs `noUgly`: Hugo still writes some list pages ugly, e.g. a term as `tags/x.html`, and a print
 output would otherwise overwrite that file).
 The step "Build a 200-chapter book within the time limit" gates performance: it generates a book of 200
-chapters (html + `print.html`; sidenotes, cross-chapter xrefs, labelled figures, citations, per-chapter
+chapters (html + `print.html`; sidenotes, cross-chapter xrefs, labelled figures, a theorem per chapter numbered
+through the book with a cross-chapter theorem xref, citations, per-chapter
 `references` cited author-year and across chapters (1200 entries in plainnat extra-label groups), index entries,
 a list of figures, a bibliography and an index) in `$RUNNER_TEMP`, builds it with `--panicOnWarning` under
-`timeout 240`, and checks a cross-chapter xref number, the extra labels (2000a…) of two author-year cites
+`timeout 240`, and checks a cross-chapter xref number, the last chapter's theorem number and theorem xref, the extra labels (2000a…) of two author-year cites
 and the print document. Cross-page results must stay
 memoised in `.Store`, or this step times out; read a memo only through `_partials/tufte/memo.html` and store
 it with the build stamp (`"b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")`), so that the rebuilds of
@@ -54,7 +68,8 @@ within one build). It also starts the book under `hugo server` and checks that a
 the last chapter, and that undoing it renumbers it back. The last step, "Check nested and mixed footnotes", builds a small
 site in `$RUNNER_TEMP/nested` (footnotes inside `footnote`/`sidenote`/`fig` shortcodes and inside Markdown
 footnotes, `[^x]` in an image title and a table caption, a label repeated in the body and in a `table` shortcode,
-`footnotes: endnotes`). It checks every post for leftover footnote markers, balanced `<span>`s, unique ids and
+`footnotes: endnotes`, a linked stand-alone image opening a theorem and ending a proof, which must stay
+figures, and `theorems.qed = none` with nested `\qedhere`s). It checks every post for leftover footnote markers, balanced `<span>`s, unique ids and
 no dangling `#` links; that inner notes follow the outer mark and no note text is lost; that `[^x]` in an image
 title or table caption does not change the kind of the page's other notes; one list item per footnote; and that
 the automatic summaries on the home and section pages are closed.
@@ -123,6 +138,25 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   by the image render hook (an image alone in a note) back into a plain `<img>`.
   Paragraphs in a note are flattened only through `func/flatten-p.html` (a `<p>` with attributes, such as an
   alert title or `{.class}`, becomes `span[data-sn="p"]`; never strip `</?p>` with a bare regex).
+- **Theorems** (amsthm; documented in README "Theorems and proofs"): `theorem`, `lemma`, `proposition`,
+  `corollary`, `definition`, `example`, `remark`, `thm` (any kind) and `proof` are block shortcodes sharing
+  `tufte/thm/`; `qedhere` is inline, and `listoftheorems` emits a `data-what="thmlist"` placeholder (never
+  `lothm`: the `lo[ftl]` regexes would match it). A theorem is a **nested `<section class="tufte-thm …">`**
+  inside the page's section (so every `section > X` rule applies to its paragraphs), with kind, counter and
+  within on its opening tag (`data-thm`, `data-counter`, `data-within`), which `tufte/labels.html` and
+  `tufte/counts.html` scan in phase 1. Book offsets come from the memoised `tufte/book/thm-offset-map.html`
+  (continuous for within none; the prefix rules of `local-offset-map.html` for within chapter). A proof claims
+  the first `data-qedhere="1"` QED span of its body (it becomes `"2"`; later ones are removed, as amsthm prints
+  one) and then prints no end symbol;
+  `tufte/math-render.html` strips `\qedhere` from display TeX before KaTeX and appends that span (with
+  `theorems.qed = none` an empty `thm-qed-none` span, for a holder with its own symbol; `func/content-raw.html`
+  removes an unclaimed one). The head and the QED look past margin material at the start and end of the body
+  (`tufte/thm/margin-split.html`), and a theorem marks the `label` anchors of its body `data-thm-in="ID"`, so
+  `tufte/labels.html` gives them the theorem's entry. Kinds resolve their counter through
+  `tufte/thm/counter-follow.html` (only counter options that are set are steps). Options are
+  `tufte.theorems.*` (defaults in `tufte/defaults.html`), words the `thm*` i18n keys. In a sidenote, margin note
+  or caption a theorem becomes `span[data-sn="section"]` (`tufte/thm/inline.html`, on every path: nest tokens,
+  a `caption=` parameter, a Markdown image title), without `tufte-block-in-note` for its root.
 - `i18n/` has `en`, `it`, `fr`, `de`, `es`. Every key must exist in all five files. Templates translate with
   `partial "func/t.html" KEY` (or a dict with `key`, `count`, `data`), never `T` directly: it falls back to
   `i18n/en.yaml` (mounted as the asset `tufte/i18n-en.yaml` in `hugo.toml`, whose `[[module.mounts]]` must keep
@@ -184,7 +218,10 @@ The spec is the parity table in `README.md` ("tufte-latex parity"). Key mechanic
   them off, and the partials read them back with mode `get`. Footnotes defined inside a field are relabelled by
   `tufte/book/fn-local.html`. `head.html` decides on KaTeX from that final HTML (same cached calls as the body), never by
   rendering content again (`.WordCount`).
-- **Markers** (fixed attribute order, matched by regexes in postprocess): `span.tufte-num` number tokens,
+- **Markers** (fixed attribute order, matched by regexes in postprocess): `span.tufte-num` number tokens
+  (a theorem's is `<span class="tufte-num" data-kind="thm" data-key="KEY"></span>`, without `data-labeled`, so it
+  never switches on float numbering; a theorem's HTML ends `…</p></section>` with **no newline before its
+  `</section>`**, since `labels.html` and `func/content.html` split the sectionized HTML on `"\n</section>\n"`),
   `a.xref`, placeholders, `span.tufte-anchor`, `span.index-anchor`, `data-cite`, `<i class="sn-end" hidden>`,
   `<i class="cap-end" hidden>`, `<i class="tufte-float" …>` (label of an unnumbered float, read by
   `tufte/labels.html`, removed by postprocess) and `<i class="tufte-block" hidden>`/`tufte-block-end` (a linked
@@ -214,11 +251,16 @@ The spec is the parity table in `README.md` ("tufte-latex parity"). Key mechanic
   shown in the other posts; `video` only as escaped code, since the site ships no video file; `bibliography`
   with a `heading`, so that page has no automatic list, while the handout keeps the automatic one and the book
   ports use `heading=""`; `all=true` runs on no example page); `books/parts-demo/` exercises parts,
-  numbered chapters and appendices. The figures are in `exampleSite/static/images/latex/` (SVG converted from the
+  numbered chapters and appendices, and theorems numbered within chapters (Theorem 1.1 and Lemma 1.2 in
+  `part-one/margins.md`, Theorem 2.1 with a cross-chapter xref in `part-two/graphs.md`, Definition A.1 in
+  `notation.md`). `posts/theorems.md` is the theorem golden page (`headings.number = 1`, the theorem counter
+  within section, conjectures on a counter of their own: tokens `1.1 1.2 1.3 1 2.1 2.2 2.3 2 2.4`); every other
+  theorem on it is `numbered=false`, so the sequence never changes. `books/sample-book` and
+  `posts/sample-handout` stay without theorems (their LaTeX sources have none). The figures are in `exampleSite/static/images/latex/` (SVG converted from the
   Tufte-LaTeX PDFs; ink is `currentColor` with a dark-mode rule). The cheat-sheet table appears both in README and
   in `posts/latex-to-hugo.md` (where shortcodes are escaped as `{{</* … */>}}`): update both together.
 - Generated headings use theme-namespaced ids (`tufte-references`, `tufte-index`, `tufte-list-of-figures`,
-  `tufte-list-of-tables`, `tufte-list-of-listings`), so they never collide with Goldmark ids of the author's own
+  `tufte-list-of-tables`, `tufte-list-of-listings`, `tufte-list-of-theorems`), so they never collide with Goldmark ids of the author's own
   headings (`## References` → `references`). Keep that prefix for any new generated heading, and pick the id with
   `tufte/gen-id.html`, which skips ids the page content already uses (`## Tufte index` → the index gets `tufte-index-2`).
 - A content file named `index.md` makes its directory a leaf bundle: never name a book's index chapter so.

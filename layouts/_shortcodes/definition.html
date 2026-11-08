@@ -1,0 +1,15 @@
+{{- /*
+  Definition (block; amsthm \begin{definition}[Note] … \end{definition}). Put it on its own
+  lines, with a blank line before and after, and close it:
+
+    {{< definition >}}…{{< /definition >}}
+    {{< definition "Note" >}}…{{< /definition >}}                 \begin{definition}[Note]
+    {{< definition "Note" "def:x" >}}…{{< /definition >}}         … plus \label{def:x}
+    {{< definition note="Note" label="def:x" >}}…{{< /definition >}}
+
+  Positional: 0 = note, 1 = label. Named: note (alias title), label,
+  numbered, style (plain | definition | remark), name, cite, qed, class.
+  Numbering, options and markup: tufte/thm/render.html, tufte/thm/kind.html
+  (README, "Theorems and proofs").
+*/ -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" (partial "tufte/thm/render.html" (dict "ctx" . "inner" .InnerDeindent "kind" "definition"))) | safeHTML -}}
