@@ -109,8 +109,8 @@
     {{- end -}}
   {{- end -}}
   {{- /* An automatic summary (no <!--more-->) may be cut inside a block
-         (Hugo 0.146 cuts after a margin block's caption paragraph): close
-         the elements still open at the end, innermost first, so they do not
+         (such as after a margin block's caption paragraph): close the
+         elements still open at the end, innermost first, so they do not
          swallow what the list page puts after the summary. Any element
          (details, dl, pre, a table cell…): every tag of the summary is
          checked, which is cheap on a summary. */ -}}

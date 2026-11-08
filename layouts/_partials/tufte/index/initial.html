@@ -18,7 +18,7 @@
     - else the rune itself (ł where it sorts after l, non-Latin scripts).
 */ -}}
 {{- $init := substr . 0 1 -}}
-{{- /* one return, at the end: Hugo 0.146 refuses a return inside a block */ -}}
+{{- /* one return, at the end */ -}}
 {{- if findRE `^[0-9]+$` . -}}
   {{- $init = "numbers" -}}
 {{- else if findRE `^[\x00-\x40\x5b-\x60\x7b-\x7f]` $init -}}

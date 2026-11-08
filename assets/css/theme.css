@@ -1024,30 +1024,6 @@ pre {
 }
 
 /* ------------------------------------------------------------------ */
-/* Endnotes (footnotes = "endnotes")                                   */
-/* ------------------------------------------------------------------ */
-/* Goldmark's div.footnotes > hr + ol sits inside the last section, so
-   tufte's section > ol width does not reach it: keep it in the text column.
-   The section-placed §11 lists (div.footnotes.footnotes-section) take the
-   footnote look of tufte-latex.css (ol.footnotes-list) instead. */
-
-div.footnotes:not(.footnotes-section) > ol {
-    width: 50%;
-    -webkit-padding-start: 5%;
-    padding-inline-start: 5%;
-    font-size: 1.1rem;
-    line-height: 1.6;
-}
-
-div.footnotes:not(.footnotes-section) li p {
-    width: auto;
-    margin: 0.3rem 0;
-    font-size: inherit;
-    line-height: inherit;
-}
-
-
-/* ------------------------------------------------------------------ */
 /* Figures and images                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -1409,10 +1385,6 @@ figure.video video {
     pre.fullwidth > code {
         width: 97%;
         margin-left: 2.5%;
-    }
-
-    div.footnotes > ol {
-        width: 90%;
     }
 
     figure.iframe-wrapper,

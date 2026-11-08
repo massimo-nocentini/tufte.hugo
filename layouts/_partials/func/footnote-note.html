@@ -26,6 +26,12 @@
     repeat          bool: an earlier reference to the same note was converted
     path            slice of the target ids being converted around this one
     flat            bool: drop the note's own references instead of converting them
+    keyPrefix       optional: the notes come from a Goldmark footnote list of
+                    their own (a site shortcode's RenderString or markdownify
+                    output, func/footnotes.html), without Markdown labels; a
+                    real footnote then gets data-key="<keyPrefix><N>" (its own
+                    identity) instead of data-md="<N>", which would be the
+                    page's [^N]
   Returns: the replacement HTML (string).
 */ -}}
 {{- $page := .page -}}
@@ -200,6 +206,10 @@
          would count its labels, equations, index entries and inner
          footnotes twice (tufte/labels.html), as \footnotemark does not. */ -}}
   {{- if .repeat }}{{ $text = "" }}{{ end -}}
-  {{- $repl = printf `<span class="tufte-fn" data-md="%s" hidden>%s</span><i class="fn-end" hidden></i>` (htmlEscape $name) $text -}}
+  {{- if and .keyPrefix (not $label) -}}
+    {{- $repl = printf `<span class="tufte-fn" data-key="%s%s" hidden>%s</span><i class="fn-end" hidden></i>` (htmlEscape .keyPrefix) (htmlEscape $name) $text -}}
+  {{- else -}}
+    {{- $repl = printf `<span class="tufte-fn" data-md="%s" hidden>%s</span><i class="fn-end" hidden></i>` (htmlEscape $name) $text -}}
+  {{- end -}}
 {{- end -}}
 {{- return $repl -}}

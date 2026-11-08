@@ -206,7 +206,7 @@ Block quotes can carry their attribution as attributes:
 GitHub-style alerts are rendered as quiet, labelled blocks:
 
 > [!NOTE]
-> The theme is tested only with the latest Hugo release and declares 0.169.0 as its minimum; older versions warn and are not supported.
+> The theme is tested only with the latest Hugo release and declares 0.169.0 as its minimum; an older version stops the build with an error.
 
 > [!TIP]
 > Run `hugo server --navigateToChanged` while writing, to jump to the page you are editing.

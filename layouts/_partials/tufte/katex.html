@@ -15,12 +15,11 @@
     article for $…$, $$…$$, \(…\) and \[…\].
 
   URLs and SRI hashes come from the [[katex]] entries of
-  data/tufte/vendor.toml. The KaTeX version follows the running Hugo, whose
-  transform.ToMath embeds KaTeX: the stylesheet must match the class names
-  of the HTML Hugo generates (KaTeX 0.18, embedded from Hugo 0.166.0,
-  renamed base, strut, tag and sizing to katex-base, katex-strut,
-  katex-tag and katex-sizing). So the theme loads KaTeX 0.16.21 on Hugo
-  0.146–0.165 and KaTeX 0.18.4 on Hugo 0.166 and later; the client engine
+  data/tufte/vendor.toml. The stylesheet must match the class names of the
+  HTML that Hugo's transform.ToMath generates (KaTeX 0.18, embedded by every
+  supported Hugo, renamed base, strut, tag and sizing to katex-base,
+  katex-strut, katex-tag and katex-sizing), so the theme loads the first
+  (newest) entry, the release Hugo embeds: KaTeX 0.18.4. The client engine
   loads the scripts of the same release.
 
   params.math.katexVersion = "" or "auto" (default) picks that version.
@@ -71,15 +70,8 @@
 {{- if not $entries -}}
   {{- errorf "tufte.hugo: the [[katex]] entries are missing from data/tufte/vendor.toml" -}}
 {{- end -}}
-{{- /* The release Hugo embeds: the first (newest) entry whose `hugo` is not
-       newer than the running Hugo. */ -}}
-{{- $auto := "" -}}
-{{- range $entries -}}
-  {{- if and (not $auto) (ge hugo.Version (printf "%v" (.hugo | default "0.0.0"))) -}}
-    {{- $auto = . -}}
-  {{- end -}}
-{{- end -}}
-{{- $auto = $auto | default (index $entries (sub (len $entries) 1)) -}}
+{{- /* The release Hugo embeds: the first (newest) entry. */ -}}
+{{- $auto := index $entries 0 -}}
 {{- $want := printf "%v" (index $cfg "katexversion" | default "") | strings.TrimSpace | strings.TrimPrefix "v" -}}
 {{- if in (slice "" "auto" "0.16.11") (lower $want) -}}
   {{- $want = "" -}}

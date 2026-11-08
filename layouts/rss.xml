@@ -10,8 +10,7 @@
   Items are newest first by publication date; undated pages (book
   chapters, in each book's reading order) come last, without <pubDate>
   (see below).
-  The language tag comes from func/lang.html (Hugo 0.158 renamed
-  LanguageCode to Locale).
+  The language tag is the language's locale (func/lang.html).
 
   Authors: params.author.email, when set, is published, as in Hugo's
   embedded feed: RSS 2.0 wants an address in <managingEditor>,

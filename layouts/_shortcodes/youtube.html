@@ -1,43 +1,137 @@
 {{- /*
   YouTube video (block), privacy-enhanced (youtube-nocookie.com), in the
-  Tufte CSS iframe-wrapper; overrides Hugo's built-in youtube shortcode.
+  Tufte CSS iframe-wrapper; overrides Hugo's built-in youtube shortcode and
+  takes its parameters (same names, defaults and player URL parameters,
+  https://developers.google.com/youtube/player_parameters).
   Put it on its own line:
 
     {{< youtube YslQ2625TR4 >}}
-    {{< youtube id="YslQ2625TR4" title="Edward Tufte on …" start="30" >}}
+    {{< youtube id="YslQ2625TR4" title="Edward Tufte on …" start="30" end="90" >}}
+    {{< youtube id="YslQ2625TR4" autoplay=true loop=true controls=false >}}
 
-  Params:
-    id     video id (required; or the first positional param)
-    title  accessible title of the iframe (default: the translated
-           "YouTube video", i18n key youtubeVideo)
-    start  start time in seconds
-    end    end time in seconds
-    class  extra classes for the figure
+  Params (the id may be positional; the others need the named form; names
+  are matched case-insensitively, so allowFullScreen = allowfullscreen):
+    id               video id (required; or the first positional param)
+    title            accessible title of the iframe (default: the translated
+                     "YouTube video", i18n key youtubeVideo)
+    start, end       start and end time, whole seconds, at most 9 digits
+                     (URL start=, end=)
+    autoplay         default false; true plays on load and forces mute
+                     (URL autoplay=1, mute=1)
+    mute             default false (URL mute=1)
+    loop             default false; repeats the video (URL loop=1 and
+                     playlist=ID, as YouTube requires)
+    controls         default true; false hides the player controls (URL
+                     controls=0)
+    allowFullScreen  default true; false drops the iframe's full-screen
+                     permission (allowfullscreen and allow "fullscreen")
+    loading          "lazy" (the theme's default; Hugo's is "eager") or "eager"
+    class            extra classes for the figure (Hugo puts them on its
+                     wrapping div)
+
+  Booleans are true/false, 1/0 or yes/no, quoted or not. An invalid value
+  is reported (warning tufte-bad-option) and the default is used. Only the
+  URL parameters that differ from YouTube's defaults are written, in
+  Hugo's (alphabetical) order. As Hugo's, the shortcode renders nothing
+  (and checks nothing) when the site sets privacy.youtube.disable = true. The host is always
+  youtube-nocookie.com (privacy.youtube.privacyEnhanced is implied).
 
   Output (Tufte CSS):
     <figure class="iframe-wrapper"><iframe src="https://www.youtube-nocookie.com/embed/ID" …></iframe></figure>
 */ -}}
-{{- $id := "" -}}{{- $title := "" -}}{{- $start := "" -}}{{- $end := "" -}}{{- $class := "" -}}
+{{- /* As Hugo's: nothing at all (no output, no validation, no warning) when
+       the site disables YouTube embeds. */ -}}
+{{- if not site.Config.Privacy.YouTube.Disable -}}
+{{- $p := dict -}}
 {{- if .IsNamedParams -}}
-  {{- $id = .Get "id" | default "" -}}
-  {{- $title = .Get "title" | default "" -}}
-  {{- $start = .Get "start" | default "" -}}
-  {{- $end = .Get "end" | default "" -}}
-  {{- $class = .Get "class" | default "" -}}
+  {{- $known := slice "id" "title" "start" "end" "autoplay" "mute" "loop" "controls" "allowfullscreen" "loading" "class" -}}
+  {{- range $k, $v := .Params -}}
+    {{- $lk := lower $k -}}
+    {{- if isset $p $lk -}}
+      {{- warnidf "tufte-bad-option" "youtube shortcode: parameter %q given twice (names are case-insensitive); %q ignored (%s)" $lk $k $.Position -}}
+    {{- else if in $known $lk -}}
+      {{- $p = merge $p (dict $lk $v) -}}
+    {{- else -}}
+      {{- warnidf "tufte-bad-option" "youtube shortcode: unknown parameter %q, ignored (known: id, title, start, end, autoplay, mute, loop, controls, allowFullScreen, loading, class) (%s)" $k $.Position -}}
+    {{- end -}}
+  {{- end -}}
 {{- else -}}
-  {{- $id = .Get 0 | default "" -}}
+  {{- $p = dict "id" (.Get 0) -}}
 {{- end -}}
-{{- $id = printf "%v" $id | strings.TrimSpace -}}
+{{- $id := printf "%v" (index $p "id" | default "") | strings.TrimSpace -}}
 {{- if not $id -}}
   {{- errorf "youtube shortcode: the video id is required (%s)" .Position -}}
+{{- else if not (findRE `^[A-Za-z0-9_-]+$` $id 1) -}}
+  {{- warnidf "tufte-bad-option" "youtube shortcode: %q does not look like a YouTube video id (letters, digits, - and _, such as YslQ2625TR4; not a URL) (%s)" $id .Position -}}
 {{- end -}}
+
+{{- /* Booleans: true/false, 1/0, yes/no (Hugo takes true/false and 1/0). */ -}}
+{{- $bool := dict -}}
+{{- range $k, $def := dict "autoplay" false "mute" false "loop" false "controls" true "allowfullscreen" true -}}
+  {{- $b := $def -}}
+  {{- with index $p $k -}}
+    {{- $s := lower (printf "%v" .) | strings.TrimSpace -}}
+    {{- if in (slice "true" "1" "yes") $s -}}{{- $b = true -}}
+    {{- else if in (slice "false" "0" "no") $s -}}{{- $b = false -}}
+    {{- else -}}
+      {{- warnidf "tufte-bad-option" "youtube shortcode: %s must be true or false, not %q; using %v (%s)" $k (printf "%v" .) $def $.Position -}}
+    {{- end -}}
+  {{- else -}}
+    {{- /* A literal false (or 0) is "empty" for with. */ -}}
+    {{- if in (slice false 0) (index $p $k) }}{{ $b = false }}{{ end -}}
+  {{- end -}}
+  {{- $bool = merge $bool (dict $k $b) -}}
+{{- end -}}
+{{- /* Times: whole seconds; 0 or empty means not set. At most 9 digits
+       (leading zeros aside), so that int never overflows (and 10^9 s is
+       longer than any video). */ -}}
+{{- $time := dict "start" 0 "end" 0 -}}
+{{- range $k := slice "start" "end" -}}
+  {{- $s := printf "%v" (index $p $k | default "") | strings.TrimSpace -}}
+  {{- if $s -}}
+    {{- if findRE `^0*\d{1,9}$` $s 1 -}}
+      {{- $time = merge $time (dict $k (int (strings.TrimLeft "0" $s | default "0"))) -}}
+    {{- else -}}
+      {{- warnidf "tufte-bad-option" "youtube shortcode: %s must be a whole number of seconds (at most 9 digits), not %q; ignored (%s)" $k $s $.Position -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (gt $time.end 0) (le $time.end $time.start) -}}
+  {{- warnidf "tufte-bad-option" "youtube shortcode: end (%d) must be after start (%d); end ignored (%s)" $time.end $time.start .Position -}}
+  {{- $time = merge $time (dict "end" 0) -}}
+{{- end -}}
+{{- $loading := lower (printf "%v" (index $p "loading" | default "lazy")) | strings.TrimSpace -}}
+{{- if not (in (slice "lazy" "eager") $loading) -}}
+  {{- warnidf "tufte-bad-option" "youtube shortcode: loading must be lazy or eager, not %q; using lazy (%s)" $loading .Position -}}
+  {{- $loading = "lazy" -}}
+{{- end -}}
+{{- $title := printf "%v" (index $p "title" | default "") | strings.TrimSpace -}}
+{{- $title = $title | default (partial "func/t.html" "youtubeVideo") | default "YouTube video" -}}
+{{- $class := printf "%v" (index $p "class" | default "") | strings.TrimSpace -}}
+
+{{- /* Player URL parameters, as Hugo's (autoplay forces mute; loop needs
+       playlist=ID), keeping only those that differ from YouTube's defaults;
+       in querify's (alphabetical) order. */ -}}
 {{- $q := slice -}}
-{{- with $start }}{{ $q = $q | append (printf "start=%s" (urlquery (printf "%v" .))) }}{{ end -}}
-{{- with $end }}{{ $q = $q | append (printf "end=%s" (urlquery (printf "%v" .))) }}{{ end -}}
+{{- if $bool.autoplay }}{{ $q = $q | append "autoplay=1" }}{{ end -}}
+{{- if not $bool.controls }}{{ $q = $q | append "controls=0" }}{{ end -}}
+{{- with $time.end }}{{ $q = $q | append (printf "end=%d" .) }}{{ end -}}
+{{- if $bool.loop }}{{ $q = $q | append "loop=1" }}{{ end -}}
+{{- if or $bool.mute $bool.autoplay }}{{ $q = $q | append "mute=1" }}{{ end -}}
+{{- if $bool.loop }}{{ $q = $q | append (printf "playlist=%s" (urlquery $id)) }}{{ end -}}
+{{- with $time.start }}{{ $q = $q | append (printf "start=%d" .) }}{{ end -}}
 {{- $src := printf "https://www.youtube-nocookie.com/embed/%s" (urlquery $id) -}}
 {{- with $q }}{{ $src = printf "%s?%s" $src (delimit . "&") }}{{ end -}}
+{{- $allow := "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" -}}
+{{- $fs := "" -}}
+{{- if $bool.allowfullscreen -}}
+  {{- $allow = printf "%s; fullscreen" $allow -}}
+  {{- $fs = " allowfullscreen" -}}
+{{- end -}}
+
 {{- /* Built as a string so that it goes through tufte/nest.html (kept
        when nested in fullwidth, marginblock…, also with unsafe = false). */ -}}
-{{- $out := printf `<figure class="iframe-wrapper%s">` (cond (ne (printf "%v" $class) "") (printf " %s" (htmlEscape (printf "%v" $class))) "") -}}
-{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" loading=\"lazy\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen></iframe>\n</figure>" $out (htmlEscape $src) (htmlEscape (printf "%v" ($title | default (partial "func/t.html" "youtubeVideo") | default "YouTube video"))) -}}
+{{- $out := printf `<figure class="iframe-wrapper%s">` (cond (ne $class "") (printf " %s" (htmlEscape $class)) "") -}}
+{{- $out = printf "%s\n<iframe src=\"%s\" title=\"%s\" loading=\"%s\" allow=\"%s\" referrerpolicy=\"strict-origin-when-cross-origin\"%s></iframe>\n</figure>" $out (htmlEscape $src) (htmlEscape $title) $loading $allow $fs -}}
 {{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}
+{{- end -}}

@@ -81,6 +81,10 @@ The `youtube` shortcode embeds a video through YouTube's privacy-enhanced domain
 
 {{< youtube YslQ2625TR4 >}}
 
+It takes the parameters of Hugo's own `youtube` shortcode: `start` and `end` (in seconds), `autoplay`, `mute`, `loop`, `controls`, `allowFullScreen`, `loading`, `title` and `class`. This copy starts at the thirtieth second and hides the player controls:
+
+{{< youtube id="YslQ2625TR4" start="30" controls=false title="The same video, from the thirtieth second" >}}
+
 For any other embeddable page there is the `iframe` shortcode, with `src`, `title` and an optional `ratio`. Here it embeds a map of Florence at a 4:3 ratio:
 
 {{< iframe src="https://www.openstreetmap.org/export/embed.html?bbox=11.2400%2C43.7650%2C11.2700%2C43.7780&layer=mapnik" title="A map of the centre of Florence" ratio="4:3" >}}

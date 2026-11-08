@@ -15,7 +15,10 @@ hugo -s exampleSite --gc --panicOnWarning      # build into exampleSite/public
 hugo server -s exampleSite --disableFastRender  # live preview
 ```
 
-CI (`.github/workflows/ci.yml`) builds the example site with the `latest` Hugo (standard edition).
+CI (`.github/workflows/ci.yml`) builds the example site with the `latest` Hugo (standard edition), resolved
+from the GitHub releases API as in `pages.yml` (so both build with the same release; `peaceiris/actions-hugo`
+would take "latest" from Homebrew, which can lag). Keep every action on its current major release (Node 24
+runtimes); a run script never contains a literal `${{` (pass expressions through `env:`).
 It checks for sidenote, margin note, section, epigraph and KaTeX markup (the `katex.min.css` version must match
 the KaTeX that Hugo embeds: `katex-base` classes need 0.18+; the bundle must keep theme.css's
 `html body { counter-reset: sidenote-counter katexEqnNo mmlEqnNo }`, which outranks katex.min.css's `body` reset)
@@ -33,7 +36,8 @@ bibliography), the book (`books/sample-book`: continuous numbering, cross-chapte
 in `markers` mode with `HUGO_PARAMS_TUFTE_STYLE=latex`, with `HUGO_PARAMS_MATH_ENGINE=client` (which also checks
 that the KaTeX script and stylesheet have the same version) and with A4 paper, `nobib` and numbered sections.
 An `HUGO_UGLYURLS=true` build checks that each book's landing and `print.html` stay separate files (the `print`
-output format needs `noUgly`: on 0.146 it would otherwise overwrite the landing `books/b.html`).
+output format needs `noUgly`: Hugo still writes some list pages ugly, e.g. a term as `tags/x.html`, and a print
+output would otherwise overwrite that file).
 The step "Build a 200-chapter book within the time limit" gates performance: it generates a book of 200
 chapters (html + `print.html`; sidenotes, cross-chapter xrefs, labelled figures, citations, per-chapter
 `references` cited author-year and across chapters (1200 entries in plainnat extra-label groups), index entries,
@@ -56,7 +60,8 @@ title or table caption does not change the kind of the page's other notes; one l
 the automatic summaries on the home and section pages are closed.
 Any change to the example content must keep those checks true.
 
-`.github/workflows/pages.yml` deploys the example site to GitHub Pages (push to `master`, Hugo `0.169.0`,
+`.github/workflows/pages.yml` deploys the example site to GitHub Pages (push to `master`, the latest Hugo
+release resolved at run time with the workflow token, standard `.deb` checked against the release checksums,
 `--minify --panicOnWarning`, base URL from `actions/configure-pages`) under the subpath `/tufte.hugo/`. It fails
 if any URL of the Pages host escapes that subpath (`href`/`src`/`srcset`, `og:image`/`twitter:image`, CSS
 `url()`, sitemap and RSS), so build every URL with `relURL`/`.RelPermalink`,
@@ -66,9 +71,10 @@ leading-slash path as written).
 ## Hugo Version and Config
 
 - The theme requires the latest Hugo release: minimum `0.169.0`, declared in `hugo.toml` (`[module.hugoVersion]`)
-  and `theme.toml` (`min_version`); CI tests only `latest`. Raise both when a new feature needs a newer Hugo.
-  The standard edition is enough. (Code paths for older Hugo, e.g. the KaTeX 0.16 entry in `vendor.toml` and
-  the `func/lang.html` shim, are kept but no longer tested.)
+  and `theme.toml` (`min_version`), and enforced by the `errorf` guard at the top of `layouts/baseof.html`; CI
+  tests only `latest`. Raise all three together when a new feature needs a newer Hugo. The standard edition is
+  enough. Write no code paths or `hugo.Version` branches for Hugo older than the minimum, and when the minimum
+  rises, remove the ones it makes dead (e.g. a `[[katex]]` entry in `vendor.toml` that no supported Hugo embeds).
 - The theme's `hugo.toml` holds every `[params]` default, **except** `[params.tufte]`: it sets only
   `style = "css"`. All other tufte-latex defaults live in `layouts/_partials/tufte/defaults.html` (per style
   preset), so that `style = "latex"` can change them; adding a `[params.tufte]` leaf to `hugo.toml` would hide the
@@ -82,7 +88,7 @@ leading-slash path as written).
 
 ## Architecture
 
-The theme uses the Hugo 0.146 template system: `layouts/baseof.html`, `home.html`, `page.html`, `list.html`,
+The theme uses the Hugo template system (introduced in 0.146): `layouts/baseof.html`, `home.html`, `page.html`, `list.html`,
 `taxonomy.html`, `term.html`, `archive.html`, `404.html`, `list.print.html` (a book's whole-book `print.html`,
 output format `print`) and `rss.xml` (Hugo's feed, with item descriptions taken from the processed summary),
 plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
@@ -121,10 +127,10 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   `partial "func/t.html" KEY` (or a dict with `key`, `count`, `data`), never `T` directly: it falls back to
   `i18n/en.yaml` (mounted as the asset `tufte/i18n-en.yaml` in `hugo.toml`, whose `[[module.mounts]]` must keep
   Hugo's default mounts) for a language without a theme i18n file.
-- `layouts/_partials/func/lang.html` hides the Hugo 0.158 renames of the Language methods (`Lang` → `Name`,
-  `LanguageName` → `Label`, `LanguageCode` → `Locale`, `LanguageDirection` → `Direction`). Never call those
-  methods directly: the deprecated ones warn (and `--panicOnWarning` fails CI) on new Hugo, the new ones do not
-  exist on old Hugo.
+- Describe a language only through `layouts/_partials/func/lang.html` (`name`, `label`, `locale`, `dir`, with
+  the theme's defaults: label and locale fall back to the language key). It reads the Language methods `Name`,
+  `Label`, `Locale` and `Direction`; never call the deprecated `Lang`, `LanguageName`, `LanguageCode` or
+  `LanguageDirection`, which warn (and `--panicOnWarning` fails CI).
 
 ## Gotchas
 

@@ -7,8 +7,7 @@
 {{- /* Pages without a URL (build.render = never) are skipped: the
        neighbours are followed (PrevInSection/NextInSection) until a page
        that has one, as tufte/book/nav.html does for chapters. The loops
-       are bounded by the pages of the section (no chain is longer; seq
-       is capped at 2000 on Hugo 0.146). */ -}}
+       are bounded by the pages of the section (no chain is longer). */ -}}
 {{- $bound := slice -}}
 {{- with .CurrentSection }}{{ $bound = .RegularPagesRecursive }}{{ end -}}
 {{- $prev := false -}}{{- $next := false -}}

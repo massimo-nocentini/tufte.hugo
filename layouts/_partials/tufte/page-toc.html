@@ -13,8 +13,8 @@
     4. Hugo's shortcode placeholders (HAHAHUGOSHORTCODE…HBHB) left in the
        texts and links of headings that hold a shortcode (such an entry
        takes its text from the rendered heading, tufte/toc-text.html),
-    5. links inside the heading texts (Hugo 0.146), and raw or dropped
-       math replaced by the heading's typeset formula (tufte/toc-text.html),
+    5. links inside the heading texts, and raw math replaced by the
+       heading's typeset formula (tufte/toc-text.html),
     6. empty items and lists (an h2 whose only subheading is a run-in h4).
   Headings of a shortcode's inner text (fullwidth, details…), which Hugo's
   TOC never sees but which are numbered like the others, are added in
@@ -55,11 +55,10 @@
     {{- $toc = replace $toc . (printf `href="#%s"` (partial "tufte/heading-anchor.html" (dict "page" $ "id" $id))) -}}
   {{- end -}}
   {{- /* Entry texts (tufte/toc-text.html): links in the heading text are
-         unwrapped (Hugo 0.146 keeps them, and an <a> in the entry's <a>
-         splits it), and a heading with math gets its typeset formula
-         (Hugo leaves raw TeX, or drops it on 0.146). An entry ends at the
-         </a> followed by its sublist or </li>, so inner links are part of
-         its text. */ -}}
+         unwrapped (an <a> in the entry's <a> splits it), and a heading
+         with math gets its typeset formula (Hugo leaves raw TeX). An
+         entry ends at the </a> followed by its sublist or </li>, so inner
+         links are part of its text. */ -}}
   {{- /* Each entry is rewritten once, in order (replace … 1), and the
          nth entry with a given id reads the nth heading with that id. */ -}}
   {{- $seen := slice -}}

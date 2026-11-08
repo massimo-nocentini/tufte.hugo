@@ -1,8 +1,7 @@
 {{- /*
-  Describes a language, hiding the Hugo 0.158 renames (Lang → Name,
-  LanguageName → Label, LanguageCode → Locale, LanguageDirection →
-  Direction). Methods are resolved at run time, so only the branch that
-  runs must exist in the Hugo version at hand.
+  Describes a language through the Language methods Name, Label, Locale
+  and Direction (the deprecated Lang, LanguageName, LanguageCode and
+  LanguageDirection warn), with the theme's defaults in one place.
 
   Takes: a language (site.Language, or .Language of a page).
   Returns: a dict
@@ -15,22 +14,12 @@
 {{- $l := . -}}
 {{- $out := dict "name" "" "label" "" "locale" "" "dir" "" -}}
 {{- with $l -}}
-  {{- if ge hugo.Version "0.158.0" -}}
-    {{- $name := printf "%v" .Name -}}
-    {{- $out = dict
-      "name" $name
-      "label" (printf "%v" (.Label | default $name))
-      "locale" (printf "%v" (.Locale | default $name))
-      "dir" (printf "%v" (.Direction | default ""))
-    -}}
-  {{- else -}}
-    {{- $name := printf "%v" .Lang -}}
-    {{- $out = dict
-      "name" $name
-      "label" (printf "%v" (.LanguageName | default $name))
-      "locale" (printf "%v" (.LanguageCode | default $name))
-      "dir" (printf "%v" (.LanguageDirection | default ""))
-    -}}
-  {{- end -}}
+  {{- $name := printf "%v" .Name -}}
+  {{- $out = dict
+    "name" $name
+    "label" (printf "%v" (.Label | default $name))
+    "locale" (printf "%v" (.Locale | default $name))
+    "dir" (printf "%v" (.Direction | default ""))
+  -}}
 {{- end -}}
 {{- return $out -}}

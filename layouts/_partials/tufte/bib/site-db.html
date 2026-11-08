@@ -2,7 +2,7 @@
   Finds bibliography entries in decoded data (SPEC-LATEX §5.1).
 
   Takes one of:
-    - a string: a key of site.Data, dotted for subdirectories
+    - a string: a key of the data tree (hugo.Data), dotted for subdirectories
       ("bibliography" = data/bibliography.{yaml,json,toml} or the directory
       data/bibliography/; "refs.main" = data/refs/main.yaml);
     - decoded data (a map or a slice), e.g. a transform.Unmarshal result or
@@ -44,13 +44,8 @@
   {{- end -}}
   {{- $dk = $dk | default "bibliography" -}}
   {{- $label = printf "data/%s" (replace $dk "." "/") -}}
-  {{- /* site.Data is deprecated from Hugo 0.156 (hugo.Data); methods are
-         resolved at run time, so only the branch that runs must exist */ -}}
-  {{- if ge hugo.Version "0.156.0" -}}
-    {{- $data = hugo.Data -}}
-  {{- else -}}
-    {{- $data = site.Data -}}
-  {{- end -}}
+  {{- /* hugo.Data: site.Data is deprecated */ -}}
+  {{- $data = hugo.Data -}}
   {{- range split $dk "." -}}
     {{- if reflect.IsMap $data -}}
       {{- $data = index $data . -}}

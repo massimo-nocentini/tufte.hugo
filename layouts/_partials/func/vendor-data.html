@@ -2,20 +2,12 @@
   Returns the table of third-party assets from data/tufte/vendor.toml (a
   map: entry name → url, integrity, version, dir), or an empty map.
 
-  Hugo 0.156.0 moved the data directory to the global hugo.Data; .Site.Data
-  is deprecated there but is the only option on older versions. Methods are
-  resolved at run time, so only the branch that runs must exist.
+  Read through hugo.Data (.Site.Data is deprecated).
 
   Takes: anything (ignored). Returns: map.
 */ -}}
-{{- $data := dict -}}
-{{- if ge hugo.Version "0.156.0" -}}
-  {{- $data = hugo.Data -}}
-{{- else -}}
-  {{- $data = site.Data -}}
-{{- end -}}
 {{- $vendor := dict -}}
-{{- with index $data "tufte" -}}
+{{- with index hugo.Data "tufte" -}}
   {{- with index . "vendor" -}}
     {{- $vendor = . -}}
   {{- end -}}

@@ -2,13 +2,13 @@
   The text of one contents entry (page TOC, book contents), as inline HTML
   that may sit inside the entry's <a>:
 
-  1. Links of the heading text are unwrapped (Hugo 0.146's
-     .TableOfContents keeps them, and an <a> inside the entry's <a> splits
-     the entry in a browser).
+  1. Links of the heading text are unwrapped: the rendered heading used
+     below holds them (and so may the text of Hugo's TOC), and an <a>
+     inside the entry's <a> splits the entry in a browser.
   2. Math: Hugo builds the TOC texts (.TableOfContents, .Fragments) from
      the Markdown source before the passthrough render hook runs, so a
-     formula in a heading comes out as raw TeX ($\alpha$, Hugo 0.169) or is
-     dropped (Hugo 0.146). When the page has math (Store "hasMath", set by
+     formula in a heading comes out as raw TeX ($\alpha$). When the page
+     has math (Store "hasMath", set by
      render-passthrough.html), the heading with this id is looked up in the
      page's phase-1 HTML (func/content-raw.html) and, when it holds typeset
      math (KaTeX output, or the client engine's span.math), its rendered

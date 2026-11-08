@@ -27,14 +27,37 @@ jobs:
         working-directory: tufte.hugo/exampleSite
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: tufte.hugo
 
-      - name: Setup Hugo ${{ matrix.hugo }}
+      # "latest" is resolved here from the GitHub releases API, as pages.yml
+      # does, so that CI and the Pages deployment build with the same Hugo
+      # (actions-hugo would resolve "latest" from the Homebrew formula, which
+      # can lag behind a new release).
+      - name: Resolve Hugo ${{ matrix.hugo }}
+        id: hugo
+        env:
+          HUGO: ${{ matrix.hugo }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "$HUGO" = latest ]; then
+            tag=$(curl -sSfL --retry 3 \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              https://api.github.com/repos/gohugoio/hugo/releases/latest |
+              python3 -I -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])')
+            HUGO=${tag#v}
+          fi
+          [[ "$HUGO" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::unexpected Hugo version '$HUGO'"; exit 1; }
+          echo "Hugo $HUGO"
+          echo "version=$HUGO" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Hugo ${{ steps.hugo.outputs.version }}
         uses: peaceiris/actions-hugo@v3
         with:
-          hugo-version: ${{ matrix.hugo }}
+          hugo-version: ${{ steps.hugo.outputs.version }}
           extended: false # the theme needs only the standard edition
 
       - name: Hugo version
@@ -67,17 +90,13 @@ jobs:
           grep -q 'class="katex' "$M" || fail "no KaTeX output in $M"
           grep -q 'katex.min.css' "$M" || fail "KaTeX stylesheet not loaded in $M"
           if grep -q 'class="math-error"' "$M"; then fail "invalid TeX (math-error) in $M"; fi
-          # KaTeX renders \tag as <span class="tag"> (KaTeX 0.16, Hugo < 0.166) or
-          # <span class="katex-tag"> (KaTeX 0.18, Hugo >= 0.166); post-meta tag
+          # KaTeX 0.18 renders \tag as <span class="katex-tag">; post-meta tag
           # links use class "post-tag".
-          grep -qE '<span class="(katex-)?tag">' "$M" || fail "no equation \\tag in $M"
+          grep -q '<span class="katex-tag">' "$M" || fail "no equation \\tag in $M"
           # The stylesheet must be the KaTeX release Hugo embeds (class names
           # changed in 0.18): katex-base in the HTML needs katex@0.18+ CSS.
-          if grep -q 'class="katex-base"' "$M"; then
-            grep -qE 'katex@0\.(1[89]|[2-9][0-9])\.[0-9]+/dist/katex\.min\.css' "$M" || fail "KaTeX 0.18 HTML with an older katex.min.css in $M"
-          else
-            grep -q 'katex@0\.16\.[0-9]*/dist/katex\.min\.css' "$M" || fail "KaTeX 0.16 HTML without katex@0.16 CSS in $M"
-          fi
+          grep -q 'class="katex-base"' "$M" || fail "no KaTeX 0.18 output (katex-base) in $M: has Hugo's embedded KaTeX changed? Update data/tufte/vendor.toml"
+          grep -qE 'katex@0\.(1[89]|[2-9][0-9])\.[0-9]+/dist/katex\.min\.css' "$M" || fail "KaTeX 0.18 HTML with an older katex.min.css in $M"
           # katex.min.css, linked after the theme bundle, has
           # body{counter-reset:katexEqnNo mmlEqnNo}, which would replace
           # tufte.css's body sidenote-counter reset (notes would restart at 1
@@ -342,9 +361,10 @@ jobs:
         shell: bash
         run: '"$RUNNER_TEMP/tufte-latex-check.sh" public-a4 markers'
 
-      # uglyURLs: Hugo 0.146 names a section's page books/b.html; without
-      # noUgly on the print format, the book's print output went to that same
-      # file and replaced the landing, with no warning.
+      # uglyURLs: Hugo writes a section's page as books/b/index.html, but
+      # still names some list pages x.html (taxonomy terms); without noUgly
+      # on the print format, a print output would go to that same file and
+      # replace the HTML page, with no warning.
       - name: Build (uglyURLs)
         env:
           HUGO_UGLYURLS: "true"
@@ -359,8 +379,8 @@ jobs:
             P=public-ugly/books/$b/print.html
             [ -f "$P" ] || fail "missing $P"
             grep -q '<body class="[^"]*tufte-print-book' "$P" || fail "$P is not the print document"
-            L=public-ugly/books/$b.html; [ -f "$L" ] || L=public-ugly/books/$b/index.html
-            [ -f "$L" ] || fail "no landing for books/$b"
+            L=public-ugly/books/$b/index.html
+            [ -f "$L" ] || fail "no landing for books/$b ($L)"
             grep -q '<body class="tufte-book' "$L" || fail "$L is not the book landing"
             ! grep -q '<body class="[^"]*tufte-print-book' "$L" || fail "$L is the print document, not the landing"
           done

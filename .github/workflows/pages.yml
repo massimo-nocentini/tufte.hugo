@@ -31,8 +31,6 @@ defaults:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      HUGO_VERSION: 0.169.0
     steps:
       # exampleSite/hugo.toml uses theme = "tufte.hugo" and themesDir = "../..",
       # so the theme must be checked out in a directory named tufte.hugo
@@ -47,26 +45,45 @@ jobs:
         id: pages
         uses: actions/configure-pages@v6
 
-      - name: Install Hugo ${{ env.HUGO_VERSION }} (standard edition)
+      # The theme requires the latest Hugo release, and ci.yml tests "latest":
+      # resolve the same release here (GitHub releases API, authenticated with
+      # the workflow token against rate limits), then install its standard
+      # edition .deb after checking it against the release checksums.
+      - name: Install the latest Hugo (standard edition)
+        id: hugo
         working-directory: ${{ runner.temp }}
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          tag=$(curl -sSfL --retry 3 \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/gohugoio/hugo/releases/latest |
+            python3 -I -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])')
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::unexpected Hugo tag '$tag'"; exit 1; }
+          HUGO_VERSION=${tag#v}
+          echo "Hugo $HUGO_VERSION"
           base="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}"
           deb="hugo_${HUGO_VERSION}_linux-amd64.deb"
           curl -sSfL -o "$deb" "$base/$deb"
           curl -sSfL -o checksums.txt "$base/hugo_${HUGO_VERSION}_checksums.txt"
           grep " ${deb}\$" checksums.txt | sha256sum -c -
           sudo dpkg -i "$deb"
-          hugo version
+          installed=$(hugo version)
+          echo "$installed"
+          [[ "$installed" == "hugo v${HUGO_VERSION}"[-\ ]* ]] || { echo "::error::installed Hugo is not v${HUGO_VERSION}"; exit 1; }
+          echo "version=$HUGO_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Hugo: \`$installed\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build
         working-directory: tufte.hugo/exampleSite
         env:
           HUGO_ENVIRONMENT: production
           HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
         run: |
-          hugo --gc --minify --panicOnWarning \
-            --baseURL "${{ steps.pages.outputs.base_url }}/"
+          hugo --gc --minify --panicOnWarning --baseURL "$BASE_URL/"
 
       # Guard: no URL of this host may escape the Pages subpath (e.g. a
       # hard-coded "/images/…" instead of "/<repo>/images/…"). It resolves

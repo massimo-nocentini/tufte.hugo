@@ -13,10 +13,10 @@ cross-references, multi-chapter books with a title page, contents, lists of figu
 and a print stylesheet with the LaTeX page geometry (see [tufte-latex parity](#tufte-latex-parity)).
 
 The theme is organised like [Beautiful Hugo](https://github.com/halogenica/beautifulhugo) and uses the
-Hugo 0.146 template system (`layouts/baseof.html`, `home.html`, `page.html`, `list.html`, plus
+Hugo template system introduced in 0.146 (`layouts/baseof.html`, `home.html`, `page.html`, `list.html`, plus
 `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`).
 
-- **Hugo**: the latest release (0.169.0 or newer). The standard edition is enough; the extended edition is not required.
+- **Hugo**: the latest release (0.169.0 or newer; an older Hugo stops the build with an error). The standard edition is enough; the extended edition is not required.
 - **License**: MIT (see [LICENSE](LICENSE)). Tufte CSS and ET Book are MIT as well (see [Credits](#credits)).
 
 ## Contents
@@ -208,9 +208,9 @@ gives the `twitter:site` card of every page (`@jack`, also when it is written as
 | `fleqn` | `false` | Set display math flush left (with a 2em indent). |
 | `leqno` | `false` | Put equation numbers on the left, as LaTeX's `leqno`: both the theme's `\label` numbers and KaTeX's `\tag{…}`. |
 | `errorColor` | `""` | Colour of invalid TeX. Empty: the theme's red, adapted to dark mode. |
-| `strict` | `"error"` | KaTeX `strict` mode: `"error"`, `"ignore"` or `"warn"` (`ignore` and `warn` need Hugo 0.147.6 / 0.147.7 for the server engine). |
+| `strict` | `"error"` | KaTeX `strict` mode: `"error"`, `"ignore"` or `"warn"`. |
 | `minRuleThickness` | `0.04` | Minimum thickness of fraction lines, in em: a number (`0.05`; `"0.05em"` works too). Any other value prints the warning `tufte-bad-option` and uses `0.04`. |
-| `katexVersion` | `"auto"` | KaTeX version of the CDN files. `"auto"` (or empty) loads the release that matches the Hugo running the build (see [Math](#math)). A version listed in `data/tufte/vendor.toml` uses the bundled hashes; any other version also needs `katexIntegrity` (CSS), `katexJSIntegrity` and `katexAutoRenderIntegrity` (client engine), or the build stops. The former default `"0.16.11"` counts as `"auto"`. |
+| `katexVersion` | `"auto"` | KaTeX version of the CDN files. `"auto"` (or empty) loads the release that Hugo embeds, 0.18.4 (see [Math](#math)). A version listed in `data/tufte/vendor.toml` uses the bundled hashes; any other version also needs `katexIntegrity` (CSS), `katexJSIntegrity` and `katexAutoRenderIntegrity` (client engine), or the build stops. The former default `"0.16.11"` counts as `"auto"`. |
 | `katexCSS` | `""` | Optional: another URL for the KaTeX stylesheet, with `katexIntegrity` as its SRI hash. It is always loaded as a stylesheet, whatever its form (a query string, a fragment or no `.css` extension are fine). |
 
 The short form `math = true` (or `false`, `"auto"`) directly under `[params]`, as in Hugo's own math guide,
@@ -367,6 +367,10 @@ a backlink to each reference, never a sidenote plus a footnote with the same tex
 the `abstract`, or inside one `thanks` text (of the title or of an author), belongs to that field only, as in a
 book's dedication (see Books): `abstract: "Text[^1]\n\n[^1]: …"` next to a body `[^1]: …` gives two notes, and
 neither definition is lost; a `[^x]` that the field references without defining it is the body's `[^x]`.
+A site's own shortcode that renders Markdown with footnotes itself (`.Page.RenderString`, `markdownify`)
+gets its own footnotes too: Goldmark numbers them from 1 like the page's, but each one keeps its own text and
+id (a sidenote, or a real footnote by `footnotes` mode; such a note has no Markdown label, so a `fn-`/`sn-`
+prefix there is not read), and Goldmark's list goes.
 
 A shortcode may sit inside a Markdown blockquote, with every line of it, closing tag included, quoted
 (`> {{< marginblock >}}`, `> Text.`, `> {{< /marginblock >}}`): the quote markers belong to the enclosing
@@ -625,20 +629,35 @@ Embeds a responsive iframe inside `<figure class="iframe-wrapper">`.
 ### `youtube`
 
 Embeds a YouTube video through the privacy-enhanced `youtube-nocookie.com` domain, inside
-`<figure class="iframe-wrapper">`. It replaces Hugo's built-in `youtube` shortcode. The video id can be
-positional or named. The other parameters need the named form.
+`<figure class="iframe-wrapper">`. It replaces Hugo's built-in `youtube` shortcode and takes the same
+parameters, with the same defaults and the same
+[player parameters](https://developers.google.com/youtube/player_parameters) in the URL, except `loading`
+(lazy here). The video id can be positional or named. The other parameters need the named form; their names
+are case-insensitive (`allowFullScreen` or `allowfullscreen`). Booleans are `true`/`false`, `1`/`0` or
+`yes`/`no`, quoted or not. An invalid value, an unknown parameter or an id that is not a YouTube id (such as a
+URL) prints the warning `tufte-bad-option`, and an invalid value falls back to the default. Only the player
+parameters that differ from YouTube's defaults are written in the URL. As with Hugo's shortcode,
+`[privacy.youtube] disable = true` in the site configuration removes every embed (and skips every check, so
+old embeds never fail a `--panicOnWarning` build); the host is always
+`youtube-nocookie.com`, whatever `privacy.youtube.privacyEnhanced` says.
 
 | Parameter | Meaning |
 |---|---|
 | `id` | Video id (required). |
 | `title` | Accessible title of the iframe (default: the translated "YouTube video", i18n key `youtubeVideo`). |
-| `start`, `end` | Start and end time, in seconds. |
+| `start`, `end` | Start and end time, in whole seconds (at most 9 digits); `end` must be after `start`. |
+| `autoplay` | Play when the page loads (default `false`). It also mutes the video, as browsers require. |
+| `mute` | Start muted (default `false`). |
+| `loop` | Repeat the video (default `false`); `start` and `end` apply to the first play only. |
+| `controls` | Player controls (default `true`); `controls=false` hides them. |
+| `allowFullScreen` | Allow full-screen mode (default `true`). |
+| `loading` | The iframe's `loading` attribute: `lazy` (default; Hugo's own default is `eager`) or `eager`. |
 | `class` | Extra classes for the `<figure>`. |
 
 ```markdown
 {{< youtube YE7VzlLtp-4 >}}
 
-{{< youtube id="YE7VzlLtp-4" title="Edward Tufte" start="30" >}}
+{{< youtube id="YE7VzlLtp-4" title="Edward Tufte" start="30" end="90" controls=false >}}
 ```
 
 ### `video`
@@ -1105,8 +1124,8 @@ passthrough extension, set
 **KaTeX version.** With the server engine the HTML is produced by the KaTeX that Hugo embeds, and the
 stylesheet must come from the same release: KaTeX 0.18 renamed the classes of its output (`base` →
 `katex-base`, `strut` → `katex-strut`, `tag` → `katex-tag`, …), so an older stylesheet leaves the math
-unstyled. The theme therefore picks the KaTeX release by Hugo version (`hugo.Version`); every supported
-Hugo (0.169.0 and later) embeds KaTeX 0.18, so it loads `katex@0.18.4`:
+unstyled. Every supported Hugo (0.169.0 and later) embeds KaTeX 0.18, so the theme loads `katex@0.18.4`,
+the first (newest) `[[katex]]` entry of `data/tufte/vendor.toml`:
 
 | Hugo | Embedded KaTeX | Stylesheet and scripts loaded |
 |---|---|---|
@@ -1117,7 +1136,7 @@ script and CSS always agree. Setting `katexVersion` to a release that differs fr
 the warning `tufte-katex-version` with the server engine.
 
 **CDN, hashes and self-hosting.** The files are loaded from jsDelivr with the SRI hashes listed per release
-in `data/tufte/vendor.toml` (one `[[katex]]` entry per release, with the first Hugo version that embeds it).
+in `data/tufte/vendor.toml` (one `[[katex]]` entry per bundled release, newest first).
 With `params.selfHosted = true`, the files are downloaded at build time, checked against those hashes and
 published under `/katex/`. Your own hashes (`katexIntegrity`, `katexJSIntegrity`, `katexAutoRenderIntegrity`)
 may take any form a browser accepts: `sha256-`, `sha384-` or `sha512-` (cdnjs publishes sha512), or several
@@ -1203,7 +1222,7 @@ write `tufte: {style: latex}` and `headings: {number: 2}`.
 | `floats.number` | `"auto"` / `true` | — | Number figures and tables: `true`, `false`, or `"auto"`: always in a book; in a handout as soon as the page has a labelled float (even one that gets no number itself: no caption, or `numbered=false`) or a labelled equation, or any `xref` or `eqref`, whatever it points to (a cross-reference to a section also numbers the page's captioned floats), or a `listoffigures`, `listoftables` or `listoflistings` (a list of floats is a list of numbered floats). Set `false` to keep Tufte CSS's unnumbered captions on such a page. |
 | `headings.number` | `0` | `secnumdepth` | `1` numbers `##`, `2` numbers `##` and `###`. `{.unnumbered}` skips one heading. In a book with `numberChapters`, a numbered chapter's sections read 2.1, 2.2…; the landing, a part page and an unnumbered, front- or back-matter chapter continue the sections of the last numbered chapter (1.3 after 1.2, as `\section` after `\chapter*`), or 0.1, 0.2… before the first one. |
 | `headings.strict` | `false` | — | `#####`/`######` give a warning (`false`) or stop the build (`true`). |
-| `bibliography.data` | `"bibliography"` | `\bibliography{…}` | Key of `site.Data` holding the database (`data/bibliography.yaml`, `.json`, `.toml`, or a `data/bibliography/` directory). |
+| `bibliography.data` | `"bibliography"` | `\bibliography{…}` | Key of the data tree (`hugo.Data`) holding the database (`data/bibliography.yaml`, `.json`, `.toml`, or a `data/bibliography/` directory). |
 | `bibliography.style` | `"tufte"` / `"plainnat"` | `\bibliographystyle` | List order: `tufte` (order of citation) or `plainnat` (sorted as plainnat.bst does: by the full author names, last name first, then year, then cite key; no title). With `bibliography.margin = false` the `[n]` numbers follow that order too: `plainnat` numbers the sorted list, so the first citation may read `[3]`, as natbib does. |
 | `bibliography.list` | `true` (books: `false`) | `\nobibliography` | Append the list of references at the end of a handout. |
 | `bibliography.margin` | `true` | `nobib` | `false`: citations become `[n]`, linked to the list, which is numbered `[n]` in the order of `bibliography.style` (order of first citation, or sorted with `plainnat`). With no list to link to (a book without a `{{< bibliography >}}` chapter, a handout with `bibliography.list = false` and no `{{< bibliography >}}`), the numbers are printed unlinked and `tufte-no-bibliography` is warned. |
@@ -1407,7 +1426,7 @@ block shortcode (`fullwidth`, `details`, `blockquote`…) is numbered like the o
 and the book contents too (Hugo's `.TableOfContents` and `.Fragments` never see it: the theme adds it in document
 order, at the nesting of its level; when the page has no heading of its own the levels are Hugo's defaults, h2 and
 h3 in a `<ul>`). Math in a heading is typeset in the page contents and the book contents (Hugo itself
-leaves the TeX raw, or drops it on 0.146), the words printed by a shortcode in a heading are kept there (Hugo
+leaves the TeX raw), the words printed by a shortcode in a heading are kept there (Hugo
 builds those texts before shortcodes run), and links in a heading are unwrapped there.
 
 ### Lists of figures and tables, contents
@@ -1789,8 +1808,9 @@ left-hand page facing the title page; the browser inserts a blank page where one
 left/right page breaks; a browser that does not just starts a new page). Print to PDF
 from the browser. A book with `outputs: ["html", "rss", "print"]` has `print.html` next to its landing page
 (front-matter `outputs` replaces Hugo's default formats, so keep `rss` in the list or the book loses its feed;
-with `uglyURLs = true` the print document stays `books/b/print.html`, apart from the landing, which Hugo 0.146
-writes as `books/b.html` and newer Hugo as `books/b/index.html`: the theme's `print` output format sets `noUgly`): the
+with `uglyURLs = true` the print document stays `books/b/print.html`, next to the landing `books/b/index.html`:
+the theme's `print` output format sets `noUgly`, so it never takes the `x.html` name of a list page that Hugo
+writes ugly, such as a taxonomy term): the
 title pages, the contents and every chapter in one document, with cross-chapter links (relative, root-relative,
 or absolute ones from `ref` and `absURL`) turned into links inside the document, and relative image and video
 URLs (`src`, `poster`, `srcset`) resolved against their chapter. Each chapter is an `<article id="tufte-cN">` and each part an `<article id="tufte-pK">`,
@@ -2134,15 +2154,15 @@ as `series` to your `i18n/<lang>.yaml` for your own taxonomies), and an archive 
 (`archives`; its year list is labelled `allPosts` for screen readers).
 
 On a multilingual site, a page that has translations gets a small language switcher under the site header
-(`nav.site-languages`, labelled with each language's `languageName`, or `label` from Hugo 0.158) and
+(`nav.site-languages`, labelled with each language's `label`, formerly `languageName`) and
 `<link rel="alternate" hreflang="…">` tags in `<head>` (not on pagers 2 and later, whose translations have no
 matching pager). In a book's `print.html` the switcher links to the other languages' `print.html`. On a
 multihost site (a `baseURL` per language) the switcher links to a translation on another host by its absolute
 URL. Hugo (up to 0.169 at least) publishes global resources, the theme's stylesheet among them, without the
 path of a language's `baseURL`: on a multihost site, give each language a `baseURL` without a path
-(`https://it.example/`, not `https://it.example/sub/`). `<html>` carries the language's `languageCode`
-(`locale` from Hugo 0.158) and, when `languageDirection` (`direction`) is set, a `dir` attribute. The Language
-methods renamed in Hugo 0.158 are handled by `layouts/_partials/func/lang.html`.
+(`https://it.example/`, not `https://it.example/sub/`). `<html>` carries the language's `locale`
+(formerly `languageCode`) and, when `direction` (formerly `languageDirection`) is set, a `dir` attribute
+(`layouts/_partials/func/lang.html`).
 
 **Right-to-left languages.** Tufte CSS is a left-to-right grid. With `dir="rtl"` the theme keeps that grid,
 so the page layout does not change: the text column is on the left, and sidenotes, margin notes, margin
@@ -2203,8 +2223,10 @@ The example site sets `theme = "tufte.hugo"` and `themesDir = "../.."`, so the t
 ### Deploying the example site to GitHub Pages
 
 `.github/workflows/pages.yml` builds the example site and publishes it with GitHub Pages on every push to
-`master` (and on demand, from the Actions tab). It installs Hugo 0.169.0 (standard edition, from the release
-`.deb`, checked against the release checksums), builds with
+`master` (and on demand, from the Actions tab). It installs the latest Hugo release, the same one that
+continuous integration tests: the version is looked up at run time in the GitHub releases API (with the
+workflow's own token) and printed in the log and the job summary, and the standard edition `.deb` is checked
+against the release checksums before it is installed. It then builds with
 `hugo --gc --minify --panicOnWarning --baseURL <Pages URL>/` in the production environment, checks that no
 URL of the Pages host escapes the site's base path (links, images and `srcset`, `og:image` and
 `twitter:image`, CSS `url()`, the sitemap and the RSS feed), and deploys the result with
@@ -2217,8 +2239,8 @@ against the base path wherever it takes one: Markdown links and images (also in 
 and schema.org tags. So root paths in content get the subpath too.
 
 One-time setup: in the repository, open **Settings → Pages → Build and deployment** and set **Source** to
-**GitHub Actions**. The workflow needs no secrets; its permissions are `contents: read`, `pages: write` and
-`id-token: write`. A fork works under its own name too: the workflow checks the theme out into a directory
+**GitHub Actions**. The workflow needs no secrets (it reads the Hugo release with the automatic
+`GITHUB_TOKEN`); its permissions are `contents: read`, `pages: write` and `id-token: write`. A fork works under its own name too: the workflow checks the theme out into a directory
 named `tufte.hugo` and takes the base URL from `actions/configure-pages` (a custom domain included).
 
 ## Credits

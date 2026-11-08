@@ -6,7 +6,7 @@
   Callers cache it:  partialCached "tufte/bib/db.html" $page (or $page.RelPermalink $page.Path)
 
   Sources, later ones winning on the same key:
-    1. the site database (site.Data at option bibliography.data);
+    1. the site database (hugo.Data at option bibliography.data);
     2. in a book, the book-wide pool: the `bibliography` and `references`
        of every part and chapter (tufte/bib/book-pool.html; the first page
        in reading order wins on a key), so a key defined by one chapter can

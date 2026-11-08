@@ -80,7 +80,7 @@
     errorColor = ""             # colour of invalid TeX ("" = the theme's red, adapted to dark mode)
     strict = "error"            # KaTeX strict mode: "error" | "ignore" | "warn"
     minRuleThickness = 0.04     # minimum fraction-line thickness, in em
-    katexVersion = "auto"       # "auto": the KaTeX release Hugo embeds (0.16.21 on Hugo < 0.166, 0.18.4 from 0.166); another version needs katexIntegrity, katexJSIntegrity, katexAutoRenderIntegrity unless listed in data/tufte/vendor.toml
+    katexVersion = "auto"       # "auto": the KaTeX release Hugo embeds (0.18.4); another version needs katexIntegrity, katexJSIntegrity, katexAutoRenderIntegrity unless listed in data/tufte/vendor.toml
     katexCSS = ""               # optional: another KaTeX stylesheet URL (with katexIntegrity)
     katexIntegrity = ""
     katexJSIntegrity = ""
@@ -113,8 +113,9 @@
 # Single-document print view of a book: a book root with
 # `outputs: [html, rss, print]` gets /…/print.html (layouts/list.print.html).
 # Front-matter `outputs` replaces the defaults: leaving out rss drops the feed.
-# noUgly: with `uglyURLs = true`, Hugo 0.146 would otherwise write a section
-# book's print output to the landing's own file (books/b.html), replacing it.
+# noUgly: with `uglyURLs = true`, Hugo writes some list pages as `x.html`
+# (taxonomy terms); a print output would then go to that same file and
+# replace the HTML page. noUgly keeps it at x/print.html.
 [outputFormats]
   [outputFormats.print]
     mediaType = "text/html"

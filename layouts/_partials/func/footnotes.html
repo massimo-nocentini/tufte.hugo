@@ -8,6 +8,15 @@
     <div class="footnotes" role="doc-endnotes"><hr><ol><li id="fn:1"><p>Text&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p></li>...</ol></div>
   at the end of the content. That block is always removed.
 
+  A site shortcode that renders Markdown itself (.Page.RenderString,
+  markdownify) leaves a list of its own inside the content, numbered from
+  fn:1 like the page's. Each such inner list is resolved first, with the
+  references just before it (walking back from the list while the targets
+  are its notes and no reference id repeats: one Goldmark render), so that
+  its fn:1 is never the page's fn:1. Its notes have no Markdown label:
+  sidenotes (id sn-HASH-gK-fnref-N, K = the list's rank) or real footnotes
+  (data-key="mdgK-N") by mode, and the list goes.
+
   Which kind (§11.1), from the mode and the Markdown label:
     mode "sidenotes" (default): sidenote, except labels starting "fn-"
                                 ([^fn-proof]) which stay footnotes;
@@ -113,6 +122,64 @@
 {{- /* The endnotes block goes even when no reference is left (a summary
        whose only reference sat in a heading that was removed). */ -}}
 {{- with $contentBlock }}{{ $out = strings.TrimSuffix . $out }}{{ end -}}
+{{- /* Inner lists (see above): each with the references of its own
+       render, before the page's notes are matched by number. */ -}}
+{{- if strings.Contains $out $fnOpen -}}
+  {{- /* <hr /> with markup.goldmark.renderer.xhtml = true. */ -}}
+  {{- $grpRE := `(?s)<div class="footnotes" role="doc-endnotes">\s*<hr\s*/?>\s*<ol>.*?</li>\s*</ol>\s*</div>` -}}
+  {{- $done := "" -}}
+  {{- $rest := $out -}}
+  {{- range $k, $blk := findRE $grpRE $out -}}
+    {{- $parts := split $rest $blk -}}
+    {{- $before := index $parts 0 -}}
+    {{- $rest = delimit (after 1 $parts) $blk -}}
+    {{- $gn := dict -}}
+    {{- range after 1 (split $blk `<li id="`) -}}
+      {{- $id := replaceRE `(?s)^([^"]*)".*$` "$1" . -}}
+      {{- $text := replaceRE `(?s)^[^"]*"[^>]*>` "" . -}}
+      {{- $text = replaceRE `(?s)</li>\s*(</ol>\s*</div>\s*)?$` "" $text -}}
+      {{- $text = replaceRE `(?s)(&#160;|&nbsp;|\s)*<a [^>]*class="footnote-backref"[^>]*>.*?</a>` "" $text | strings.TrimSpace -}}
+      {{- with $id }}{{ $gn = merge $gn (dict . $text) }}{{ end -}}
+    {{- end -}}
+    {{- /* Its references: the last ones before it, back to the first that
+           is not one of its notes or repeats a reference id. */ -}}
+    {{- $refs := findRE $refRE $before -}}
+    {{- $own := 0 -}}
+    {{- $sups := dict -}}
+    {{- $stop := false -}}
+    {{- range $i := cond (gt (len $refs) 0) (seq (sub (len $refs) 1) 0) slice -}}
+      {{- if not $stop -}}
+        {{- $r := index $refs $i -}}
+        {{- $tg := replaceRE `(?s)^.*href="#([^"]+)".*$` "$1" $r -}}
+        {{- $sup := replaceRE `(?s)^<sup [^>]*\bid="([^"]+)".*$` "$1" $r -}}
+        {{- if and (isset $gn $tg) (not (isset $sups $sup)) -}}
+          {{- $sups = merge $sups (dict $sup true) -}}
+          {{- $own = add $own 1 -}}
+        {{- else -}}
+          {{- $stop = true -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- /* The text up to its first reference stays as it is. */ -}}
+    {{- $head := "" -}}
+    {{- range first (sub (len $refs) $own) $refs -}}
+      {{- $cut := split $before . -}}
+      {{- $head = printf "%s%s%s" $head (index $cut 0) . -}}
+      {{- $before = delimit (after 1 $cut) . -}}
+    {{- end -}}
+    {{- $gk := printf "g%d" (add $k 1) -}}
+    {{- $ctx := dict "page" $page "summary" $summary "hash" (printf "%s-%s" $hash $gk) "sideDefault" $sideDefault "labels" slice "real" slice "notes" $gn "keyPrefix" (printf "md%s-" $gk) -}}
+    {{- $seenG := dict -}}
+    {{- range last $own $refs -}}
+      {{- $tg := replaceRE `(?s)^.*href="#([^"]+)".*$` "$1" . -}}
+      {{- $repl := partial "func/footnote-note.html" (merge $ctx (dict "target" $tg "ref" . "repeat" (isset $seenG $tg))) -}}
+      {{- $seenG = merge $seenG (dict $tg true) -}}
+      {{- $before = replace $before . $repl 1 -}}
+    {{- end -}}
+    {{- $done = printf "%s%s%s" $done $head $before -}}
+  {{- end -}}
+  {{- $out = printf "%s%s" $done $rest -}}
+{{- end -}}
 {{- if strings.Contains $out "footnote-ref" -}}
   {{- /* Markdown labels by Goldmark number. */ -}}
   {{- $labels := slice -}}

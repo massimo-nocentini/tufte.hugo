@@ -83,34 +83,18 @@
 
 {{- /* Distinctive (and still red, should it ever be shown) colour. */ -}}
 {{- $sentinel := "#cc0001" -}}
-{{- /* transform.ToMath knows "strict" from Hugo 0.147.6, and its "warn"
-       value from 0.147.7: older versions keep KaTeX's default ("error").
-       The dict is built in one go (merge would lowercase the macro names). */ -}}
-{{- $server := dict -}}
-{{- if or (ge hugo.Version "0.147.7") (and (ge hugo.Version "0.147.6") (ne $strict "warn")) -}}
-  {{- $server = dict
-    "output" "htmlAndMathml"
-    "displayMode" $display
-    "throwOnError" false
-    "errorColor" $sentinel
-    "fleqn" $fleqn
-    "leqno" $leqno
-    "minRuleThickness" $minRule
-    "strict" $strict
-    "macros" $macros
-  -}}
-{{- else -}}
-  {{- $server = dict
-    "output" "htmlAndMathml"
-    "displayMode" $display
-    "throwOnError" false
-    "errorColor" $sentinel
-    "fleqn" $fleqn
-    "leqno" $leqno
-    "minRuleThickness" $minRule
-    "macros" $macros
-  -}}
-{{- end -}}
+{{- /* The dict is built in one go (merge would lowercase the macro names). */ -}}
+{{- $server := dict
+  "output" "htmlAndMathml"
+  "displayMode" $display
+  "throwOnError" false
+  "errorColor" $sentinel
+  "fleqn" $fleqn
+  "leqno" $leqno
+  "minRuleThickness" $minRule
+  "strict" $strict
+  "macros" $macros
+-}}
 {{- /* Client: the sentinel too; tufte/katex.html replaces it with the
        .katex-error class (the theme's colour, adapted to dark mode) plus
        the site's errorColor, if any, inline. */ -}}

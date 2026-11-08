@@ -7,8 +7,8 @@
 # (themesDir is also set below, so a plain `hugo server` works too.)
 
 baseURL = "https://example.org/"
-# `locale` replaces `languageCode` (deprecated) from Hugo 0.158. Older Hugo
-# ignores it, and the theme then uses the language key ("en") for <html lang>.
+# `locale` (formerly `languageCode`, now deprecated) sets <html lang>; without
+# it the theme uses the language key ("en").
 locale = "en-US"
 defaultContentLanguage = "en"
 title = "Tufte Hugo"
