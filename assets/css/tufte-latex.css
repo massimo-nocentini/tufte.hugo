@@ -2945,7 +2945,11 @@ nav.book-nav .next {
         --pl: 3.5;
     }
 
-    blockquote.alert {
+    /* Also in a real footnote, where theme.css gives quotes 1em margins
+       (0,1,2): the notes measure the item's --pw/--pl, so the alert must
+       fill the item. */
+    blockquote.alert,
+    ol.footnotes-list blockquote.alert {
         margin-left: 0;
         margin-right: 0;
     }
