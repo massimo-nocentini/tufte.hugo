@@ -164,7 +164,7 @@ does not set (`HUGO_PARAMS_ETBOOK=false hugo`).
 | `readMore` | `true` | Show a "Read more" link under each summary that Hugo cut (`.Truncated`: a `<!--more-->` divider, or an automatic summary shorter than the page). |
 | `homeIntro` | `true` | Render the content of `content/_index.md` above the post list on the home page. |
 | `customCSS` | `[]` | Paths under your site's `assets/` (for example `["css/custom.css"]`). They are appended to the CSS bundle, so they win. A single string is accepted too, with several paths separated by commas (as `HUGO_PARAMS_CUSTOMCSS` gives it). |
-| `copyright` | `""` | Footer text (Markdown; several paragraphs become lines of one). Default: `© YEAR Author`. |
+| `copyright` | `""` | Footer text (Markdown; several paragraphs become lines of one). Default: Hugo's top-level `copyright` when the site sets it, else `© YEAR Author`. The RSS `<copyright>` is the top-level `copyright`, else this text as plain text. |
 | `selfHosted` | `false` | `true`: download the third-party files (KaTeX) at build time, check them against their SRI hashes and serve them from your site instead of the CDN. See [Math](#math). |
 | `mainSections` | Hugo default | Sections listed on the home page and archives. Set it with Hugo's **top-level** `mainSections` key (for example `mainSections = ["posts"]`, above `[params]`); when unset, Hugo computes it from the section with the most pages. The legacy `params.mainSections` is still honoured and wins when set. |
 
@@ -183,7 +183,8 @@ counts as the `name`.
 
 Links shown in the footer. Leave a key empty to hide it. Besides the user name or handle, `github`, `gitlab`,
 `bluesky`, `twitter`, `linkedin` and `orcid` accept a full profile URL: a value is taken as a URL only when it
-starts with `http://` or `https://`, so a user name such as `httpie` still links to `https://github.com/httpie`.
+starts with `http://` or `https://`, so a user name such as `httpie` still links to `https://github.com/httpie`. A leading `@` of a handle is dropped (`@jack` links to `https://x.com/jack`). The `twitter` value also
+gives the `twitter:site` card of every page (`@jack`, also when it is written as a profile URL).
 
 | Key | Value |
 |---|---|
@@ -268,7 +269,7 @@ mainSections = ["posts"]
 
 | Key | Meaning |
 |---|---|
-| `title` | Page title, rendered as the article's `<h1>`, and the `<title>`, OpenGraph, Twitter, schema.org and RSS title. Hugo does not require one: a page, section, book, part or term without `title` (or with an empty one) is called by its `linkTitle`; else a term by the term, a section (book, part) by its directory name, humanized (`my-book` → “My Book”), and a regular page by the translated “Untitled” (i18n key `untitled`). That name is used in its h1, `<title>`, summaries, archive and term lists, navigation (and the book navigation's label), book contents and RSS item, so no heading or link is ever empty. The home page keeps Hugo's default, the site title. |
+| `title` | Page title, rendered as the article's `<h1>`, and the `<title>`, OpenGraph, Twitter, schema.org and RSS title. Hugo does not require one: a page, section, book, part or term without `title` (or with an empty one) is called by its `linkTitle`; else a term by the term, a section (book, part) by its directory name, humanized (`my-book` → “My Book”; also a top-level section without `_index.md`, which Hugo would call “My-Book”), and a regular page by the translated “Untitled” (i18n key `untitled`). That name is used in its h1, `<title>`, summaries, archive and term lists, navigation (and the book navigation's label), book contents and RSS item, so no heading or link is ever empty. The home page keeps Hugo's default, the site title. |
 | `linkTitle` | Short title for links (Hugo's link title): summary titles, the archive and term lists, the previous/next post navigation and book navigation. Default: `title`. |
 | `subtitle` | Rendered as `<p class="subtitle">` under the title. Also used as the meta description when `description` is empty. |
 | `date` | Publication date. |
@@ -339,6 +340,10 @@ There are two kinds of shortcodes:
   `listoffigures`, `bibliography`, `printindex` or `tableofcontents` in a note is shown there as inline blocks).
 - **Block** (`epigraph`, `blockquote`, `fullwidth`, `details`) are placed **on their own lines**. Their inner text is
   rendered as *block* Markdown, so it can contain several paragraphs.
+
+Call every theme shortcode with the `{{< >}}` delimiters, never with `{{% %}}`: the theme renders the inner
+Markdown itself, and with `{{% %}}` Hugo passes the shortcode's HTML back to Goldmark, which drops it
+(`<!-- raw HTML omitted -->`) when `unsafe = false`.
 
 Shortcodes can be nested with the `{{< >}}` form, e.g. a `sidenote` inside a `blockquote`, or a `figure`
 inside `fullwidth`. The HTML of the nested shortcode is kept as is and the Markdown around it is still
@@ -515,11 +520,13 @@ Replaces Hugo's built-in `figure` shortcode and renders all three Tufte figure s
 
 | Parameter | Meaning |
 |---|---|
-| `src` | Image path. It is looked up as a page resource (page bundle), then as a global resource in `assets/`, and otherwise used as a URL (for example a file in `static/`). |
+| `src` | Image path. It is looked up as a page resource (page bundle), then as a global resource in `assets/`, and otherwise used as a URL (for example a file in `static/`). As in Hugo's own image hook, a percent-encoded name (`my%20pic.png`) and a `?query` or `#fragment` (kept on the resource's URL) find the resource too; the same holds for Markdown images and the `video` sources. |
 | `alt` | Alternative text. |
 | `caption` | Caption (inline Markdown). For `main`, it is a margin note next to the image. For `fullwidth`, it is a `<figcaption>`. For `margin`, it is placed under the image in the margin. |
 | `type` | `main` (default), `margin` or `fullwidth`. |
 | `link` | Wrap the image in a link to this URL. |
+| `target`, `rel` | The `target` and `rel` attributes of that link (`target="_blank" rel="noopener"`), as in Hugo's built-in `figure`. |
+| `loading` | `lazy` (default) or `eager`, the `<img loading>` attribute: `eager` for an image at the top of the page. A Markdown image takes it as an attribute (`{loading="eager"}`). |
 | `width`, `height` | `<img>` dimensions. Raster images from page or global resources get their intrinsic size by default (none when Hugo cannot decode the file, e.g. a JPEG saved as `.png`). |
 | `title` | Shown in bold before the caption. It is not emitted as an `<img title>` attribute. |
 | `attr` | Attribution text, appended to the caption. |
@@ -1166,7 +1173,8 @@ more here: `parser.attribute.block = true` gives ids and captions to Markdown im
 equations (`{#fig:x}`), and `parser.attribute.title = true` gives headings their labels
 (`## Page Layout {#sec:page-layout}`). Keep Goldmark's default `parser.autoHeadingID = true`: section
 numbers, the names `xref` gives to labels and the tables of contents follow headings by their ids, and a `##`
-or `###` heading without one is left out of them (warning `tufte-heading-id`).
+or `###` heading without one is left out of them (warning `tufte-heading-id`; the page's table of contents
+keeps its text, without a link).
 
 ### Options: `[params.tufte]`
 
@@ -1191,7 +1199,7 @@ write `tufte: {style: latex}` and `headings: {number: 2}`.
 | `numerals` | `"lining"` / `"oldstyle"` | mathpazo `osf` | Old-style figures in the text (ET Book; bold text takes the figures of ET Book's semi-bold old-style face, as mathpazo's bold keeps old-style figures). |
 | `marginals` | `"auto"` | `marginals=` | Alignment of all margin material: `justified`, `raggedright`, `raggedleft`, `raggedouter`, `auto` (follows `justified`). |
 | `sidenote.align`, `marginnote.align`, `caption.align`, `citation.align` | `""` | `sidenote=` … | Override `marginals` for one kind of margin material. |
-| `sidenote.font`, `marginnote.font`, `caption.font`, `citation.font` | `""` | `\setsidenotefont` … | Words: `italic`, `upright`, `sans`, `serif`, `mono`, `small`, `smaller`, `normal`, and a `#hex` colour. `small` and `smaller` are 0.9 and 0.8 of the default note size (0.99rem and 0.88rem; 0.9rem and 0.8rem with `sfsidenotes`), in rem, so the size is the same wherever the note sits (paragraph, title heading, caption, citation inside a note). |
+| `sidenote.font`, `marginnote.font`, `caption.font`, `citation.font` | `""` | `\setsidenotefont` … | Words: `italic`, `upright`, `sans`, `serif`, `mono`, `small`, `smaller`, `normal`, and a `#hex` colour (used as given in both colour schemes, so it must read on the dark background too). `small` and `smaller` are 0.9 and 0.8 of the default note size (0.99rem and 0.88rem; 0.9rem and 0.8rem with `sfsidenotes`), in rem, so the size is the same wherever the note sits (paragraph, title heading, caption, citation inside a note). |
 | `floats.number` | `"auto"` / `true` | — | Number figures and tables: `true`, `false`, or `"auto"`: always in a book; in a handout as soon as the page has a labelled float (even one that gets no number itself: no caption, or `numbered=false`) or a labelled equation, or any `xref` or `eqref`, whatever it points to (a cross-reference to a section also numbers the page's captioned floats), or a `listoffigures`, `listoftables` or `listoflistings` (a list of floats is a list of numbered floats). Set `false` to keep Tufte CSS's unnumbered captions on such a page. |
 | `headings.number` | `0` | `secnumdepth` | `1` numbers `##`, `2` numbers `##` and `###`. `{.unnumbered}` skips one heading. In a book with `numberChapters`, a numbered chapter's sections read 2.1, 2.2…; the landing, a part page and an unnumbered, front- or back-matter chapter continue the sections of the last numbered chapter (1.3 after 1.2, as `\section` after `\chapter*`), or 0.1, 0.2… before the first one. |
 | `headings.strict` | `false` | — | `#####`/`######` give a warning (`false`) or stop the build (`true`). |
@@ -1817,7 +1825,7 @@ build and cannot be ignored.
 | `tufte-unknown-cite` | A cited key is not in the database. |
 | `tufte-duplicate-cite` | A cite key repeated within one bibliography database (keys are case-insensitive), or defined with different entries by two pages of one book (the root, then the parts and chapters in reading order); the first entry is kept, as BibTeX does ("Repeated entry"). |
 | `tufte-heading-depth` | A `#####` or `######` heading (an error with `headings.strict`). |
-| `tufte-heading-id` | A `##` or `###` heading without an id (the site sets `markup.goldmark.parser.autoHeadingID = false` and the heading has no `{#id}`): it is left out of section numbering, of the names `xref` gives to labels and of the tables of contents. |
+| `tufte-heading-id` | A `##` or `###` heading without an id (the site sets `markup.goldmark.parser.autoHeadingID = false` and the heading has no `{#id}`): it is left out of section numbering and of the names `xref` gives to labels, and its entry in the page's table of contents is plain text, without a link. |
 | `tufte-unlabeled-float` | A numbered float without a label (only with `debug`). |
 | `tufte-bad-offset` | An invalid `offset`. |
 | `tufte-bad-option` | An unknown or invalid value of an option or parameter: `tufte.*` options (an enum word not in the list, a boolean that is not `true`/`false`/`yes`/`no`/`on`/`off`/`1`/`0`, `headings.number` outside 0–2; the default is used instead; a `tufte` value that is not a table, such as `tufte: latex`, or a single value in place of an option group, such as `headings: 2` for `headings: {number: 2}`, is ignored), `sections`, `params.math.engine`, `strict` and `macros`, a missing `customCSS` file or a `customCSS` that is neither a list nor a string, partial `params.giscus` settings, an `iframe` `ratio` or `video` `type`, `epigraph` parameters ignored by its block-quote form, a `label=` key without a letter or digit, a second `\label` in one display equation, an `index` entry deeper than three levels, with an empty level (`Yahoo!`: quote it, `Yahoo"!`) or with a page format other than `see`, `seealso`, `(` and `)` (`|textbf` has no effect), and the like. |
@@ -2033,7 +2041,9 @@ page-relative link or image (`[other](../other/)`, `img.png`) gets the URL the b
 
 **Extra CSS.** Put a file in your site's `assets/` and list it in `customCSS`. It is appended to the theme's
 CSS bundle after `et-book.css` (when `etBook` is on), `tufte.css`, `theme.css`, `tufte-latex.css` and
-`syntax.css`, in this order, so its rules take precedence.
+`syntax.css`, in this order, so its rules take precedence. Its `@import` statements (a web font's stylesheet,
+for example) are moved to the top of the bundle, since a browser ignores an `@import` that follows other rules;
+a relative `@import` URL is then resolved against the bundle, published under `/css/`.
 
 ```toml
 [params]
@@ -2080,8 +2090,15 @@ still hold the theme's unresolved markers (empty figure and table numbers, raw c
 `partialCached "func/content.html" (dict "page" . "summary" true) (or .RelPermalink .Path) true` (its summary),
 the same calls that `page.html`, `post-summary.html` and `rss.xml` make; the front-matter abstract is left out
 of both and returned by `partial "tufte/abstract.html" .`. A custom output, such as a JSON search index, uses
-the same call, for example
-`"content": partialCached "func/content.html" $p (or $p.RelPermalink $p.Path) false | plainify | htmlUnescape`.
+the same call. For plain text, drop the heading anchors (`#`) and the margin toggles (`⊕`) first, and put a
+space before each block and note, so that the words of a sidenote do not run into the sentence before it:
+
+```go-html-template
+{{- $html := partialCached "func/content.html" $p (or $p.RelPermalink $p.Path) false | string -}}
+{{- $html = $html | replaceRE `<a class="heading-anchor"[^>]*>[^<]*</a>|<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label>` ""
+      | replaceRE `<(/?)(p|li|h[1-6]|span class="(?:sidenote|marginnote))\b` " <$1$2" -}}
+{{- $text := $html | plainify | htmlUnescape | replaceRE `\s+` " " | strings.TrimSpace -}}
+```
 
 **Favicon.** If your site has `static/favicon.ico` and/or `static/favicon.svg`, they are linked
 automatically (`<link rel="icon">`, the SVG with `type="image/svg+xml"`).
@@ -2118,15 +2135,20 @@ as `series` to your `i18n/<lang>.yaml` for your own taxonomies), and an archive 
 
 On a multilingual site, a page that has translations gets a small language switcher under the site header
 (`nav.site-languages`, labelled with each language's `languageName`, or `label` from Hugo 0.158) and
-`<link rel="alternate" hreflang="…">` tags in `<head>`. On a multihost site (a `baseURL` per language) the
-switcher links to a translation on another host by its absolute URL. `<html>` carries the language's `languageCode`
+`<link rel="alternate" hreflang="…">` tags in `<head>` (not on pagers 2 and later, whose translations have no
+matching pager). In a book's `print.html` the switcher links to the other languages' `print.html`. On a
+multihost site (a `baseURL` per language) the switcher links to a translation on another host by its absolute
+URL. Hugo (up to 0.169 at least) publishes global resources, the theme's stylesheet among them, without the
+path of a language's `baseURL`: on a multihost site, give each language a `baseURL` without a path
+(`https://it.example/`, not `https://it.example/sub/`). `<html>` carries the language's `languageCode`
 (`locale` from Hugo 0.158) and, when `languageDirection` (`direction`) is set, a `dir` attribute. The Language
 methods renamed in Hugo 0.158 are handled by `layouts/_partials/func/lang.html`.
 
 **Right-to-left languages.** Tufte CSS is a left-to-right grid. With `dir="rtl"` the theme keeps that grid,
 so the page layout does not change: the text column is on the left, and sidenotes, margin notes, margin
-figures and captions are in the right margin. The navigation keeps its layout too: the previous / newer
-link is on the left with `←`, the next / older link is on the right with `→`. Inside each block, the text
+figures and captions are in the right margin. The navigation keeps its layout too: the links with `←`
+(“Previous post”, the older one; “Newer posts” of the paginator) are on the left, those with `→` (“Next post”,
+the newer one; “Older posts”) on the right. Inside each block, the text
 runs right to left: paragraphs, headings, lists, tables (columns from right to left), captions and notes
 align to the right. List markers and footnote marks (numbers or letters) hang on the right, in the list's
 indent, and so do the other indents (verse lines, index subentries, nested entries of the contents, lists in

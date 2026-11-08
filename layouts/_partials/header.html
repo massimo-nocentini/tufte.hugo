@@ -19,15 +19,20 @@
   {{- /* Multilingual sites: links to the other translations of this page.
          On a multihost site (a baseURL per language) a translation served
          from another host gets its absolute permalink: its RelPermalink is
-         relative to that other host. */ -}}
+         relative to that other host. In a book's print.html (the print
+         output format: html is then an alternative format) a translation
+         that has a print.html links to it, not to its HTML landing. */ -}}
   {{- if .IsTranslated }}
   {{- $host := (urls.Parse site.BaseURL).Host }}
+  {{- $isPrint := and (.OutputFormats.Get "print") (.AlternativeOutputFormats.Get "html") }}
   <nav class="site-languages" aria-label="{{ partial "func/t.html" "translations" }}">
     <ul>
       {{- range .Translations }}
       {{- $l := partial "func/lang.html" .Language }}
-      {{- $href := .RelPermalink }}
-      {{- if ne (urls.Parse .Permalink).Host $host }}{{ $href = .Permalink }}{{ end }}
+      {{- $t := . }}
+      {{- if $isPrint }}{{ with .OutputFormats.Get "print" }}{{ $t = . }}{{ end }}{{ end }}
+      {{- $href := $t.RelPermalink }}
+      {{- if ne (urls.Parse $t.Permalink).Host $host }}{{ $href = $t.Permalink }}{{ end }}
       <li><a href="{{ $href }}" hreflang="{{ $l.locale }}" lang="{{ $l.locale }}">{{ $l.label }}</a></li>
       {{- end }}
     </ul>

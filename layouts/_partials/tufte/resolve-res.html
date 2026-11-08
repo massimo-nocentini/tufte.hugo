@@ -1,0 +1,45 @@
+{{- /*
+  Finds the resource a local source names (figure, image and video
+  sources): a resource of the page, then a global resource under assets/.
+  The path is tried as written, then (as Hugo's embedded image hook does)
+  as the URL's decoded path without its ?query and #fragment, which are
+  kept on the resource's URL: "my%20pic.png", "a.svg?v=2", "clip.mp4#t=5".
+
+  Takes a dict:
+    page  the page whose resources are searched
+    src   the source as written (not a remote URL)
+  Returns: a dict {res, url}: the resource ("" when none) and its URL
+  (its RelPermalink with the query and fragment; "" when none).
+*/ -}}
+{{- $src := printf "%v" .src -}}
+{{- $suffix := "" -}}
+{{- $paths := slice (strings.TrimPrefix "./" $src) -}}
+{{- with try (urls.Parse $src) -}}
+  {{- if not .Err -}}
+    {{- with .Value -}}
+      {{- if and .Path (not .Scheme) (not .Host) -}}
+        {{- $p := strings.TrimPrefix "./" .Path -}}
+        {{- if ne $p (index $paths 0) -}}
+          {{- $paths = $paths | append $p -}}
+          {{- with .RawQuery }}{{ $suffix = printf "?%s" . }}{{ end -}}
+          {{- with .Fragment }}{{ $suffix = printf "%s#%s" $suffix . }}{{ end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $res := "" -}}
+{{- $url := "" -}}
+{{- range $i, $path := $paths -}}
+  {{- if not $res -}}
+    {{- with $.page.Resources.Get $path -}}
+      {{- $res = . -}}
+    {{- else -}}
+      {{- with resources.Get (strings.TrimPrefix "/" $path) -}}
+        {{- $res = . -}}
+      {{- end -}}
+    {{- end -}}
+    {{- with $res }}{{ $url = printf "%s%s" .RelPermalink (cond (gt $i 0) $suffix "") }}{{ end -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "res" $res "url" $url) -}}

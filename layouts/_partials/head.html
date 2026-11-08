@@ -40,6 +40,7 @@
        slash against the host: so the root-relative prefix that relURL
        gives ("/blog/", or "/" with canonifyURLs) goes first. */ -}}
 {{- $canonical := .Permalink -}}
+{{- $pagerN := false -}}
 {{- /* Book landings and parts list no summaries: no paginator (it would
        also publish /page/N/ copies of them). */ -}}
 {{- if and (not $inBook) (or .IsHome (eq .Kind "section")) -}}
@@ -48,6 +49,7 @@
       {{- $u := .URL -}}
       {{- if strings.HasPrefix $u "/" }}{{ $u = strings.TrimPrefix (relURL "") $u }}{{ end -}}
       {{- $canonical = absURL $u -}}
+      {{- $pagerN = true -}}
     {{- end -}}
   {{- end -}}
 {{- end }}
@@ -59,8 +61,11 @@
 <link rel="{{ .Rel }}" type="{{ .MediaType.Type }}" href="{{ .RelPermalink }}" title="{{ site.Title }}">
 {{- end }}
 {{- end }}
-{{- /* Multilingual sites: every translation of this page, itself included. */ -}}
-{{- if .IsTranslated }}
+{{- /* Multilingual sites: every translation of this page, itself included.
+       Not on pagers 2+: the translations' URLs are their first pagers, which
+       are not this page's alternates (and the self link would contradict
+       the canonical above). */ -}}
+{{- if and .IsTranslated (not $pagerN) }}
 {{- range .AllTranslations }}
 {{- $l := partial "func/lang.html" .Language }}
 <link rel="alternate" hreflang="{{ $l.locale }}" href="{{ .Permalink }}">
@@ -107,6 +112,30 @@
             {{- $good = replace $good (index . 0) (index . 1) -}}
           {{- end -}}
           {{- $social = replace $social (printf `content="%s"` $bad) (printf `content="%s"` $good) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* twitter:site: Hugo's embedded card puts "@" before params.social.twitter
+       as written, but the footer (social.html) also takes a full profile URL
+       there ("https://x.com/jack" would give "@https://x.com/jack"). The
+       card gets the handle from the URL's last path segment; a URL without
+       a valid handle (letters, digits, "_") drops the tag. */ -}}
+{{- with site.Params.social -}}
+  {{- if reflect.IsMap . -}}
+    {{- with .twitter -}}
+      {{- $tw := strings.TrimSpace (printf "%v" .) -}}
+      {{- if findRE `(?i)^https?://` $tw 1 -}}
+        {{- $handle := "" -}}
+        {{- with try (urls.Parse $tw) -}}
+          {{- if not .Err }}{{ $handle = path.Base (strings.TrimRight "/" .Value.Path) | strings.TrimPrefix "@" }}{{ end -}}
+        {{- end -}}
+        {{- $tag := `[ \t]*<meta name="twitter:site" content="[^"]*"\s*/?>\n?` -}}
+        {{- if findRE `^[A-Za-z0-9_]+$` $handle 1 -}}
+          {{- $social = replaceRE `(<meta name="twitter:site" content=")[^"]*(")` (printf "${1}@%s${2}" $handle) $social -}}
+        {{- else -}}
+          {{- $social = replaceRE $tag "" $social -}}
         {{- end -}}
       {{- end -}}
     {{- end -}}

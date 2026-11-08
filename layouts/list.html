@@ -14,7 +14,9 @@
 {{ partial "tufte/book/part.html" (dict "page" . "root" $root) }}
 {{- else }}
 <article>
-  <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" .Title "heading" true) }}</h1>
+  {{- /* The title the <title> shows (tufte/page-title.html: a section
+         without _index.md is named after its directory, humanized). */}}
+  <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" (partial "tufte/page-title.html" .) "heading" true) }}</h1>
   {{- with .Params.subtitle }}
   <p class="subtitle">{{ . }}</p>
   {{- end }}

@@ -9,8 +9,9 @@
 <footer class="site-footer">
   {{- partial "social.html" . }}
   <p class="footer-copyright">
-    {{- with site.Params.copyright -}}
-      {{- /* Several paragraphs become lines of this one. */ -}}
+    {{- /* params.copyright, else Hugo's top-level `copyright` (which the RSS
+           feeds also use). Several paragraphs become lines of this one. */ -}}
+    {{- with site.Params.copyright | default site.Copyright -}}
       {{ partial "func/flatten-p.html" (. | markdownify | string | strings.TrimSpace) | safeHTML }}
     {{- else -}}
       &copy; {{ now.Format "2006" }}

@@ -12,7 +12,7 @@
     {{< fig "rhino.png" >}}A rhinoceros.{{< /fig >}}     (positional: src)
 
   Params (named): every param of the figure shortcode (src, alt, title,
-  attr, attrlink, link, type, width, height, class, inline, label, short,
+  attr, attrlink, link, target, rel, loading, type, width, height, class, inline, label, short,
   numbered, captionpos, offset, cite) except caption, which is the inner
   text. A citation inside the caption becomes a citation block in the
   caption, as \cite inside \caption does in tufte-latex.
@@ -48,6 +48,9 @@
   "Attr" (index $get "attr" | default "")
   "AttrLink" (index $get "attrlink" | default "")
   "Link" (index $get "link" | default "")
+  "Target" (index $get "target" | default "")
+  "Rel" (index $get "rel" | default "")
+  "Loading" (index $get "loading" | default "")
   "Type" (index $get "type" | default "main")
   "Width" (index $get "width" | default "")
   "Height" (index $get "height" | default "")

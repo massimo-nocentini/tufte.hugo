@@ -2,26 +2,28 @@
   Plain text social links from Params.social (no icon font). A value may be
   a handle or a full URL; mastodon expects the full profile URL. A value is a
   URL only when it starts with http:// or https:// (any case): a user name
-  such as "httpie" builds the profile URL. The RSS link is shown unless
+  such as "httpie" builds the profile URL. A leading "@" of a handle
+  ("@jack", "@me.bsky.social") is dropped, as Hugo's Twitter card does:
+  the profile URLs take the bare name. The RSS link is shown unless
   Params.social.rss is false.
 */ -}}
 {{- $links := slice -}}
 {{- $rss := true -}}
 {{- with site.Params.social -}}
   {{- with .github -}}
-    {{- $links = $links | append (dict "name" "GitHub" "url" (cond (findRE `(?i)^https?://` (string .) 1) . (printf "https://github.com/%s" .))) -}}
+    {{- $links = $links | append (dict "name" "GitHub" "url" (cond (findRE `(?i)^https?://` (string .) 1) . (printf "https://github.com/%s" (strings.TrimPrefix "@" (strings.TrimSpace (string .)))))) -}}
   {{- end -}}
   {{- with .gitlab -}}
-    {{- $links = $links | append (dict "name" "GitLab" "url" (cond (findRE `(?i)^https?://` (string .) 1) . (printf "https://gitlab.com/%s" .))) -}}
+    {{- $links = $links | append (dict "name" "GitLab" "url" (cond (findRE `(?i)^https?://` (string .) 1) . (printf "https://gitlab.com/%s" (strings.TrimPrefix "@" (strings.TrimSpace (string .)))))) -}}
   {{- end -}}
   {{- with .mastodon -}}
     {{- $links = $links | append (dict "name" "Mastodon" "url" . "rel" "me") -}}
   {{- end -}}
   {{- with .bluesky -}}
-    {{- $links = $links | append (dict "name" "Bluesky" "url" (cond (findRE `(?i)^https?://` (string .) 1) . (printf "https://bsky.app/profile/%s" .))) -}}
+    {{- $links = $links | append (dict "name" "Bluesky" "url" (cond (findRE `(?i)^https?://` (string .) 1) . (printf "https://bsky.app/profile/%s" (strings.TrimPrefix "@" (strings.TrimSpace (string .)))))) -}}
   {{- end -}}
   {{- with .twitter -}}
-    {{- $links = $links | append (dict "name" "X" "url" (cond (findRE `(?i)^https?://` (string .) 1) . (printf "https://x.com/%s" .))) -}}
+    {{- $links = $links | append (dict "name" "X" "url" (cond (findRE `(?i)^https?://` (string .) 1) . (printf "https://x.com/%s" (strings.TrimPrefix "@" (strings.TrimSpace (string .)))))) -}}
   {{- end -}}
   {{- with .linkedin -}}
     {{- $links = $links | append (dict "name" "LinkedIn" "url" (cond (findRE `(?i)^https?://` (string .) 1) . (printf "https://www.linkedin.com/in/%s" .))) -}}

@@ -90,6 +90,15 @@
 {{- if not $built }}
   {{- if not .Lastmod.IsZero }}{{ $built = .Lastmod }}{{ else if not .Date.IsZero }}{{ $built = .Date }}{{ end }}
 {{- end }}
+{{- /* <copyright>: Hugo's top-level `copyright`, else the footer's
+       params.copyright as plain text (its Markdown rendered and stripped,
+       paragraphs joined by a space). */}}
+{{- $copyright := site.Copyright }}
+{{- if not $copyright }}
+  {{- with site.Params.copyright }}
+    {{- $copyright = printf "%v" . | markdownify | plainify | htmlUnescape | replaceRE `\s+` " " | strings.TrimSpace }}
+  {{- end }}
+{{- end }}
 {{- $lang := partial "func/lang.html" site.Language }}
 {{- printf "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>" | safeHTML }}
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -107,7 +116,7 @@
     <generator>Hugo</generator>
     <language>{{ $lang.locale }}</language>{{ with $authorEmail }}
     <managingEditor>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</managingEditor>{{ end }}{{ with $authorEmail }}
-    <webMaster>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</webMaster>{{ end }}{{ with site.Copyright }}
+    <webMaster>{{ . }}{{ with $authorName }} ({{ . }}){{ end }}</webMaster>{{ end }}{{ with $copyright }}
     <copyright>{{ . }}</copyright>{{ end }}{{ with $built }}
     <lastBuildDate>{{ .Format "Mon, 02 Jan 2006 15:04:05 -0700" | safeHTML }}</lastBuildDate>{{ end }}
     {{- with .OutputFormats.Get "rss" }}

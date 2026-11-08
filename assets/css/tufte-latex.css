@@ -1244,7 +1244,10 @@ section > h6 {
     margin: 0.4rem 0;
 }
 
-.title-block.latex .post-meta {
+/* The taxonomy line follows the latex title block (it is the header's
+   next sibling, not a child). */
+.title-block.latex .post-meta,
+.title-block.latex + p.post-meta {
     margin-top: 1rem;
 }
 
@@ -3517,7 +3520,7 @@ body.tufte-debug .index-anchor::before {
     font-size: 0.7rem;
     font-style: normal;
     vertical-align: super;
-    color: #b00;
+    color: var(--tufte-alert-caution, #b00);
 }
 
 body.tufte-debug .tufte-anchor::before {
@@ -3526,7 +3529,7 @@ body.tufte-debug .tufte-anchor::before {
 
 body.tufte-debug .index-anchor::before {
     content: "\2192\00a0" attr(data-index);
-    color: #070;
+    color: var(--tufte-alert-tip, #070);
 }
 
 body.tufte-debug figure[id]::before,
@@ -3536,7 +3539,7 @@ body.tufte-debug label.sidenote-number[id]::before {
     content: "#" attr(id);
     font-family: var(--tufte-mono, monospace);
     font-size: 0.7rem;
-    color: #b00;
+    color: var(--tufte-alert-caution, #b00);
 }
 
 body.tufte-debug .tufte-num:empty,

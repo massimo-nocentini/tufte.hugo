@@ -172,6 +172,10 @@
       {{- $toc = $html -}}
     {{- end -}}
   {{- end -}}
+  {{- /* A heading without an id (autoHeadingID = false, warning
+         tufte-heading-id): Hugo lists it with href="#", a link to the top
+         of the page; its text stays, unlinked. */ -}}
+  {{- $toc = replaceRE `(?s)<li><a href="#">(.*?)</a>` "<li><span>$1</span>" $toc -}}
   {{- /* Empty items: a level with no entry of its own, e.g. an h2 whose
          only subheading is a run-in h4 (#### Title) below the TOC levels. */ -}}
   {{- range seq 3 -}}

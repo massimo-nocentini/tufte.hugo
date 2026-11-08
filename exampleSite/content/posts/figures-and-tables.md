@@ -27,6 +27,8 @@ The `figure` shortcode replaces Hugo's built-in one and accepts a `type`: `main`
 
 {{< figure src="images/table-example-be-page-159.png" alt="A table of figures from Beautiful Evidence" caption="The same page, placed with the `figure` shortcode. Captions may contain *emphasis* and [links](https://www.edwardtufte.com/book/beautiful-evidence/)." >}}
 
+Like Hugo's own shortcode, it takes `link` (the image becomes a link), with that link's `target` and `rel`, and `loading`: `lazy`, the default, or `eager` for an image at the top of a page (`{{</* figure src="cover.jpg" link="https://example.org/" target="_blank" rel="noopener" loading="eager" */>}}`).
+
 ## Margin figures
 
 {{< marginfigure src="images/table-example-be-page-159.png" alt="A table of figures from Beautiful Evidence" caption="A margin figure: the image and its caption sit in the margin, next to this paragraph." inline="true" >}} Small, ancillary graphics go in the margin. The `marginfigure` shortcode, which is the same as `figure` with `type="margin"`, puts the image inside a margin note. Write it at the start of a paragraph, on the same line as the text, with `inline="true"`, so the margin note becomes part of that paragraph. On a narrow screen it hides behind the &#8853; toggle, like any other margin note.

@@ -47,6 +47,10 @@
     Title       optional title, shown in bold before the caption
     Attr        optional attribution appended to the caption; AttrLink links it
     Link        URL the image links to
+    Target, Rel optional target and rel attributes of that link (as in
+                Hugo's built-in figure shortcode)
+    Loading     "lazy" (default) | "eager": the img loading attribute (an
+                image above the fold); Attrs may set it too ({loading=eager})
     Type        "main" (default) | "margin" | "fullwidth" | "inline"
     Width, Height  img attributes
     Class       extra classes (figure; margin: the wrapping p, or the
@@ -84,16 +88,11 @@
 {{- $res := "" -}}
 {{- $remote := or (strings.HasPrefix $src "http://") (strings.HasPrefix $src "https://") (strings.HasPrefix $src "//") (strings.HasPrefix $src "data:") -}}
 {{- if and $src (not $remote) -}}
-  {{- $path := strings.TrimPrefix "./" $src -}}
-  {{- with $resPage.Resources.Get $path -}}
-    {{- $res = . -}}
-  {{- else -}}
-    {{- with resources.Get (strings.TrimPrefix "/" $path) -}}
-      {{- $res = . -}}
-    {{- end -}}
-  {{- end -}}
+  {{- /* tufte/resolve-res.html: also "my%20pic.png", "a.svg?v=2". */ -}}
+  {{- $found := partial "tufte/resolve-res.html" (dict "page" $resPage "src" $src) -}}
+  {{- $res = $found.res -}}
   {{- with $res -}}
-    {{- $url = .RelPermalink -}}
+    {{- $url = $found.url -}}
   {{- else -}}
     {{- if strings.HasPrefix $src "/" -}}
       {{- $url = strings.TrimPrefix "/" $src | relURL -}}
@@ -204,6 +203,21 @@
 
 {{- $class := printf "%v" (.Class | default "") | strings.TrimSpace -}}
 {{- $link := .Link | default "" -}}
+{{- /* loading: "lazy" unless Loading (or an image attribute) says "eager". */ -}}
+{{- $loading := "lazy" -}}
+{{- $loadingArg := .Loading | default "" -}}
+{{- range $k, $v := .Attrs }}{{ if eq (lower $k) "loading" }}{{ $loadingArg = $v }}{{ end }}{{ end -}}
+{{- with $loadingArg -}}
+  {{- $l := lower (strings.TrimSpace (printf "%v" .)) -}}
+  {{- if in (slice "lazy" "eager") $l -}}
+    {{- $loading = $l -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: loading = %q for %q: expected \"lazy\" or \"eager\", using \"lazy\" (%s)" (printf "%v" .) $src $where -}}
+  {{- end -}}
+{{- end -}}
+{{- $linkAttrs := "" -}}
+{{- with .Target }}{{ $linkAttrs = printf `%s target="%s"` $linkAttrs (htmlEscape (printf "%v" .)) }}{{ end -}}
+{{- with .Rel }}{{ $linkAttrs = printf `%s rel="%s"` $linkAttrs (htmlEscape (printf "%v" .)) }}{{ end -}}
 
 {{- /* Numbering, label, offset, citations (SPEC-LATEX §3.4). */ -}}
 {{- $numbered := true -}}
@@ -312,13 +326,13 @@
 {{- else -}}
   {{- $imgClass := "" -}}
   {{- if eq $type "inline" }}{{ $imgClass = $class }}{{ end -}}
-  {{- $img = printf `<img src="%s" alt="%s"%s%s%s%s loading="lazy"/>` (htmlEscape $url) (htmlEscape $alt) (cond (ne $width "") (printf ` width="%s"` (htmlEscape $width)) "") (cond (ne $height "") (printf ` height="%s"` (htmlEscape $height)) "") (cond (ne $imgClass "") (printf ` class="%s"` (htmlEscape $imgClass)) "") $extra -}}
+  {{- $img = printf `<img src="%s" alt="%s"%s%s%s%s loading="%s"/>` (htmlEscape $url) (htmlEscape $alt) (cond (ne $width "") (printf ` width="%s"` (htmlEscape $width)) "") (cond (ne $height "") (printf ` height="%s"` (htmlEscape $height)) "") (cond (ne $imgClass "") (printf ` class="%s"` (htmlEscape $imgClass)) "") $extra $loading -}}
   {{- with $link -}}
     {{- /* As html/template would: no script URLs (tufte/safe-url.html);
            a root-absolute path is resolved against the site's base path
            (tufte/site-url.html), as $src is above. */ -}}
     {{- $href := partial "tufte/safe-url.html" . | partial "tufte/site-url.html" -}}
-    {{- $img = printf `<a href="%s">%s</a>` (htmlEscape $href) $img -}}
+    {{- $img = printf `<a href="%s"%s>%s</a>` (htmlEscape $href) $linkAttrs $img -}}
   {{- end -}}
 {{- end -}}
 {{- $img = printf "%s%s" $mark $img -}}

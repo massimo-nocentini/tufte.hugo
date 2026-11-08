@@ -2,7 +2,8 @@
   Emits the single theme stylesheet. In order: ET Book @font-face rules
   (unless Params.etBook is false or "false", func/flag.html), tufte.css, theme.css, tufte-latex.css,
   syntax.css and
-  every path listed in Params.customCSS (resolved in the site's assets/).
+  every path listed in Params.customCSS (resolved in the site's assets/;
+  their @import statements go first).
   The bundle is published as css/tufte-hugo.<hash>.css, so the relative
   font URLs in et-book.css (../et-book/...) resolve against static/et-book/.
   Minified in production builds only, always fingerprinted with SRI.
@@ -39,12 +40,28 @@
     {{- warnidf "tufte-bad-option" "tufte.hugo: customCSS must be a list of paths under assets/ (or one path), not %v; ignored" . -}}
   {{- end -}}
 {{- end -}}
+{{- /* A browser ignores an @import that follows other rules, and the
+       custom files come last in the bundle: their @import statements
+       (a web font stylesheet, say) are moved to the top of the bundle,
+       in order, and removed from the files. */ -}}
+{{- $imports := slice -}}
+{{- /* The URL may hold ";" (Google Fonts: wght@400;700), so a quoted or
+       url(…) URL is matched whole, then the media list up to ";". */ -}}
+{{- $importRE := `(?i)@import\s*(?:url\(\s*(?:"[^"]*"|'[^']*'|[^)]*)\s*\)|"[^"]*"|'[^']*')[^;]*;` -}}
 {{- range $custom -}}
   {{- with resources.Get (printf "%v" .) -}}
-    {{- $resources = $resources | append . -}}
+    {{- $r := . -}}
+    {{- with findRE $importRE $r.Content -}}
+      {{- $imports = $imports | append . -}}
+      {{- $r = resources.FromString (printf "tufte/custom-css/%s" $r.Name) (replaceRE $importRE "" $r.Content) -}}
+    {{- end -}}
+    {{- $resources = $resources | append $r -}}
   {{- else -}}
     {{- warnidf "tufte-bad-option" "tufte.hugo: customCSS %q not found in assets/, skipped" . -}}
   {{- end -}}
+{{- end -}}
+{{- with $imports -}}
+  {{- $resources = slice (resources.FromString "tufte/custom-css/imports.css" (delimit . "\n")) | append $resources -}}
 {{- end -}}
 {{- with $resources -}}
   {{- $css := . | resources.Concat "css/tufte-hugo.css" -}}

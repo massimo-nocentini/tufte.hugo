@@ -16,7 +16,7 @@
   browsers break apart, and the text would lose the paragraph styles.
 
   Params: as for the figure shortcode (src, alt, caption, title, attr,
-  attrlink, link, width, height, class, label, short, numbered, offset,
+  attrlink, link, target, rel, loading, width, height, class, label, short, numbered, offset,
   cite), without type, plus inline. captionpos="bottom" has no effect on
   a margin float (warning tufte-bad-option).
 
@@ -38,6 +38,9 @@
   "Attr" (.Get "attr" | default "")
   "AttrLink" (.Get "attrlink" | default "")
   "Link" (.Get "link" | default "")
+  "Target" (.Get "target" | default "")
+  "Rel" (.Get "rel" | default "")
+  "Loading" (.Get "loading" | default "")
   "Type" "margin"
   "Width" (.Get "width" | default "")
   "Height" (.Get "height" | default "")

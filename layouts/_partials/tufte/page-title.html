@@ -53,5 +53,13 @@
     {{- with .File.ContentBaseName }}{{ $t = strings.TrimSpace (title (humanize .)) }}{{ end -}}
   {{- end -}}
   {{- if not $t }}{{ with partial "func/t.html" "untitled" }}{{ $t = . }}{{ end }}{{ end -}}
+{{- else if and (eq .Kind "section") (not .File) -}}
+  {{- /* A section without _index.md: Hugo titles it with its directory name,
+         only re-cased ("my-notes" -> "My-Notes"); humanized here as for an
+         untitled _index.md ("My Notes"). */ -}}
+  {{- $dir := path.Base (strings.TrimRight "/" .Path) -}}
+  {{- if and $dir (eq (lower $t) (lower $dir)) -}}
+    {{- $t = strings.TrimSpace (title (humanize $dir)) -}}
+  {{- end -}}
 {{- end -}}
 {{- return $t -}}

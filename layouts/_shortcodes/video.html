@@ -39,17 +39,11 @@
   {{- $u := $v -}}
   {{- $remote := or (strings.HasPrefix $v "http://") (strings.HasPrefix $v "https://") (strings.HasPrefix $v "//") (strings.HasPrefix $v "data:") -}}
   {{- if and $v (not $remote) -}}
-    {{- $path := strings.TrimPrefix "./" $v -}}
-    {{- $res := "" -}}
-    {{- with $p.Resources.Get $path -}}
-      {{- $res = . -}}
-    {{- else -}}
-      {{- with resources.Get (strings.TrimPrefix "/" $path) -}}
-        {{- $res = . -}}
-      {{- end -}}
-    {{- end -}}
+    {{- /* tufte/resolve-res.html: also "my%20clip.mp4", "clip.mp4#t=5". */ -}}
+    {{- $found := partial "tufte/resolve-res.html" (dict "page" $p "src" $v) -}}
+    {{- $res := $found.res -}}
     {{- with $res -}}
-      {{- $u = .RelPermalink -}}
+      {{- $u = $found.url -}}
       {{- if eq $key "src" }}{{ $mime = .MediaType.Type }}{{ end -}}
     {{- else -}}
       {{- if strings.HasPrefix $v "/" -}}

@@ -13,6 +13,8 @@
     title    shown in bold before the caption
     attr     attribution appended to the caption; attrlink links it
     link     URL the image links to
+    target, rel  attributes of that link (target="_blank" rel="noopener")
+    loading  "lazy" (default) | "eager" (an image above the fold)
     type     "main" (default: main column, caption as a margin note)
              | "margin" (the image goes in the margin, see marginfigure)
              | "fullwidth" (full width, caption in the margin, see fullwidthfigure)
@@ -52,6 +54,9 @@
   "Attr" (.Get "attr" | default "")
   "AttrLink" (.Get "attrlink" | default "")
   "Link" (.Get "link" | default "")
+  "Target" (.Get "target" | default "")
+  "Rel" (.Get "rel" | default "")
+  "Loading" (.Get "loading" | default "")
   "Type" (.Get "type" | default "main")
   "Width" (.Get "width" | default "")
   "Height" (.Get "height" | default "")

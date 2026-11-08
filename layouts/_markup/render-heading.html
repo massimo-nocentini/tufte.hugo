@@ -55,7 +55,7 @@
        follow headings by their ids, so an h2/h3 without one is left out of
        them (README, "Required site configuration"). Warned once per page. */ -}}
 {{- if and (not $anchor) (in (slice 2 3) .Level) -}}
-  {{- warnidf "tufte-heading-id" "tufte.hugo: %s has a heading without an id (markup.goldmark.parser.autoHeadingID = false?): section numbers, cross-reference names and the table of contents skip it; keep autoHeadingID = true or give the heading an id ({#sec:x})" $where -}}
+  {{- warnidf "tufte-heading-id" "tufte.hugo: %s has a heading without an id (markup.goldmark.parser.autoHeadingID = false?): section numbers and cross-reference names skip it, and its table-of-contents entry has no link; keep autoHeadingID = true or give the heading an id ({#sec:x})" $where -}}
 {{- end -}}
 {{- $num := "" -}}
 {{- if and (in (slice 2 3) .Level) $anchor (not (in $classes "unnumbered")) -}}
