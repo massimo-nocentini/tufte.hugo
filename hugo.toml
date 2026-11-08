@@ -10,7 +10,7 @@
 
 [module]
   [module.hugoVersion]
-    min = "0.146.0"
+    min = "0.169.0"
     extended = false # no SCSS, no WebP encoding: the standard edition is enough
   # Hugo's default mounts (a module that lists mounts gets no defaults),
   # plus i18n/en.yaml as an asset: func/t.html reads it as the English

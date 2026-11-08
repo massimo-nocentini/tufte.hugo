@@ -15,7 +15,7 @@ hugo -s exampleSite --gc --panicOnWarning      # build into exampleSite/public
 hugo server -s exampleSite --disableFastRender  # live preview
 ```
 
-CI (`.github/workflows/ci.yml`) builds the example site with Hugo `0.146.0` and `latest` (standard edition).
+CI (`.github/workflows/ci.yml`) builds the example site with the `latest` Hugo (standard edition).
 It checks for sidenote, margin note, section, epigraph and KaTeX markup (the `katex.min.css` version must match
 the KaTeX that Hugo embeds: `katex-base` classes need 0.18+; the bundle must keep theme.css's
 `html body { counter-reset: sidenote-counter katexEqnNo mmlEqnNo }`, which outranks katex.min.css's `body` reset)
@@ -65,8 +65,10 @@ leading-slash path as written).
 
 ## Hugo Version and Config
 
-- Minimum Hugo is `0.146.0`, declared in `hugo.toml` (`[module.hugoVersion]`) and `theme.toml` (`min_version`).
-  The standard edition is enough. Use only template functions that exist in 0.146.
+- The theme requires the latest Hugo release: minimum `0.169.0`, declared in `hugo.toml` (`[module.hugoVersion]`)
+  and `theme.toml` (`min_version`); CI tests only `latest`. Raise both when a new feature needs a newer Hugo.
+  The standard edition is enough. (Code paths for older Hugo, e.g. the KaTeX 0.16 entry in `vendor.toml` and
+  the `func/lang.html` shim, are kept but no longer tested.)
 - The theme's `hugo.toml` holds every `[params]` default, **except** `[params.tufte]`: it sets only
   `style = "css"`. All other tufte-latex defaults live in `layouts/_partials/tufte/defaults.html` (per style
   preset), so that `style = "latex"` can change them; adding a `[params.tufte]` leaf to `hugo.toml` would hide the

@@ -17,7 +17,7 @@ Above all else show the data.
 
 ## Installation
 
-The theme needs Hugo 0.146 or later; the standard edition is enough, since the theme ships plain CSS and needs neither Sass nor JavaScript tooling.
+The theme needs the latest Hugo release (0.169.0 or later); the standard edition is enough, since the theme ships plain CSS and needs neither Sass nor JavaScript tooling.
 
 As a Git submodule:
 
@@ -206,7 +206,7 @@ Block quotes can carry their attribution as attributes:
 GitHub-style alerts are rendered as quiet, labelled blocks:
 
 > [!NOTE]
-> Hugo 0.146 introduced the template system this theme uses. Older versions will not build it.
+> The theme is tested only with the latest Hugo release and declares 0.169.0 as its minimum; older versions warn and are not supported.
 
 > [!TIP]
 > Run `hugo server --navigateToChanged` while writing, to jump to the page you are editing.

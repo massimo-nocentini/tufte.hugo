@@ -16,7 +16,7 @@ The theme is organised like [Beautiful Hugo](https://github.com/halogenica/beaut
 Hugo 0.146 template system (`layouts/baseof.html`, `home.html`, `page.html`, `list.html`, plus
 `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`).
 
-- **Hugo**: 0.146.0 or newer. The standard edition is enough; the extended edition is not required.
+- **Hugo**: the latest release (0.169.0 or newer). The standard edition is enough; the extended edition is not required.
 - **License**: MIT (see [LICENSE](LICENSE)). Tufte CSS and ET Book are MIT as well (see [Credits](#credits)).
 
 ## Contents
@@ -1105,12 +1105,12 @@ passthrough extension, set
 **KaTeX version.** With the server engine the HTML is produced by the KaTeX that Hugo embeds, and the
 stylesheet must come from the same release: KaTeX 0.18 renamed the classes of its output (`base` →
 `katex-base`, `strut` → `katex-strut`, `tag` → `katex-tag`, …), so an older stylesheet leaves the math
-unstyled. The theme therefore picks the KaTeX release by Hugo version (`hugo.Version`):
+unstyled. The theme therefore picks the KaTeX release by Hugo version (`hugo.Version`); every supported
+Hugo (0.169.0 and later) embeds KaTeX 0.18, so it loads `katex@0.18.4`:
 
 | Hugo | Embedded KaTeX | Stylesheet and scripts loaded |
 |---|---|---|
-| 0.146.0 – 0.165.x | 0.16.x | `katex@0.16.21` |
-| 0.166.0 and later | 0.18.x | `katex@0.18.4` |
+| 0.169.0 and later | 0.18.x | `katex@0.18.4` |
 
 The client engine loads `katex.min.js` and `auto-render.min.js` of the same release as the stylesheet, so
 script and CSS always agree. Setting `katexVersion` to a release that differs from Hugo's embedded one gives
@@ -2173,7 +2173,7 @@ hugo server -s exampleSite
 ```
 
 The example site sets `theme = "tufte.hugo"` and `themesDir = "../.."`, so the theme directory must be named
-`tufte.hugo`. Continuous integration builds the example site with Hugo 0.146.0 and the latest release
+`tufte.hugo`. Continuous integration builds the example site with the latest Hugo release
 (`.github/workflows/ci.yml`) and checks:
 
 - the Tufte markup (sidenotes, margin notes, sections, epigraphs, KaTeX output with the stylesheet of the

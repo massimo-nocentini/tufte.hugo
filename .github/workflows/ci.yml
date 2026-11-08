@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        hugo: ["0.146.0", "latest"]
+        hugo: ["latest"] # the theme requires the latest Hugo release (min 0.169.0)
     defaults:
       run:
         # exampleSite/hugo.toml uses theme = "tufte.hugo" and themesDir = "../..",

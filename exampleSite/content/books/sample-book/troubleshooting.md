@@ -102,5 +102,5 @@ document classes rely upon. Packages marked with an asterisk are optional.
 xifthen, ifpdf\*, ifxetex\*, hyperref, geometry, ragged2e, chngpage *or* changepage, paralist, textcase, soul\*, letterspace\*, setspace, natbib *and* bibentry, optparams, placeins, mathpazo\*, helvet\*, fontenc, beramono\*, fancyhdr, xcolor, textcomp, titlesec, titletoc
 {{< /fullwidth >}}
 
-This theme depends on Hugo (0.146 or newer) only; math is typeset by KaTeX,
+This theme depends on Hugo (the latest release, 0.169.0 or newer) only; math is typeset by KaTeX,
 either at build time or in the browser.
