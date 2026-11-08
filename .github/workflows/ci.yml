@@ -421,7 +421,7 @@ jobs:
             for s in 0 1 2 3; do
               printf '## Section %d {#sec:c%d-s%d}\n\n' "$s" "$i" "$s" >> "$f"
               for n in 0 1 2; do
-                printf 'Text{{< sidenote >}}note %d.%d with $x_%d${{< /sidenote >}} {{< index "term%d!sub%d" >}} see {{< xref "fig:c%d-f%d" "full" >}} {{< cite "tufte2006" >}}.\n\n' "$s" "$n" "$n" "$n" "$s" "$p" "$s" >> "$f"
+                printf 'Text{{< sidenote >}}note %d.%d with $x_%d\x24{{< /sidenote >}} {{< index "term%d!sub%d" >}} see {{< xref "fig:c%d-f%d" "full" >}} {{< cite "tufte2006" >}}.\n\n' "$s" "$n" "$n" "$n" "$s" "$p" "$s" >> "$f"
               done
               printf '{{< figure src="/x.png" caption="Figure %d-%d" label="fig:c%d-f%d" >}}\n\n' "$i" "$s" "$i" "$s" >> "$f"
             done
