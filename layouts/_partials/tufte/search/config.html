@@ -1,0 +1,82 @@
+{{- /*
+  The site search of the current language (README "Search"), or false when
+  it is off: params.search.enable is not true, or the home page has no
+  "searchindex" output (then the warning tufte-search-output: the box
+  would search an index that does not exist).
+
+  Depends only on the site and its language: call it through
+  partialCached with the language name as the variant.
+
+  Returns: false, or a dict with
+    index          RelPermalink of the index (layouts/home.searchindex.json)
+    page           RelPermalink of the results page (the first page with
+                   `layout: search`), or ""
+    fuse           URL of Fuse.js (data/tufte/vendor.toml [fuse]; served
+                   from the site with params.selfHosted) and
+    fuseIntegrity  its SRI hash
+    maxResults     results under the header box (int ≥ 1)
+    threshold      Fuse.js threshold (0–1)
+    hotkey         key that focuses the header box ("" = none)
+    locale         the language's locale, for plural rules
+    msg            the translated strings of the search script
+*/ -}}
+{{- $cfg := false -}}
+{{- $s := site.Params.search -}}
+{{- if not (reflect.IsMap $s) }}{{ $s = dict "enable" $s }}{{ end -}}
+{{- if partial "func/flag.html" (dict "value" $s.enable "default" false) -}}
+  {{- with site.Home.OutputFormats.Get "searchindex" -}}
+    {{- $index := .RelPermalink -}}
+    {{- $page := "" -}}
+    {{- range first 1 (where site.Pages "Layout" "search") }}{{ $page = .RelPermalink }}{{ end -}}
+    {{- $fuse := index (partial "func/vendor-data.html" .) "fuse" -}}
+    {{- if not $fuse.url -}}
+      {{- errorf "tufte.hugo: data/tufte/vendor.toml has no [fuse] url (params.search)" -}}
+    {{- end -}}
+    {{- $src := partial "tufte/vendor-src.html" (dict "url" $fuse.url "kind" "js" "integrity" $fuse.integrity "dir" ($fuse.dir | default "fuse")) -}}
+    {{- $max := 8 -}}
+    {{- with $s.maxresults -}}
+      {{- if findRE `^\s*[1-9][0-9]{0,2}\s*$` (printf "%v" .) 1 -}}
+        {{- $max = int (strings.TrimSpace (printf "%v" .)) -}}
+      {{- else -}}
+        {{- warnidf "tufte-bad-option" "params.search.maxResults: expected a whole number from 1 to 999, not %q; using 8" (printf "%v" .) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $threshold := 0.3 -}}
+    {{- if ne $s.threshold nil -}}
+      {{- $t := strings.TrimSpace (printf "%v" $s.threshold) -}}
+      {{- if and (findRE `^(?:0|1|0?\.[0-9]+|1\.0*)$` $t 1) (le (float $t) 1.0) -}}
+        {{- $threshold = float $t -}}
+      {{- else if $t -}}
+        {{- warnidf "tufte-bad-option" "params.search.threshold: expected a number from 0 to 1, not %q; using 0.3" $t -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $hotkey := "/" -}}
+    {{- if ne $s.hotkey nil }}{{ $hotkey = printf "%v" $s.hotkey }}{{ end -}}
+    {{- if gt (strings.RuneCount $hotkey) 1 -}}
+      {{- warnidf "tufte-bad-option" "params.search.hotkey: expected one character or \"\", not %q; using \"/\"" $hotkey -}}
+      {{- $hotkey = "/" -}}
+    {{- end -}}
+    {{- $msg := dict
+      "loading" (partial "func/t.html" "searchLoading")
+      "error" (partial "func/t.html" "searchError")
+      "none" (partial "func/t.html" "searchNoResults")
+      "one" (partial "func/t.html" (dict "key" "searchResults" "count" 1))
+      "other" (partial "func/t.html" (dict "key" "searchResults" "count" 2))
+      "untitled" (partial "func/t.html" "untitled")
+    -}}
+    {{- $cfg = dict
+      "index" $index
+      "page" $page
+      "fuse" $src.href
+      "fuseIntegrity" $src.integrity
+      "maxResults" $max
+      "threshold" $threshold
+      "hotkey" $hotkey
+      "locale" (replace (partial "func/lang.html" site.Language).locale "_" "-")
+      "msg" $msg
+    -}}
+  {{- else -}}
+    {{- warnidf "tufte-search-output" "params.search.enable is true, but the home page has no \"searchindex\" output, so there is no index to search: add it to the site configuration ([outputs] home = [\"html\", \"rss\", \"searchindex\"]). The search box is left out." -}}
+  {{- end -}}
+{{- end -}}
+{{- return $cfg -}}

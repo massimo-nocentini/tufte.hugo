@@ -40,3 +40,14 @@ dir = "katex"
   [katex.autorender]
   url = "https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/contrib/auto-render.min.js"
   integrity = "sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz"
+
+# Fuse.js, the fuzzy search of params.search (layouts/_partials/tufte/search/,
+# assets/tufte/search.js). Since 7.3 Fuse.js ships only ES modules: the
+# search script loads this file as <script type="module" integrity=…> on the
+# first search, then imports the same URL, which the browser takes from its
+# module map (already checked against the hash) instead of fetching it again.
+[fuse]
+version = "7.5.0"
+url = "https://cdn.jsdelivr.net/npm/fuse.js@7.5.0/dist/fuse.min.mjs"
+integrity = "sha384-q0aLEO7RBzlrypvGA6+2CLbdnwCONRgCmmkPYWRTu5isFkLs7tLZshJIZhY5b1Rk"
+dir = "fuse"

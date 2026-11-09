@@ -63,6 +63,11 @@ mainSections = ["posts"]
   [params.comments]
     enable = false
 
+  # Site search: a box in the header (press "/"), results on /search/. It
+  # needs the "searchindex" output of the home page ([outputs] below).
+  [params.search]
+    enable = true
+
   # tufte-latex parity: the site keeps the default preset ("css"), so the
   # Tufte CSS showcase renders exactly as Tufte CSS does. The handout and the
   # book switch to the LaTeX look in their own front matter
@@ -148,5 +153,5 @@ mainSections = ["posts"]
   weight = 7
 
 [outputs]
-  home = ["HTML", "RSS"]
+  home = ["HTML", "RSS", "searchindex"]
   section = ["HTML", "RSS"]

@@ -1,0 +1,31 @@
+{{- /*
+  A piece of the final article HTML as the plain text of the search index
+  (tufte/search/entry.html; KaTeX output is already reduced to $TeX$ and
+  the margin notes are already cut out by then).
+
+  Drops what is not running text: margin toggles and their checkboxes,
+  heading anchors ("#"), footnote references and back links, end-of-proof
+  symbols, scripts, styles, SVG, embedded media, and the generated lists
+  (lists of figures, tables, listings and theorems; the index; a table
+  of contents) and code line numbers, whose
+  entries would match every search. Block boundaries become spaces, so
+  that paragraphs, list items and table cells do not run together; the
+  space left where a note was cut out is dropped before punctuation
+  ("Alpha."), as in tufte/description.html.
+
+  Takes: the HTML (string).
+  Returns: the text (string, not HTML-escaped).
+*/ -}}
+{{- $h := string . -}}
+{{- $h = replaceRE `<label [^>]*class="margin-toggle[^"]*"[^>]*>[^<]*</label>|<input\b[^>]*>` "" $h -}}
+{{- $h = replaceRE `<a class="heading-anchor"[^>]*>[^<]*</a>|<a [^>]*class="footnote-backref"[^>]*>[^<]*</a>` "" $h -}}
+{{- $h = replaceRE `<sup class="footnote-ref"[^>]*>[\s\S]*?</sup>|<span class="thm-qed[^"]*"[^>]*>[^<]*</span>` "\uE003" $h -}}
+{{- $h = replaceRE `<(?:script|style|svg|video|audio|iframe|object|template)\b[\s\S]*?</(?:script|style|svg|video|audio|iframe|object|template)>` " " $h -}}
+{{- $h = replaceRE `<ol class="tufte-lof"[\s\S]*?</ol>|<div class="tufte-index\b[\s\S]*?</ul></div>|<nav class="(?:toc|book-toc)"[\s\S]*?</nav>` " " $h -}}
+{{- /* Chroma's line numbers ("1def f"); a table of numbers has its own cell */ -}}
+{{- $h = replaceRE `<span class="ln"[^>]*>[^<]*</span>|<td class="lntd">\s*<pre[^>]*>[\s\S]*?</pre>\s*</td>` "" $h -}}
+{{- $h = replaceRE `<(?:/?(?:p|li|ol|ul|dl|dt|dd|h[1-6]|div|br|hr|blockquote|figure|figcaption|table|caption|thead|tbody|tfoot|tr|td|th|section|pre|header|footer|nav|aside|details|summary)\b|span (?:class="(?:subfigure|subcaption|verse-line)"|data-sn=))` " ${0}" $h -}}
+{{- $t := $h | plainify | htmlUnescape -}}
+{{- $t = replaceRE `\s*\x{E003}\s*([.,;:!?)\]])` "${1}" $t -}}
+{{- $t = replace $t "\uE003" " " -}}
+{{- return ($t | replaceRE `\s+` " " | strings.TrimSpace) -}}

@@ -1,0 +1,22 @@
+{{- /*
+  A regular expression for the inside of an element whose descendants may
+  be elements of the same name, nested down to a fixed depth: text and any
+  tag but <TAG and </TAG (so in a span: <svg>, <sup>, <em>…), or a whole
+  nested TAG element. Go regexps have no recursion, so the pattern is
+  unrolled DEPTH times; an element nested deeper does not match, and the
+  caller then leaves it in place (no text is lost).
+
+  Takes: a dict with
+    tag    "span" or "div" (any name of two letters or more)
+    depth  int
+  Returns: the pattern (string), with no capturing group.
+*/ -}}
+{{- $tag := .tag -}}
+{{- $a := substr $tag 0 1 -}}
+{{- $b := substr $tag 1 1 -}}
+{{- $leaf := printf `(?:[^<]|<[^%s/]|<%s[^%s]|</[^%s]|</%s[^%s])` $a $a $b $a $a $b -}}
+{{- $re := printf `%s*` $leaf -}}
+{{- range seq (int .depth) -}}
+  {{- $re = printf `(?:%s|<%s\b[^>]*>%s</%s>)*` $leaf $tag $re $tag -}}
+{{- end -}}
+{{- return $re -}}

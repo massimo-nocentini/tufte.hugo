@@ -2,8 +2,8 @@
 
 This is a **Hugo theme**, not a standalone site. Its job is to turn Markdown into the exact markup that
 [Tufte CSS](https://github.com/edwardtufte/tufte-css) expects. All changes are template-level (Go templates,
-HTML, CSS, YAML i18n). There is no package manager, JavaScript, build tool or unit test suite. Hugo's own build
-is the only check.
+HTML, CSS, YAML i18n). There is no package manager, build tool or unit test suite, and no JavaScript but the
+optional site search (`assets/tufte/search.js`). Hugo's own build is the only check.
 
 ## Build / Verify
 
@@ -22,7 +22,11 @@ runtimes); a run script never contains a literal `${{` (pass expressions through
 It checks for sidenote, margin note, section, epigraph and KaTeX markup (the `katex.min.css` version must match
 the KaTeX that Hugo embeds: `katex-base` classes need 0.18+; the bundle must keep theme.css's
 `html body { counter-reset: sidenote-counter katexEqnNo mmlEqnNo }`, which outranks katex.min.css's `body` reset)
-and for duplicate ids, then runs a second minified
+and for duplicate ids; the step "Check the site search" checks `public/search-index.json` (entries, the
+`posts/theorems` golden section `groups` with its `$TeX$` and its margin note in `notes`, no markup or private-use
+markers left), the hidden header box, the settings JSON (Fuse.js URL and hash equal to `vendor.toml`) and the
+script on every page and the results page, then builds with `HUGO_PARAMS_SEARCH_ENABLE=false` (no box, the
+search-off line) and with `HUGO_OUTPUTS_HOME=html` (the `tufte-search-output` warning, no index). It then runs a second minified
 build with `HUGO_PARAMS_SECTIONS=none` and `HUGO_PARAMS_FOOTNOTES=endnotes`. Two §11 steps check sidenotes and
 real footnotes together (`posts/footnotes-as-sidenotes`: one `section.footnotes`; `posts/footnotes-and-sidenotes`:
 `div.footnotes.footnotes-section` per section; letter marks, links in both directions, no Goldmark leftovers)
@@ -157,6 +161,17 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   `tufte.theorems.*` (defaults in `tufte/defaults.html`), words the `thm*` i18n keys. In a sidenote, margin note
   or caption a theorem becomes `span[data-sn="section"]` (`tufte/thm/inline.html`, on every path: nest tokens,
   a `caption=` parameter, a Markdown image title), without `tufte-block-in-note` for its root.
+- **Search** (README "Search"; off unless `params.search.enable` and the home page has the theme's
+  `searchindex` output format, declared in `hugo.toml`): `layouts/home.searchindex.json` writes the index from
+  each page's final HTML (`tufte/search/entry.html`: the same cached `func/content.html` call as the layouts,
+  KaTeX reduced to its TeX annotation, margin notes cut out into `notes` with the depth-unrolled regexes of
+  `tufte/search/nested.html`, text cut at each `h2`–`h4` with an id, `tufte/search/plain.html`).
+  `tufte/search/config.html` (partialCached per language) holds the settings, `tufte/search/form.html` the header
+  box (`hidden` until the script runs), `layouts/search.html` the results page (`layout: search`), and `js.html`
+  emits the settings JSON and `assets/tufte/search.js`, the theme's only script. Fuse.js is an ES module
+  (`vendor.toml` `[fuse]`, resolved by `tufte/vendor-src.html`, which `tufte/vendor.html` also uses): the script
+  adds it as a module script with `integrity`, then `import()`s the same URL. Keep the index free of markup and
+  of the theme's markers.
 - `i18n/` has `en`, `it`, `fr`, `de`, `es`. Every key must exist in all five files. Templates translate with
   `partial "func/t.html" KEY` (or a dict with `key`, `count`, `data`), never `T` directly: it falls back to
   `i18n/en.yaml` (mounted as the asset `tufte/i18n-en.yaml` in `hugo.toml`, whose `[[module.mounts]]` must keep

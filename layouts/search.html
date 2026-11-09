@@ -1,0 +1,33 @@
+{{ define "main" }}
+{{- /* Search results page (front matter "layout: search"; README "Search"):
+       the title, the page content, if any, then a search box and the
+       results of the query in the URL (?q=), which the search script
+       (assets/tufte/search.js) fills in. Without JavaScript, or with
+       params.search off, a line says why there are no results. */ -}}
+{{- $cfg := partialCached "tufte/search/config.html" . (partial "func/lang.html" site.Language).name }}
+<article>
+  <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" (partial "tufte/page-title.html" .) "heading" true) }}</h1>
+  {{- with .Params.subtitle }}
+  <p class="subtitle">{{ . }}</p>
+  {{- end }}
+  {{ partial "before_content.html" . }}
+  {{ partial "tufte/abstract.html" . }}
+  {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}
+  <section class="search-page">
+  {{- if $cfg }}
+    {{- $id := partial "tufte/gen-id.html" (dict "page" . "base" "tufte-search-query") }}
+    <form class="search-page-form" role="search" method="get" action="{{ .RelPermalink }}" data-tufte-search="page" hidden>
+      <label class="visually-hidden" for="{{ $id }}">{{ partial "func/t.html" "searchLabel" }}</label>
+      <input type="search" id="{{ $id }}" name="q" placeholder="{{ partial "func/t.html" "searchPlaceholder" }}" autocomplete="off" spellcheck="false" enterkeyhint="search">
+      <button type="submit">{{ partial "func/t.html" "searchLabel" }}</button>
+    </form>
+    <p class="search-status" role="status" aria-live="polite"></p>
+    <ol class="search-results"></ol>
+    <noscript><p class="search-status">{{ partial "func/t.html" "searchNoScript" }}</p></noscript>
+  {{- else }}
+    <p class="search-status">{{ partial "func/t.html" "searchOff" }}</p>
+  {{- end }}
+  </section>
+  {{ partial "after_content.html" . }}
+</article>
+{{ end }}

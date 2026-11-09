@@ -1,4 +1,5 @@
-{{- /* Site header: title, subtitle (home only) and the "main" menu. */ -}}
+{{- /* Site header: title, subtitle (home only), the "main" menu and the
+       search box (params.search: tufte/search/form.html). */ -}}
 <header class="site-header">
   <a class="site-title" href="{{ site.Home.RelPermalink }}"{{ if .IsHome }} aria-current="page"{{ end }}>{{ site.Title }}</a>
   {{- if .IsHome }}
@@ -16,6 +17,7 @@
     </ul>
   </nav>
   {{- end }}
+  {{- partial "tufte/search/form.html" . }}
   {{- /* Multilingual sites: links to the other translations of this page.
          On a multihost site (a baseURL per language) a translation served
          from another host gets its absolute permalink: its RelPermalink is

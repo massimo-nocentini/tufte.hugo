@@ -1,0 +1,85 @@
+{{- /*
+  Resolves a third-party asset to the URL a page loads and its SRI hash:
+  the CDN URL, or with params.selfHosted = true a copy fetched once at
+  build time with resources.GetRemote, checked against the hash,
+  fingerprinted and served from the site (Hugo keeps it in the getresource
+  file cache). tufte/vendor.html prints the tag; tufte/search/config.html
+  hands Fuse.js's URL to the search script, which loads it on demand.
+
+  Takes a dict:
+    url        the CDN URL                                         required
+    kind       "css" (stylesheet) or "js" (script); by default it is
+               "css" when the URL path, without its ?query and #fragment,
+               ends in .css, else "js"
+    integrity  its SRI hash ("" = no integrity attribute)
+    dir        publish directory with params.selfHosted (default "vendor")
+  Returns: a dict with href, integrity ("" when none) and kind.
+*/ -}}
+{{- $url := printf "%v" (.url | default "") -}}
+{{- $integrity := printf "%v" (.integrity | default "") -}}
+{{- if not $url -}}
+  {{- errorf "tufte.hugo: tufte/vendor-src.html needs a url" -}}
+{{- end -}}
+{{- /* The URL path alone: a ?query or #fragment is not part of the file
+       name (path.Ext of "katex.min.css?v=1" is ".css?v=1"). */ -}}
+{{- $upath := replaceRE `[?#].*$` "" $url -}}
+{{- $kind := lower (printf "%v" (.kind | default "")) -}}
+{{- if not $kind -}}
+  {{- $kind = cond (eq (lower (path.Ext $upath)) ".css") "css" "js" -}}
+{{- end -}}
+{{- if not (in (slice "css" "js") $kind) -}}
+  {{- errorf "tufte.hugo: tufte/vendor-src.html: kind = %q, expected \"css\" or \"js\"" $kind -}}
+{{- end -}}
+{{- $href := $url -}}
+{{- if partial "func/flag.html" (dict "value" site.Params.selfHosted "default" false) -}}
+  {{- with try (resources.GetRemote $url) -}}
+    {{- with .Err -}}
+      {{- errorf "tufte.hugo: cannot fetch %s (params.selfHosted): %s" $url . -}}
+    {{- else -}}
+      {{- with .Value -}}
+        {{- /* Name the copy after the URL path, with the extension of its
+               kind so that the server sends the right MIME type. */ -}}
+        {{- $name := path.Base $upath -}}
+        {{- if in (slice "" "." "/") $name }}{{ $name = "asset" }}{{ end -}}
+        {{- $ext := cond (eq $kind "css") ".css" ".js" -}}
+        {{- if ne (lower (path.Ext $name)) $ext }}{{ $name = printf "%s%s" $name $ext }}{{ end -}}
+        {{- $copy := . | resources.Copy (path.Join ($.dir | default "vendor") $name) -}}
+        {{- $r := $copy | fingerprint "sha384" -}}
+        {{- if $integrity -}}
+          {{- /* Any SRI form a browser accepts: sha256-, sha384- or
+                 sha512-, several hashes separated by spaces, ?options.
+                 As in a browser, only the strongest algorithm listed
+                 counts and the file must match one of its hashes; the
+                 file is fingerprinted with that algorithm. */ -}}
+          {{- $rank := dict "sha256" 1 "sha384" 2 "sha512" 3 -}}
+          {{- $hashes := slice -}}
+          {{- $best := "" -}}
+          {{- $bestRank := 0 -}}
+          {{- range findRE `\S+` $integrity -}}
+            {{- $tok := replaceRE `\?.*$` "" . -}}
+            {{- $alg := lower (index (split $tok "-") 0) -}}
+            {{- with index $rank $alg -}}
+              {{- $hashes = $hashes | append (printf "%s%s" $alg (strings.TrimPrefix (index (split $tok "-") 0) $tok)) -}}
+              {{- if gt . $bestRank }}{{ $bestRank = . }}{{ $best = $alg }}{{ end -}}
+            {{- end -}}
+          {{- end -}}
+          {{- if not $best -}}
+            {{- errorf "tufte.hugo: the SRI hash %q of %s has no sha256-, sha384- or sha512- value (params.selfHosted)" $integrity $url -}}
+          {{- else -}}
+            {{- $r = $copy | fingerprint $best -}}
+            {{- $ok := false -}}
+            {{- range $hashes }}{{ if eq . $r.Data.Integrity }}{{ $ok = true }}{{ end }}{{ end -}}
+            {{- if not $ok -}}
+              {{- errorf "tufte.hugo: %s does not match its SRI hash %s (its %s hash is %s; as in browsers, only the hashes of the strongest algorithm listed count)" $url $integrity $best $r.Data.Integrity -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+        {{- $href = $r.RelPermalink -}}
+        {{- $integrity = $r.Data.Integrity -}}
+      {{- else -}}
+        {{- errorf "tufte.hugo: cannot fetch %s (params.selfHosted)" $url -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict "href" $href "integrity" $integrity "kind" $kind) -}}

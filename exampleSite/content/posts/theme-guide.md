@@ -76,6 +76,7 @@ All parameters live under `[params]` and have sensible defaults. The ones you wi
 | `toc`             | `false`        | Table of contents at the top of posts                     |
 | `math.enable`     | `"auto"`       | Load the KaTeX stylesheet only where math appears         |
 | `customCSS`       | `[]`           | Extra stylesheets from your `assets/` folder              |
+| `search.enable`   | `false`        | Search box in the header and a results page               |
 
 Author and social links go in `[params.author]` and `[params.social]`; comments use Giscus (`[params.giscus]`) or Hugo's Disqus template, and `[params] comments = false` (short for `[params.comments] enable = false`) turns them off site-wide.
 
@@ -88,7 +89,8 @@ title is shown, so no heading or link is left empty), `date`, `tags` and `catego
 - `subtitle`, shown in the style of Tufte's subtitles below the title;
 - `sections`, `footnotes` and `toc`, overriding the site parameters for one page (this page sets `toc: true`);
 - `math: true` to force the KaTeX stylesheet;
-- `comments: false` to hide comments.
+- `comments: false` to hide comments;
+- `searchHidden: true` to keep the page out of the site search.
 
 ## Writing with shortcodes
 
@@ -230,9 +232,32 @@ Lists nest, and the notes and figure captions of a nested item still go to the m
 
 ## Customisation
 
-The theme leaves empty partials for you to override from your site's `layouts/_partials/` folder: `head_custom.html`, `header_custom.html`, `before_content.html`, `after_content.html`, `footer_custom.html` and `scripts_custom.html`. Stylesheets listed in `params.customCSS` are appended to the theme's CSS bundle, so their rules win. The theme ships no JavaScript; scripts you put in your site's `assets/js/tufte/` folder (that folder only) are bundled, fingerprinted and loaded deferred on every page as one classic script.
+The theme leaves empty partials for you to override from your site's `layouts/_partials/` folder: `head_custom.html`, `header_custom.html`, `before_content.html`, `after_content.html`, `footer_custom.html` and `scripts_custom.html`. Stylesheets listed in `params.customCSS` are appended to the theme's CSS bundle, so their rules win. The theme ships no JavaScript, except the optional site search below; scripts you put in your site's `assets/js/tufte/` folder (that folder only) are bundled, fingerprinted and loaded deferred on every page as one classic script.
 
 On a multilingual site, the header links every page to its translations, and the head lists them as `hreflang` alternates. Translations for the theme's few words, such as "Read more" or "Older posts", are provided in English, Italian, French, German and Spanish; in any other language they fall back to English until you add your own `i18n/<lang>.yaml`. The short dates of the archive follow the language too ("Jan 2" in English, "2 Jan" in Italian): set `archiveDateFormat` under `[params]` to choose another Go layout.
+
+## Searching the site
+
+This site has a search box in its header: type a few words, or press `/` to get there. The best
+matches show under the box, each with the section where the words are and a few lines around them; the arrow
+keys and Enter open one, and Enter on the query opens the [search page](/search/?q=sidenote),
+which lists them all. Words may come in any order and with a typo (try “lagrnge”), and accents do not matter.
+
+It is the theme's only JavaScript, and it is off unless the site turns it on and gives the home page the
+index, the `searchindex` output:
+
+```toml
+[params.search]
+  enable = true
+
+[outputs]
+  home = ["html", "rss", "searchindex"]
+```
+
+The results page is any page with `layout: search` (here `content/search.md`). The index is built from the
+pages as they read, numbers and cross-references resolved, with the notes in the margin kept apart and math as
+its TeX; `searchHidden: true` keeps a page out of it. Fuse.js, which does the matching, and the index load only
+when someone searches.
 
 ## Writing like tufte-latex
 

@@ -36,6 +36,7 @@ Hugo template system introduced in 0.146 (`layouts/baseof.html`, `home.html`, `p
   [warnings](#warnings), [LaTeX to Hugo cheat sheet](#latex-to-hugo-cheat-sheet)
 - [Syntax highlighting](#syntax-highlighting)
 - [Pages and layouts](#pages-and-layouts)
+- [Search](#search)
 - [Comments, analytics and social links](#comments-analytics-and-social-links)
 - [Customisation](#customisation)
 - [Languages](#languages)
@@ -165,7 +166,7 @@ does not set (`HUGO_PARAMS_ETBOOK=false hugo`).
 | `homeIntro` | `true` | Render the content of `content/_index.md` above the post list on the home page. |
 | `customCSS` | `[]` | Paths under your site's `assets/` (for example `["css/custom.css"]`). They are appended to the CSS bundle, so they win. A single string is accepted too, with several paths separated by commas (as `HUGO_PARAMS_CUSTOMCSS` gives it). |
 | `copyright` | `""` | Footer text (Markdown; several paragraphs become lines of one). Default: Hugo's top-level `copyright` when the site sets it, else `© YEAR Author`. The RSS `<copyright>` is the top-level `copyright`, else this text as plain text. |
-| `selfHosted` | `false` | `true`: download the third-party files (KaTeX) at build time, check them against their SRI hashes and serve them from your site instead of the CDN. See [Math](#math). |
+| `selfHosted` | `false` | `true`: download the third-party files (KaTeX, and Fuse.js for the [search](#search)) at build time, check them against their SRI hashes and serve them from your site instead of the CDN. See [Math](#math). |
 | `mainSections` | Hugo default | Sections listed on the home page and archives. Set it with Hugo's **top-level** `mainSections` key (for example `mainSections = ["posts"]`, above `[params]`); when unset, Hugo computes it from the section with the most pages. The legacy `params.mainSections` is still honoured and wins when set. |
 
 ### `[params.author]`
@@ -231,6 +232,19 @@ for `params.math` prints the warning `tufte-bad-option` and uses the defaults.
 | `comments.enable` | `true` | Allow comments on pages inside a section (posts). Front matter `comments` overrides it; a page outside any section (such as `/about/`) needs `comments: true` in its front matter. |
 | `comments` | — | Shorthand: `[params] comments = false` (or `true`, or `HUGO_PARAMS_COMMENTS=false`) is the same as `comments.enable`. Any other single value prints the warning `tufte-bad-option` and leaves comments on. |
 
+### `[params.search]`
+
+The site search; see [Search](#search) for the setup (it needs the home page's `searchindex` output).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enable` | `false` | `true`: a search box in the site header on every page, and the results page (a page with `layout: search`) works. Without the `searchindex` output on the home page the build prints the warning `tufte-search-output` and shows no box. Also `HUGO_PARAMS_SEARCH_ENABLE=false`. |
+| `sections` | `[]` | Page types (`.Type`: the top-level section, or front matter `type`) to index, for example `["posts", "books"]`; the entry `"mainSections"` stands for the site's main sections. Empty: every page. |
+| `contentChars` | `0` | The most characters of text and notes indexed per page (headings are always kept). `0`: the whole page. Lower it to make the index of a large site smaller. |
+| `maxResults` | `8` | How many matches show under the header box (1–999). The results page shows them all. |
+| `threshold` | `0.3` | How fuzzy a match may be, from `0` (each word as typed) to `1` (anything matches): Fuse.js's `threshold`. |
+| `hotkey` | `"/"` | The key that puts the cursor in the header box, when no input field has it. `""`: none. |
+
 ### Hugo services
 
 | Setting | Effect |
@@ -287,7 +301,8 @@ mainSections = ["posts"]
 | `comments` | `true`/`false`. Overrides `params.comments.enable`. `true` is needed on pages outside any section (such as `content/about.md`), which have no comments otherwise. |
 | `draft` | Hugo's standard draft flag. |
 | `images` | Images for Open Graph and Twitter cards: page resources, absolute URLs, or paths under the site root (`/images/card.png`, resolved against the base path also on a site hosted under a subpath). A page without `images` uses the site-wide `params.images`, resolved the same way. |
-| `layout` | Set `layout: archive` on a page to render the archives (posts grouped by year; undated pages, such as book chapters, last under “Undated”, in the order of the RSS feed: each book's chapters in its reading order, then the other undated pages). |
+| `layout` | Set `layout: archive` on a page to render the archives (posts grouped by year; undated pages, such as book chapters, last under “Undated”, in the order of the RSS feed: each book's chapters in its reading order, then the other undated pages), or `layout: search` for the search results page (see [Search](#search)). |
+| `searchHidden` | `true` keeps the page out of the search index (see [Search](#search)). |
 
 Create a post with the bundled archetype:
 
@@ -2096,6 +2111,7 @@ build and cannot be ignored.
 | `tufte-orphan-footnotemark` | A `footnotemark` without its `footnotetext` (only with `debug`). |
 | `tufte-bib-format` | A bibliography database that cannot be read. |
 | `tufte-katex-version` | `params.math.katexVersion` differs from the KaTeX that Hugo embeds (server engine). |
+| `tufte-search-output` | `params.search.enable` is true but the home page has no `searchindex` output, so there is no index to search (see [Search](#search)); the search box is left out. |
 
 ### LaTeX to Hugo cheat sheet
 
@@ -2245,6 +2261,7 @@ Code uses Hugo's built-in Chroma highlighter and the monospace style of Tufte CS
 | Single page | `page.html` | Title, subtitle, metadata, optional TOC, sectioned content, tags, post navigation, comments. |
 | Taxonomy | `taxonomy.html` | All terms with page counts (for example `/tags/`). |
 | Term | `term.html` | Pages for one term (for example `/tags/typography/`). |
+| Search | `search.html` | Any page with `layout: search`: its title and content, then a search box and the results of the query in its URL (`?q=`). See [Search](#search). |
 | Archives | `archive.html` | Any page with `layout: archive`. It lists all posts grouped by year (pages without a date, such as book chapters, last under an “Undated” heading, as on term pages, in the order of the RSS feed: each book's chapters in its reading order, book after book, then the other undated pages in Hugo's default order). |
 | Not found | `404.html` | Localised "page not found" page. |
 | Book landing | `list.html` → `tufte/book/landing.html` | A section with `book: true`: title page, contents, dedication. See [Books](#books). |
@@ -2271,6 +2288,80 @@ A summary is shown on other pages (the home page, section lists, the feed), so i
 its own page: a fragment link (`[details](#details)`) points to the page (`/posts/x/#details`), and a
 page-relative link or image (`[other](../other/)`, `img.png`) gets the URL the browser would give it on the page
 (`/posts/other/`).
+
+## Search
+
+A full-text search of the site, as in [Beautiful Hugo](https://github.com/halogenica/beautifulhugo): a search
+box in the site header shows the best matches as you type, and a results page lists them all. It runs in the
+browser with [Fuse.js](https://www.fusejs.io/) on an index that Hugo writes at build time, so it needs no
+server and no third-party service. It is off by default, since it is the theme's only JavaScript.
+
+Turn it on in the site configuration, and give the home page the theme's `searchindex` output (Hugo does not
+merge `[outputs]` from a theme, and a site's `[outputs]` replaces the default formats, so keep `html` and `rss`):
+
+```toml
+[params.search]
+  enable = true
+
+[outputs]
+  home = ["html", "rss", "searchindex"]
+```
+
+Then add the results page, `content/search.md`:
+
+```markdown
+---
+title: Search
+layout: search
+---
+```
+
+**Using it.** Type in the header box, or press <kbd>/</kbd> to go there (`params.search.hotkey`). The best
+matches show under the box (up to `maxResults`): the page title, the section heading of the match, where the
+page is (a chapter's book, a post's section) and its date, and a few lines of text around the words searched
+for, which are highlighted. The arrow keys move through the matches, <kbd>Enter</kbd> opens one, and
+<kbd>Esc</kbd> closes the list. <kbd>Enter</kbd> on the query itself opens the results page
+(`/search/?q=…`), which lists every match; without a results page it opens the best match. A match links
+to its section (`/posts/x/#heading`).
+
+Words match in any order, and each must appear somewhere in the page (its title, headings, text or notes).
+They match with a little fuzziness (`threshold`): a typo still finds the word (“lagrnge”), and accents are
+ignored (“theoreme” finds “théorème”). Matches in titles weigh most, then section headings, then the text and
+the notes.
+
+**The index.** `searchindex` is a JSON file, `/search-index.json` (`/LANG/search-index.json` for each
+language of a multilingual site), made by `layouts/home.searchindex.json`. It is built from the HTML the
+reader sees, so numbers, cross-references and citations read as on the page, and each entry is
+
+| Key | Value |
+|---|---|
+| `title` | The plain title. |
+| `url` | The page's `RelPermalink` (so it works on a site served under a subpath). |
+| `where` | The book of a chapter or part, else the section of a page below the home page. |
+| `date` | The date of a regular page as the page shows it (front matter `dateText`; `""` when it is undated or `showDate: false`). |
+| `sections` | The text cut at each `##`–`####` heading with an id (run-in headings included): a list of `{id, heading, text, notes}`; the first has `id` and `heading` `""`. `notes` holds the text of the section's sidenotes, margin notes and margin citations, which are kept apart so that they do not split its sentences. Math reads as its TeX (`$x^2$`, `$$…$$`); heading anchors, footnote marks, end-of-proof symbols, scripts, media, code line numbers and the generated lists (lists of figures, tables, listings and theorems; the index; a table of contents) are left out. |
+
+Regular pages are indexed, and the home, section, book and part pages that have text of their own. Left out:
+pages with `searchHidden: true` in their front matter, pages with `layout: search` or `layout: archive`, pages
+that are not rendered (build options `render: never`, or `render: link` in the page's own front matter: one that
+gets it through `cascade` needs `searchHidden: true` too), and with `params.search.sections` the pages of other types. The index of
+the example site is about 150 kB (about 50 kB compressed); `contentChars` makes it smaller.
+
+**Loading.** Every page links a small script (`assets/tufte/search.js`, fingerprinted, with SRI) and the
+settings it reads (`<script type="application/json" id="tufte-search-config">`). Fuse.js and the index load
+only when a reader first uses the box (or opens the results page). Fuse.js comes from jsDelivr, pinned with an
+SRI hash in `data/tufte/vendor.toml` (`[fuse]`); since Fuse.js 7.3 it is an ES module, so the script adds it
+as `<script type="module" integrity=…>` and then imports it from the same URL, which the browser takes from
+its module cache. With `params.selfHosted = true` the theme downloads it at build time and serves it from your
+site. Without JavaScript the header box is not shown and the results page says so.
+
+**Customising.** The box and the results are styled in `assets/css/theme.css` (`.site-search`,
+`.site-search-results`, `.search-page`, `.search-result*`). The strings come from the i18n keys `searchLabel`,
+`searchPlaceholder`, `searchLoading`, `searchError`, `searchNoResults`, `searchResults` (`one`/`other`;
+`{count}` and `{query}` are filled in by the script), `searchNoScript` and `searchOff`. A script of yours can
+search too: `window.tufteSearch.load()` returns a promise of the engine, whose `search(query, limit)` returns
+`{entry, section, terms}` objects (`entry` is an index entry, `section` the index of its best-matching
+section).
 
 ## Comments, analytics and social links
 
@@ -2324,7 +2415,7 @@ own rules live in `assets/css/theme.css` (site chrome, lists, code, alerts, dark
 class options and the print geometry). Page-dependent values (margin-note fonts and alignment, paper size,
 running heads) are emitted in a small `<style>` after the bundle by `tufte/head-style.html`.
 
-**Extra JavaScript.** The theme ships no JavaScript. Files in your site's `assets/js/tufte/*.js` (that folder
+**Extra JavaScript.** The theme ships no JavaScript, except the optional [search](#search). Files in your site's `assets/js/tufte/*.js` (that folder
 only) are concatenated in file-name order into `js/tufte-hugo.js`, minified in production, fingerprinted and
 loaded on every page as one classic script with `defer` and an SRI `integrity` attribute. They are not ES
 modules: an `import` there is a syntax error. Other files under `assets/js/` (for example your own `js.Build`

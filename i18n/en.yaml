@@ -124,3 +124,15 @@ thmProofOf: "Proof of {{ .Ref }}"
 thmPunct: "."
 thmQed: "End of proof"
 listOfTheorems: "List of Theorems"
+# Site search (params.search; README "Search"). {query} and {count} are
+# filled in by the search script (assets/tufte/search.js), in the browser.
+searchLabel: "Search"
+searchPlaceholder: "Search…"
+searchLoading: "Loading the search index…"
+searchError: "The search index could not be loaded."
+searchNoResults: "No results for “{query}”."
+searchResults:
+  one: "{count} result for “{query}”."
+  other: "{count} results for “{query}”."
+searchNoScript: "The search needs JavaScript."
+searchOff: "Search is not enabled on this site."

@@ -1,0 +1,45 @@
+{{- /*
+  The search index (README "Search"): the "searchindex" output of the home
+  page (hugo.toml [outputFormats.searchindex]), /search-index.json, read by
+  assets/tufte/search.js. A JSON list with one entry per page
+  (tufte/search/entry.html): regular pages, and the home, section, book
+  and part pages that have text of their own.
+
+  Left out: pages with `searchHidden: true`, pages with `layout: search`
+  or `layout: archive`, pages that are not rendered (build options:
+  render "never", or "link" set in the page's own front matter), and,
+  when params.search.sections lists page types, pages of other types
+  ("mainSections" stands for params.mainSections, else the site's main
+  sections). params.search.contentChars cuts each page's text.
+*/ -}}
+{{- $s := site.Params.search -}}
+{{- if not (reflect.IsMap $s) }}{{ $s = dict }}{{ end -}}
+{{- $types := slice -}}
+{{- $list := $s.sections -}}
+{{- if and $list (not (reflect.IsSlice $list)) }}{{ $list = slice $list }}{{ end -}}
+{{- range $list -}}
+  {{- if eq (printf "%v" .) "mainSections" -}}
+    {{- range site.Params.mainSections | default site.MainSections }}{{ $types = $types | append (printf "%v" .) }}{{ end -}}
+  {{- else -}}
+    {{- $types = $types | append (printf "%v" .) -}}
+  {{- end -}}
+{{- end -}}
+{{- $chars := 0 -}}
+{{- with $s.contentchars -}}
+  {{- if findRE `^\s*(?:0|[1-9][0-9]*)\s*$` (printf "%v" .) 1 -}}
+    {{- $chars = int (strings.TrimSpace (printf "%v" .)) -}}
+  {{- else -}}
+    {{- warnidf "tufte-bad-option" "params.search.contentChars: expected a whole number (0 = all), not %q; indexing the whole text" (printf "%v" .) -}}
+  {{- end -}}
+{{- end -}}
+{{- $entries := slice -}}
+{{- range site.Pages -}}
+  {{- $render := "" -}}
+  {{- with or .Params.build .Params._build }}{{ with .render }}{{ $render = printf "%v" . }}{{ end }}{{ end -}}
+  {{- if and (ne $render "link") (in (slice "page" "section" "home") .Kind) .RelPermalink (not (partial "func/flag.html" (dict "value" .Params.searchhidden "default" false))) (not (in (slice "search" "archive") .Layout)) (or (not $types) (in $types .Type)) -}}
+    {{- with partial "tufte/search/entry.html" (dict "page" . "chars" $chars) -}}
+      {{- $entries = $entries | append . -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $entries | jsonify -}}

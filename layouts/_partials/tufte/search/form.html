@@ -1,0 +1,23 @@
+{{- /*
+  The search box of the site header (README "Search"), when the site search
+  is on (tufte/search/config.html). It is `hidden` until the search script
+  (assets/tufte/search.js) runs, so a reader without JavaScript sees no box
+  that cannot work. Typing shows the best matches under the box; Enter
+  opens the results page (the page with `layout: search`) for the query,
+  or, on a site without one, the first match.
+
+  The ids are in the theme's tufte- namespace and skip ids the page's own
+  content uses (tufte/gen-id.html).
+
+  Takes: the page.
+*/ -}}
+{{- with partialCached "tufte/search/config.html" . (partial "func/lang.html" site.Language).name -}}
+{{- $id := partial "tufte/gen-id.html" (dict "page" $ "base" "tufte-search") -}}
+{{- $rid := partial "tufte/gen-id.html" (dict "page" $ "base" "tufte-search-results") }}
+<form class="site-search" role="search" method="get"{{ with .page }} action="{{ . }}"{{ end }} data-tufte-search="box" hidden>
+  <label class="visually-hidden" for="{{ $id }}">{{ partial "func/t.html" "searchLabel" }}</label>
+  <input type="search" id="{{ $id }}" name="q" placeholder="{{ partial "func/t.html" "searchPlaceholder" }}" autocomplete="off" spellcheck="false" enterkeyhint="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{{ $rid }}"{{ with .hotkey }} aria-keyshortcuts="{{ . }}"{{ end }}>
+  <div class="site-search-results" tabindex="-1" hidden><div id="{{ $rid }}" role="listbox" aria-label="{{ partial "func/t.html" "searchLabel" }}"></div><p class="search-result-none" hidden></p></div>
+  <p class="visually-hidden" role="status" aria-live="polite"></p>
+</form>
+{{- end -}}

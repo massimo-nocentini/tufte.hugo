@@ -1,0 +1,140 @@
+{{- /*
+  The search-index entry of a page (layouts/home.searchindex.json),
+  built from the HTML the reader sees: the processed abstract and content
+  (func/content.html, the same cached call as the page's own layout), so
+  numbers, cross-references and citations read as on the page.
+
+    title     the plain title (tufte/plain-title.html)
+    url       RelPermalink
+    where     the book of a chapter or part, else the section of a page
+              below the home page ("" otherwise)
+    date      the date of a regular page as it shows it ("" when undated
+              or hidden, and for list pages)
+    sections  the text cut at each h2–h4 with an id (run-in headings
+              included): a list of {id, heading, text, notes}, the first
+              one with id "" and heading "" for the text before the
+              first heading. notes holds the text of each sidenote,
+              margin note and margin citation of the section, which are
+              cut out of its text so that they do not split its
+              sentences.
+
+  KaTeX output reads as its TeX ($x^2$, $$…$$ for a display, from its
+  MathML annotation): its visual HTML is in layout order (\frac{a}{b}
+  reads "ba").
+
+  Takes: a dict with
+    page   the page
+    chars  int: the most characters of text and notes kept (0 = all);
+           headings are always kept
+  Returns: the entry (a dict), or false for a list page with no text.
+*/ -}}
+{{- $p := .page -}}
+{{- $chars := int (.chars | default 0) -}}
+{{- $key := or $p.RelPermalink $p.Path -}}
+{{- $html := string (partial "tufte/abstract.html" $p) -}}
+{{- if or (not $p.IsHome) (partial "func/flag.html" (dict "value" site.Params.homeIntro "default" true)) (partialCached "tufte/book/root.html" $p $key) -}}
+  {{- $html = printf "%s%s" $html (string (partialCached "func/content.html" $p $key false)) -}}
+{{- end -}}
+{{- /* The private-use characters U+E000–U+E003 mark sections and cut
+       notes below: drop any the page itself holds (an icon-font glyph). */ -}}
+{{- $html = replaceRE `[\x{E000}-\x{E003}]` "" $html -}}
+{{- /* Server KaTeX: the TeX of the MathML annotation, without the visual
+       HTML (nested spans, up to 48 levels deep: a deeper formula keeps its
+       visual text). */ -}}
+{{- if strings.Contains $html `class="katex` -}}
+  {{- $html = replaceRE `<span class="katex-mathml"><math[^>]*display="block"[\s\S]*?<annotation encoding="application/x-tex">([\s\S]*?)</annotation></semantics></math></span>` " $$$$${1}$$$$ " $html -}}
+  {{- $html = replaceRE `<span class="katex-mathml"><math[\s\S]*?<annotation encoding="application/x-tex">([\s\S]*?)</annotation></semantics></math></span>` "$$${1}$$" $html -}}
+  {{- $span := partialCached "tufte/search/nested.html" (dict "tag" "span" "depth" 48) "span48" -}}
+  {{- $html = replaceRE (printf `<span class="katex-html"[^>]*>%s</span>` $span) "" $html -}}
+{{- end -}}
+{{- /* Section numbers stay out of the headings ("Groups", not "1Groups"). */ -}}
+{{- $html = replaceRE `<span class="tufte-num" data-kind="sec"[^>]*>[^<]*</span>` "" $html -}}
+{{- $html = replaceRE `<h[2-4]\b[^>]*?\sid="([^"]+)"[^>]*>([\s\S]*?)</h[2-4]>` "\uE000${1}\uE001${2}\uE002" $html -}}
+{{- $noteRE := "" -}}
+{{- $blockRE := "" -}}
+{{- if or (strings.Contains $html `class="sidenote`) (strings.Contains $html `class="marginnote`) (strings.Contains $html `class="citation-block`) -}}
+  {{- $noteRE = printf `<span class="(?:sidenote|marginnote|citation-block)\b[^"]*"[^>]*>%s</span>` (partialCached "tufte/search/nested.html" (dict "tag" "span" "depth" 24) "span24") -}}
+  {{- $blockRE = printf `<div class="marginnote\b[^"]*"[^>]*>%s</div>` (partialCached "tufte/search/nested.html" (dict "tag" "div" "depth" 8) "div8") -}}
+{{- end -}}
+{{- $sections := slice -}}
+{{- $left := $chars -}}
+{{- range $i, $part := split $html "\uE000" -}}
+  {{- $id := "" -}}
+  {{- $head := "" -}}
+  {{- $body := $part -}}
+  {{- if gt $i 0 -}}
+    {{- $a := split $part "\uE001" -}}
+    {{- $id = htmlUnescape (index $a 0) -}}
+    {{- $b := split (delimit (after 1 $a) "\uE001") "\uE002" -}}
+    {{- $head = index $b 0 -}}
+    {{- $body = delimit (after 1 $b) "\uE002" -}}
+  {{- end -}}
+  {{- $notes := slice -}}
+  {{- if gt $i 0 -}}
+    {{- /* a heading's own notes go to its section's notes */ -}}
+    {{- with $noteRE -}}
+      {{- range findRE . $head }}{{ $notes = $notes | append . }}{{ end -}}
+      {{- $head = replaceRE . "" $head -}}
+    {{- end -}}
+    {{- $head = partial "tufte/search/plain.html" $head -}}
+  {{- end -}}
+  {{- with $noteRE -}}
+    {{- range findRE $blockRE $body }}{{ $notes = $notes | append . }}{{ end -}}
+    {{- $body = replaceRE $blockRE "\uE003" $body -}}
+    {{- range findRE . $body }}{{ $notes = $notes | append . }}{{ end -}}
+    {{- $body = replaceRE . "\uE003" $body -}}
+  {{- end -}}
+  {{- $text := partial "tufte/search/plain.html" $body -}}
+  {{- $nt := slice -}}
+  {{- range $notes -}}
+    {{- with partial "tufte/search/plain.html" . }}{{ $nt = $nt | append . }}{{ end -}}
+  {{- end -}}
+  {{- if gt $chars 0 -}}
+    {{- if le $left 0 -}}
+      {{- $text = "" -}}
+    {{- else if gt (strings.RuneCount $text) $left -}}
+      {{- $text = strings.TrimSpace (substr $text 0 $left) -}}
+    {{- end -}}
+    {{- $left = sub $left (strings.RuneCount $text) -}}
+    {{- $kept := slice -}}
+    {{- range $nt -}}
+      {{- if gt $left 0 -}}
+        {{- $n := . -}}
+        {{- if gt (strings.RuneCount $n) $left }}{{ $n = strings.TrimSpace (substr $n 0 $left) }}{{ end -}}
+        {{- $kept = $kept | append $n -}}
+        {{- $left = sub $left (strings.RuneCount $n) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $nt = $kept -}}
+  {{- end -}}
+  {{- if or $head $text $nt -}}
+    {{- $sections = $sections | append (dict "id" $id "heading" $head "text" $text "notes" $nt) -}}
+  {{- end -}}
+{{- end -}}
+{{- $entry := false -}}
+{{- if or $sections (eq $p.Kind "page") -}}
+  {{- $where := "" -}}
+  {{- with partialCached "tufte/book/root.html" $p $key -}}
+    {{- if ne . $p }}{{ $where = partial "tufte/plain-title.html" (dict "page" .) }}{{ end -}}
+  {{- else -}}
+    {{- with $p.Parent -}}
+      {{- if not .IsHome }}{{ $where = partial "tufte/plain-title.html" (dict "page" .) }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $date := "" -}}
+  {{- if and (eq $p.Kind "page") (partial "func/flag.html" (dict "value" $p.Params.showdate "default" true)) -}}
+    {{- with $p.Params.datetext -}}
+      {{- $date = printf "%v" . -}}
+    {{- else -}}
+      {{- if not $p.Date.IsZero }}{{ $date = partial "func/date.html" $p.Date }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $entry = dict
+    "title" (partial "tufte/plain-title.html" (dict "page" $p))
+    "url" $p.RelPermalink
+    "where" $where
+    "date" (string $date | plainify | htmlUnescape)
+    "sections" $sections
+  -}}
+{{- end -}}
+{{- return $entry -}}

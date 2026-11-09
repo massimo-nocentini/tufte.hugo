@@ -118,6 +118,96 @@ jobs:
             [ -z "$dups" ] || fail "duplicate ids in $f: $dups"
           done
 
+      # Site search (params.search, README "Search"): the index (the home
+      # page's "searchindex" output), the header box and its settings on every
+      # page, the results page; then the same site with search off, and with
+      # search on but no index output (the warning tufte-search-output).
+      - name: Check the site search
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          python3 - <<'EOF'
+          import json, re, sys, glob, tomllib
+          def fail(m):
+              print("::error::" + m); sys.exit(1)
+          idx = json.load(open("public/search-index.json", encoding="utf-8"))
+          if not isinstance(idx, list) or len(idx) < 30:
+              fail(f"search-index.json: expected 30+ entries, got {len(idx)}")
+          urls = [e["url"] for e in idx]
+          if len(set(urls)) != len(urls):
+              fail("search-index.json: a page is listed twice")
+          for e in idx:
+              for k in ("title", "url", "where", "date", "sections"):
+                  if k not in e:
+                      fail(f"search-index.json: {e.get('url')} has no {k}")
+              if not e["url"].startswith("/"):
+                  fail(f"search-index.json: url {e['url']} is not a RelPermalink")
+          for u in ("/search/", "/archives/"):
+              if u in urls:
+                  fail(f"search-index.json lists {u} (layout search/archive)")
+          text = json.dumps(idx, ensure_ascii=False)
+          for bad in ('class=\\"katex', "katex-html", "TUFTENEST", "\ue000", "\ue001", "\ue002", "\ue003", "<sup", "sn-end", "tufte-num"):
+              if bad in text:
+                  fail(f"search-index.json holds {bad!r}")
+          th = {e["url"]: e for e in idx}.get("/posts/theorems/")
+          if not th:
+              fail("search-index.json has no /posts/theorems/")
+          if th["where"] != "Posts" or not th["date"]:
+              fail(f"/posts/theorems/: where/date {th['where']!r} {th['date']!r}")
+          sec = {s["id"]: s for s in th["sections"]}
+          g = sec.get("groups")
+          if not g or g["heading"] != "Groups":
+              fail(f"/posts/theorems/: no section 'groups' headed 'Groups' (ids: {list(sec)})")
+          if not re.search(r"Theorem\s1\.2 \(Lagrange\)", g["text"]) or "$H$" not in g["text"]:
+              fail("/posts/theorems/#groups: the theorem head or the $TeX$ of its math is missing")
+          if not any("Lagrange proved it in 1771" in n for n in g["notes"]):
+              fail("/posts/theorems/#groups: the margin note is not in notes")
+          if "Lagrange proved it" in g["text"]:
+              fail("/posts/theorems/#groups: a margin note left in the text")
+          if not any("$$" in s["text"] for s in th["sections"]):
+              fail("/posts/theorems/: no display math as $$TeX$$")
+          bk = {e["url"]: e for e in idx}.get("/books/sample-book/tufte-book/")
+          if not bk or bk["where"] != "A Tufte-Style Book" or bk["date"]:
+              fail("/books/sample-book/tufte-book/: where should be the book, without a date")
+          vendor = tomllib.load(open("../data/tufte/vendor.toml", "rb"))["fuse"]
+          pages = [f for f in glob.glob("public/**/*.html", recursive=True) if not f.endswith("/print.html")]
+          for f in pages:
+              h = open(f, encoding="utf-8").read()
+              if "<html" not in h or 'http-equiv="refresh"' in h:
+                  continue
+              if h.count('<form class="site-search" role="search"') != 1:
+                  fail(f"{f}: expected one header search box")
+              if not re.search(r'<form class="site-search" role="search" method="get" action="/search/" data-tufte-search="box" hidden>', h):
+                  fail(f"{f}: the search box is not hidden, or has no action /search/")
+              m = re.search(r'<script type="application/json" id="tufte-search-config">(.*?)</script>', h)
+              if not m:
+                  fail(f"{f}: no search settings")
+              cfg = json.loads(m.group(1))
+              if cfg["index"] != "/search-index.json" or cfg["page"] != "/search/":
+                  fail(f"{f}: index {cfg['index']} page {cfg['page']}")
+              if cfg["fuse"] != vendor["url"] or cfg["fuseIntegrity"] != vendor["integrity"]:
+                  fail(f"{f}: Fuse.js URL or hash differs from vendor.toml")
+              if not re.search(r'<script src="/tufte/search(?:\.min)?\.[0-9a-f]+\.js" integrity="sha256-[^"]+" crossorigin="anonymous" defer></script>', h):
+                  fail(f"{f}: no search script with SRI")
+          sp = open("public/search/index.html", encoding="utf-8").read()
+          if 'data-tufte-search="page"' not in sp or '<ol class="search-results"></ol>' not in sp:
+              fail("public/search/index.html: no results form or list")
+          print(f"search: {len(idx)} entries, {len(pages)} pages checked")
+          EOF
+
+          HUGO_PARAMS_SEARCH_ENABLE=false hugo --gc --panicOnWarning -d "$RUNNER_TEMP/nosearch"
+          N="$RUNNER_TEMP/nosearch"
+          if grep -lE 'site-search|tufte-search-config|/tufte/search\.' "$N/index.html" "$N/posts/theorems/index.html"; then
+            fail "search.enable = false still shows the search box or loads its script"
+          fi
+          grep -q 'Search is not enabled on this site.' "$N/search/index.html" || fail "search page without the search-off line"
+
+          out=$(HUGO_OUTPUTS_HOME=html hugo --gc -d "$RUNNER_TEMP/noindex" 2>&1) || fail "build without the index output failed: $out"
+          grep -q 'tufte-search-output' <<< "$out" || fail "no tufte-search-output warning without the index output: $out"
+          [ ! -e "$RUNNER_TEMP/noindex/search-index.json" ] || fail "search-index.json written without the output"
+          if grep -q 'site-search' "$RUNNER_TEMP/noindex/index.html"; then fail "search box shown without an index"; fi
+
       # Exercises the other code paths: HTML minification, no sectioning and
       # Goldmark endnotes (pages may still override both in front matter).
       - name: Build (minified, sections = none, footnotes = endnotes)

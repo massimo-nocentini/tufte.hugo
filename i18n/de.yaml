@@ -108,3 +108,15 @@ thmProofOf: "Beweis von {{ .Ref }}"
 thmPunct: "."
 thmQed: "Ende des Beweises"
 listOfTheorems: "Verzeichnis der Sätze"
+# Site search (params.search; README "Search"). {query} and {count} are
+# filled in by the search script (assets/tufte/search.js), in the browser.
+searchLabel: "Suche"
+searchPlaceholder: "Suchen …"
+searchLoading: "Suchindex wird geladen …"
+searchError: "Der Suchindex konnte nicht geladen werden."
+searchNoResults: "Keine Ergebnisse für „{query}“."
+searchResults:
+  one: "{count} Ergebnis für „{query}“."
+  other: "{count} Ergebnisse für „{query}“."
+searchNoScript: "Die Suche benötigt JavaScript."
+searchOff: "Die Suche ist auf dieser Website nicht aktiviert."

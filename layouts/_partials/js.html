@@ -1,5 +1,10 @@
 {{- /*
-  The theme is CSS-only and ships no JavaScript. If the site (or a fork)
+  The theme ships no JavaScript but the optional site search: with
+  params.search on (tufte/search/config.html), its settings as JSON and
+  assets/tufte/search.js (deferred, minified in production, fingerprinted
+  with SRI), which loads Fuse.js and the index on the first search.
+
+  If the site (or a fork)
   adds files under assets/js/tufte/*.js, they are concatenated in name
   order into one deferred classic script on every page, minified in
   production, fingerprinted with SRI (README "Customisation"). Only that
@@ -12,5 +17,12 @@
     {{- $js = $js | minify -}}
   {{- end -}}
   {{- $js = $js | fingerprint }}
+<script src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" crossorigin="anonymous" defer></script>
+{{- end -}}
+{{- with partialCached "tufte/search/config.html" . (partial "func/lang.html" site.Language).name }}
+<script type="application/json" id="tufte-search-config">{{ . }}</script>
+{{- $js := resources.Get "tufte/search.js" -}}
+{{- if hugo.IsProduction }}{{ $js = $js | minify }}{{ end -}}
+{{- $js = $js | fingerprint }}
 <script src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" crossorigin="anonymous" defer></script>
 {{- end -}}

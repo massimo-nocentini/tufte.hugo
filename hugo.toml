@@ -90,6 +90,20 @@
     #   macros = [["\\RR", "\\mathbb{R}"], ["\\abs", "\\left|#1\\right|"]]
     macros = []
 
+  # Site search (Fuse.js, in the browser): a search box in the header and a
+  # results page (a page with `layout: search`). It needs the index, the
+  # "searchindex" output of the home page:
+  #   [outputs]
+  #     home = ["html", "rss", "searchindex"]
+  # README "Search".
+  [params.search]
+    enable = false              # true: search box in the header (warns `tufte-search-output` without the index)
+    sections = []               # page types to index ([] = all; "mainSections" stands for params.mainSections)
+    contentChars = 0            # indexed characters of text and notes per page (0 = all)
+    maxResults = 8              # results under the header box (the results page shows them all)
+    threshold = 0.3             # Fuse.js fuzziness: 0 = exact words … 1 = anything
+    hotkey = "/"                # key that focuses the search box ("" = none)
+
   [params.giscus]               # enabled only when repo, repoId, category and categoryId are all set
     repo = ""
     repoId = ""
@@ -125,7 +139,18 @@
     permalinkable = false
     notAlternative = true
 
+  # The search index of params.search (layouts/home.searchindex.json): a
+  # JSON file, /search-index.json (/LANG/search-index.json on a
+  # multilingual site), that a site adds to its home page outputs.
+  [outputFormats.searchindex]
+    mediaType = "application/json"
+    baseName = "search-index"
+    isPlainText = true
+    notAlternative = true
+    permalinkable = false
+
 # BibTeX databases as page resources or assets (`bibliography: refs.bib`).
 [mediaTypes]
   [mediaTypes."text/x-bibtex"]
     suffixes = ["bib"]
+
