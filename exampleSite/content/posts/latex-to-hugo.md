@@ -154,6 +154,7 @@ classes do not define but mathematical texts load with them.
 | 115 | `\ref`, cleveref `\cref`, `\nameref` to a theorem | `{{</* xref "thm:x" */>}}`, `{{</* xref "thm:x" "full" */>}}`, `{{</* xref "thm:x" "name" */>}}` | should | “2.1”, “Theorem 2.1”, the note |
 | 116 | thmtools `\listoftheorems` | `{{</* listoftheorems */>}}` (standalone) | should | `kinds="theorem,lemma"`, `heading=""` |
 | 117 | `\swapnumbers`, `\newtheoremstyle`, thmtools `restatable` | — | **wont** | heads come in two looks (`tufte.theorems.look`: `tufte`, `amsthm`); restyle one kind with `thm-kind-k` in `customCSS` |
+| 118 | `\usepackage{euler}`, `eulervm` | `[params.math] font = "euler"`; front matter `mathFont: euler` | could | MathML set in the bundled Euler Math font; text and `\text{…}` stay in ET Book |
 {.fullwidth}
 
 ## Notes {#sec:notes}

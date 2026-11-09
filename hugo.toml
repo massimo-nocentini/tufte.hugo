@@ -75,6 +75,7 @@
   [params.math]
     enable = "auto"             # "auto" (only pages that contain math) | true | false
     engine = "server"           # "server" (build-time KaTeX, no JS) | "client" (KaTeX JS in the browser)
+    font = "katex"              # "katex" (KaTeX's fonts and layout) | "euler" (MathML set in the bundled Euler Math font); front matter mathFont overrides
     fleqn = false               # display math flush left
     leqno = false               # equation numbers on the left: \label numbers and \tag
     errorColor = ""             # colour of invalid TeX ("" = the theme's red, adapted to dark mode)

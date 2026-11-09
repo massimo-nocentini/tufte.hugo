@@ -161,6 +161,25 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   `tufte.theorems.*` (defaults in `tufte/defaults.html`), words the `thm*` i18n keys. In a sidenote, margin note
   or caption a theorem becomes `span[data-sn="section"]` (`tufte/thm/inline.html`, on every path: nest tokens,
   a `caption=` parameter, a Markdown image title), without `tufte-block-in-note` for its root.
+- **Euler math** (README "Euler math"): `params.math.font = "euler"` or front matter `mathFont` makes
+  `func/math-options.html` ask KaTeX for MathML only (`output "mathml"`, both engines). `tufte/math-render.html`
+  wraps the server's MathML as KaTeX's HTML+MathML output does, `<span class="katex"><span class="katex-mathml">`
+  (so every reader of the TeX annotation keeps working; `theme.css` shows that span when it is the only child,
+  `clip-path` included), wraps a display in `span.katex-display[ fleqn][ leqno]`, prints `\tag` itself as an
+  `eq-number` (`math-display tagged numbered`, hidden token before the number), and runs
+  `tufte/mathml-core.html`: mathvariant → Unicode math alphabets (`tufte/mathml-alphabets.html`), unary signs
+  (`lspace`/`rspace` 0), TeX's thin space around operator names (U+2061), stretchable accents, and mtable
+  `columnalign`/`columnspacing`/`columnlines`/`rowlines`/`rowspacing` as `--tufte-ca*`/`cs*`/`cl*`/`rl*`/`rs`
+  custom properties (MathML Core has none of them; `theme.css` applies them with `:nth-child(K of
+  :not(.mtr-glue, .mml-eqn-num))`, and only the `-webkit-` values of `text-align` move a cell's block math boxes)
+  and `menclose` boxes and strikes in CSS. `\notag`/`\nonumber` in a numbered environment are taken out of the
+  TeX and the row's number cell marked `tufte-notag`; a `\tag` on a row of such an environment warns
+  (`tufte-euler-tag`). The client engine
+  marks its spans `data-output="mathml"` and `tufte/katex.html` does the same fixes in `mathmlCore()` (plus
+  wrapping KaTeX's bare text nodes in `mtext`). The font is `static/euler-math/Euler-Math.woff2` (OFL, with
+  `OFL.txt`), its `@font-face` in `theme.css`. `posts/euler-math` is the example; CI checks it ("Check Euler
+  math") and builds the whole site with `HUGO_PARAMS_MATH_FONT=euler`, `fleqn` and `leqno` (markers mode, no
+  `katex-html` left).
 - **Search** (README "Search"; off unless `params.search.enable` and the home page has the theme's
   `searchindex` output format, declared in `hugo.toml`): `layouts/home.searchindex.json` writes the index from
   each page's final HTML (`tufte/search/entry.html`: the same cached `func/content.html` call as the layouts,

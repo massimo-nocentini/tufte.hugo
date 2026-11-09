@@ -1,0 +1,135 @@
+{{- /*
+  What KaTeX's MathML leaves to the browser and MathML Core, which
+  Chromium implements, does not do; for the Euler font's MathML output
+  (tufte/math-render.html). tufte/katex.html does the same in the browser
+  for the client engine. Fixes:
+
+  1. Math alphabets. MathML Core ignores mathvariant (but "normal"), so
+     \mathbb{R}, \mathcal{F}, \mathfrak{g}, \mathbf{x}, \boldsymbol{\alpha},
+     \mathsf, \mathtt (KaTeX: <mi mathvariant="double-struck">R</mi>…)
+     would show plain letters: their characters become those of the
+     Unicode mathematical alphabets (tufte/mathml-alphabets.html), which
+     Euler Math has, <mi>ℝ</mi>. Text (\textbf, \textit: mtext) keeps
+     the attribute, which theme.css styles.
+
+  2. Spacing TeX gives and MathML Core does not:
+     - a sign is unary (no space around it) where TeX makes it so: first
+       in its row or cell, or after an operator or an opening fence
+       ("= −1", "f(−x)", "x^{−1}"); MathML Core sets every such "−" as
+       a binary operator, "= − 1". The <mo> gets lspace and rspace 0.
+     - an operator name (\sin, \det, \lim, \operatorname) gets TeX's thin
+       space after it before a letter, a number or a fraction ("sin θ";
+       "\sin(x)" stays tight), also when it has limits (\lim_{n} a_n,
+       \max_i x_i), and before it after a letter, a number or a closing
+       fence ("2 sin x"). KaTeX writes the function application U+2061
+       after the name, which browsers set with no space.
+
+  3. Tables (aligned, matrix, cases, array, align…): MathML Core has no
+     columnalign, columnspacing, rowspacing, columnlines or rowlines, and
+     an aligned derivation would centre every cell and lose its alignment
+     at "=". Each <mtable> gets them as custom properties,
+
+       style="--tufte-ca1:-webkit-right;…;--tufte-cs1:0em;…;--tufte-cl1:none;…;--tufte-rl1:none;…;--tufte-rs:0.25em"
+
+     (the alignment of columns 1–12, as the -webkit- values of text-align,
+     which alone move the block-level math boxes of a cell; the space
+     after columns 1–11; the rule after columns 1–11 and rows 1–12; the
+     space between rows; as in MathML, the last value listed repeats, and
+     the defaults are center, 0.8em, none and 1ex), which theme.css
+     applies to the cells. The glue and number cells of KaTeX's numbered
+     environments (mtd.mtr-glue, mtd.mml-eqn-num) do not count as
+     columns there. Every table sets all of them, so a nested table never
+     inherits its parent's.
+
+  4. Accents: Euler Math stretches the combining marks U+0305 (over),
+     U+0332 (under), U+0302 and U+0303 but has no U+203E, U+02C9 or
+     stretchy ^ and ~: \overline, \underline, \widehat, \widetilde and
+     \bar get those characters.
+
+  Boxes and strikes (\boxed, \cancel…: menclose) are drawn by theme.css.
+
+  Takes: the MathML (string).
+  Returns: the fixed MathML (string).
+*/ -}}
+{{- $html := string . -}}
+{{- if strings.Contains $html ` mathvariant="` -}}
+  {{- $alpha := partialCached "tufte/mathml-alphabets.html" "alphabets" "alphabets" -}}
+  {{- range $m := (findRESubmatch `<(mi|mn)\b([^>]*?) mathvariant="([a-z-]+)"([^>]*)>([^<]*)</m[in]>` $html -1) -}}
+    {{- with index $alpha (index $m 3) -}}
+      {{- $map := . -}}
+      {{- $text := "" -}}
+      {{- range split (index $m 5) "" }}{{ $text = printf "%s%s" $text (index $map . | default .) }}{{ end -}}
+      {{- $html = replace $html (index $m 0) (printf "<%s%s%s>%s</%s>" (index $m 1) (index $m 2) (index $m 4) $text (index $m 1)) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Unary signs (twice: two signs in a row share a boundary). */ -}}
+{{- if findRE `<mo>[+\x{2212}\x{00B1}\x{2213}]</mo>` $html 1 -}}
+  {{- range seq 2 -}}
+    {{- $html = replaceRE `(<mrow>|<mtd[^>]*>|<mstyle[^>]*>|<semantics>|<mo[^>]*>[^<)\]}|!\x{27E9}\x{230B}\x{2309}\x{2016}\x{2032}\x{2033}]*</mo>)<mo>([+\x{2212}\x{00B1}\x{2213}])</mo>` "${1}<mo lspace=\"0em\" rspace=\"0em\">${2}</mo>" $html -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Operator names. */ -}}
+{{- if strings.Contains $html "<mo>\u2061</mo>" -}}
+  {{- $ord := `(?:<m(?:i|n|sub|sup|subsup|row|frac|sqrt|root|over|under|underover|text)[\s>]|<mspace)` -}}
+  {{- /* after the name: before an Ord */ -}}
+  {{- $html = replaceRE (printf `<mo>\x{2061}</mo>((?:<mrow>|<msub>|<msup>|<msubsup>|<mstyle[^>]*>)?%s)` $ord) "<mo rspace=\"0.1667em\">\u2061</mo>${1}" $html -}}
+  {{- /* after a name with limits: the space follows its scripts */ -}}
+  {{- range $t := slice "munder" "msub" -}}
+    {{- $in := partialCached "tufte/search/nested.html" (dict "tag" $t "depth" 3) (printf "%s3" $t) -}}
+    {{- $html = replaceRE (printf `(<%s><mrow><mi[^>]*>[^<]+</mi><mo>\x{2061}</mo></mrow>%s</%s>)(%s)` $t $in $t $ord) "${1}<mspace width=\"0.1667em\"/>${2}" $html -}}
+  {{- end -}}
+  {{- /* before the name: after an Ord or a closing fence */ -}}
+  {{- $html = replaceRE `(</m(?:i|n|sub|sup|subsup|frac|sqrt|root|over|under)>|<mo[^>]*>[)\]}]</mo>)((?:<(?:munder|msub|munderover|msubsup|msup)><mrow>)?<mi[^>]*>[^<]+</mi><mo[^>]*>\x{2061}</mo>)` "${1}<mspace width=\"0.1667em\"/>${2}" $html -}}
+{{- end -}}
+{{- /* Accents Euler Math can stretch. */ -}}
+{{- if or (strings.Contains $html `<mo stretchy="true">`) (strings.Contains $html "<mo>\u02C9</mo>") -}}
+  {{- $html = replace $html "<mo stretchy=\"true\">\u203E</mo></mover>" "<mo stretchy=\"true\">\u0305</mo></mover>" -}}
+  {{- $html = replace $html "<mo stretchy=\"true\">\u203E</mo></munder>" "<mo stretchy=\"true\">\u0332</mo></munder>" -}}
+  {{- $html = replace $html "<mo stretchy=\"true\">^</mo>" "<mo stretchy=\"true\">\u0302</mo>" -}}
+  {{- $html = replace $html "<mo stretchy=\"true\">~</mo>" "<mo stretchy=\"true\">\u0303</mo>" -}}
+  {{- $html = replace $html "<mo>\u02C9</mo>" "<mo>\u00AF</mo>" -}}
+{{- end -}}
+{{- if strings.Contains $html "<mtable" -}}
+  {{- /* One table at a time, in document order. */ -}}
+  {{- range seq 200 -}}
+    {{- $tag := "" -}}
+    {{- range findRE `<mtable\b[^>]*>` $html -}}
+      {{- if and (not $tag) (not (strings.Contains . ` style="`)) }}{{ $tag = . }}{{ end -}}
+    {{- end -}}
+    {{- if not $tag }}{{ break }}{{ end -}}
+    {{- $ca := slice "center" -}}
+    {{- with findRESubmatch `\scolumnalign="([^"]*)"` $tag 1 }}{{ with findRE `[a-z]+` (index . 0 1) }}{{ $ca = . }}{{ end }}{{ end -}}
+    {{- $cs := slice "0.8em" -}}
+    {{- with findRESubmatch `\scolumnspacing="([^"]*)"` $tag 1 }}{{ with findRE `[0-9.]+[a-z]*` (index . 0 1) }}{{ $cs = . }}{{ end }}{{ end -}}
+    {{- $rs := "1ex" -}}
+    {{- with findRESubmatch `\srowspacing="([^"]*)"` $tag 1 }}{{ with findRE `[0-9.]+[a-z]*` (index . 0 1) 1 }}{{ $rs = index . 0 }}{{ end }}{{ end -}}
+    {{- $cl := slice "none" -}}
+    {{- with findRESubmatch `\scolumnlines="([^"]*)"` $tag 1 }}{{ with findRE `[a-z]+` (index . 0 1) }}{{ $cl = . }}{{ end }}{{ end -}}
+    {{- $rl := slice "none" -}}
+    {{- with findRESubmatch `\srowlines="([^"]*)"` $tag 1 }}{{ with findRE `[a-z]+` (index . 0 1) }}{{ $rl = . }}{{ end }}{{ end -}}
+    {{- $style := slice -}}
+    {{- range $k := seq 12 -}}
+      {{- $v := index $ca (sub (cond (lt (len $ca) $k) (len $ca) $k) 1) -}}
+      {{- if not (in (slice "left" "center" "right") $v) }}{{ $v = "center" }}{{ end -}}
+      {{- /* The cells of a MathML table hold block-level math boxes, which
+             only the -webkit- values of text-align move (Chromium's own
+             default is -webkit-center; WebKit and Gecko know them too). */ -}}
+      {{- $style = $style | append (printf "--tufte-ca%d:-webkit-%s" $k $v) -}}
+    {{- end -}}
+    {{- range $k := seq 11 -}}
+      {{- $style = $style | append (printf "--tufte-cs%d:%s" $k (index $cs (sub (cond (lt (len $cs) $k) (len $cs) $k) 1))) -}}
+    {{- end -}}
+    {{- range $k := seq 11 -}}
+      {{- $v := index $cl (sub (cond (lt (len $cl) $k) (len $cl) $k) 1) -}}
+      {{- $style = $style | append (printf "--tufte-cl%d:%s" $k (cond (in (slice "solid" "dashed") $v) (printf "0.06em %s" $v) "none")) -}}
+    {{- end -}}
+    {{- range $k := seq 12 -}}
+      {{- $v := index $rl (sub (cond (lt (len $rl) $k) (len $rl) $k) 1) -}}
+      {{- $style = $style | append (printf "--tufte-rl%d:%s" $k (cond (in (slice "solid" "dashed") $v) (printf "0.06em %s" $v) "none")) -}}
+    {{- end -}}
+    {{- $style = $style | append (printf "--tufte-rs:%s" $rs) -}}
+    {{- $html = replace $html $tag (printf `%s style="%s">` (strings.TrimSuffix ">" $tag) (delimit $style ";")) 1 -}}
+  {{- end -}}
+{{- end -}}
+{{- return $html -}}

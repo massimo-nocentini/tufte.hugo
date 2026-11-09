@@ -75,6 +75,7 @@ All parameters live under `[params]` and have sensible defaults. The ones you wi
 | `showReadingTime` | `true`         | Reading time in the post meta line                        |
 | `toc`             | `false`        | Table of contents at the top of posts                     |
 | `math.enable`     | `"auto"`       | Load the KaTeX stylesheet only where math appears         |
+| `math.font`       | `"katex"`      | `"euler"`: formulas in Zapf's Euler (MathML)              |
 | `customCSS`       | `[]`           | Extra stylesheets from your `assets/` folder              |
 | `search.enable`   | `false`        | Search box in the header and a results page               |
 
@@ -89,6 +90,7 @@ title is shown, so no heading or link is left empty), `date`, `tags` and `catego
 - `subtitle`, shown in the style of Tufte's subtitles below the title;
 - `sections`, `footnotes` and `toc`, overriding the site parameters for one page (this page sets `toc: true`);
 - `math: true` to force the KaTeX stylesheet;
+- `mathFont: euler` to set this page's formulas in Euler, as [Euler Math](/posts/euler-math/) does;
 - `comments: false` to hide comments;
 - `searchHidden: true` to keep the page out of the site search.
 

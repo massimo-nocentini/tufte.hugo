@@ -125,6 +125,139 @@
 {{- end -}}
 {{- if eq $m.engine "client" }}
 <script>
+/* What KaTeX's MathML leaves to the browser and MathML Core does not do
+   (the Euler font), as tufte/mathml-core.html does at build time: the
+   Unicode math alphabets for mathvariant, the thin space after an
+   operator name, the layout attributes of tables as the custom
+   properties theme.css applies. */
+var mathAlphabets = (function () {
+  var sets = ["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789",
+    "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡϴΣΤΥΦΧΨΩ∇", "αβγδεζηθικλμνξοπρςστυφχψω∂ϵϑϰϕϱϖ"];
+  var bases = {
+    "bold": [0x1D400, 0x1D41A, 0x1D7CE, 0x1D6A8, 0x1D6C2],
+    "italic": [0x1D434, 0x1D44E, 0, 0x1D6E2, 0x1D6FC],
+    "bold-italic": [0x1D468, 0x1D482, 0, 0x1D71C, 0x1D736],
+    "script": [0x1D49C, 0x1D4B6, 0, 0, 0],
+    "bold-script": [0x1D4D0, 0x1D4EA, 0, 0, 0],
+    "fraktur": [0x1D504, 0x1D51E, 0, 0, 0],
+    "bold-fraktur": [0x1D56C, 0x1D586, 0, 0, 0],
+    "double-struck": [0x1D538, 0x1D552, 0x1D7D8, 0, 0],
+    "sans-serif": [0x1D5A0, 0x1D5BA, 0x1D7E2, 0, 0],
+    "bold-sans-serif": [0x1D5D4, 0x1D5EE, 0x1D7EC, 0x1D756, 0x1D770],
+    "sans-serif-italic": [0x1D608, 0x1D622, 0, 0, 0],
+    "sans-serif-bold-italic": [0x1D63C, 0x1D656, 0, 0x1D790, 0x1D7AA],
+    "monospace": [0x1D670, 0x1D68A, 0x1D7F6, 0, 0]
+  };
+  var holes = {
+    "italic": { h: "ℎ" },
+    "script": { B: "ℬ", E: "ℰ", F: "ℱ", H: "ℋ", I: "ℐ", L: "ℒ", M: "ℳ", R: "ℛ", e: "ℯ", g: "ℊ", o: "ℴ" },
+    "fraktur": { C: "ℭ", H: "ℌ", I: "ℑ", R: "ℜ", Z: "ℨ" },
+    "double-struck": { C: "ℂ", H: "ℍ", N: "ℕ", P: "ℙ", Q: "ℚ", R: "ℝ", Z: "ℤ" }
+  };
+  var out = {};
+  Object.keys(bases).forEach(function (v) {
+    var m = out[v] = {};
+    bases[v].forEach(function (b, i) {
+      if (b) { Array.from(sets[i]).forEach(function (c, k) { m[c] = String.fromCodePoint(b + k); }); }
+    });
+    Object.assign(m, holes[v] || {});
+  });
+  return out;
+})();
+function mathmlCore(root) {
+  /* KaTeX in the browser writes a space such as \, as a bare text node
+     (its build-time markup wraps it in mtext), which MathML ignores
+     outside a token element. */
+  var ns = "http://www.w3.org/1998/Math/MathML";
+  var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  var bare = [];
+  while (w.nextNode()) {
+    var t = w.currentNode, p = t.parentNode;
+    if (p && p.namespaceURI === ns && !/^(mi|mn|mo|mtext|ms|annotation|annotation-xml)$/.test(p.localName) && t.data.length) { bare.push(t); }
+  }
+  bare.forEach(function (t) {
+    var m = document.createElementNS(ns, "mtext");
+    t.parentNode.replaceChild(m, t);
+    m.appendChild(t);
+  });
+  root.querySelectorAll("mi[mathvariant], mn[mathvariant]").forEach(function (e) {
+    var m = mathAlphabets[e.getAttribute("mathvariant")];
+    if (!m) { return; }
+    e.textContent = Array.from(e.textContent).map(function (c) { return m[c] || c; }).join("");
+    e.removeAttribute("mathvariant");
+  });
+  /* Unary signs: first in a row or cell, or after an operator or an
+     opening fence. */
+  var closing = /^[)\]}|!\u27E9\u230B\u2309\u2016\u2032\u2033]*$/;
+  root.querySelectorAll("mo").forEach(function (e) {
+    if (!/^[+\u2212\u00B1\u2213]$/.test(e.textContent) || e.hasAttribute("lspace")) { return; }
+    var p = e.previousElementSibling;
+    var parent = e.parentElement && e.parentElement.localName;
+    if ((!p && /^(mrow|mtd|mstyle|semantics|math)$/.test(parent)) || (p && p.localName === "mo" && !closing.test(p.textContent))) {
+      e.setAttribute("lspace", "0em");
+      e.setAttribute("rspace", "0em");
+    }
+  });
+  /* Operator names: the thin space after (before an Ord; after the
+     scripts of a name with limits) and before (after an Ord or a closing
+     fence). */
+  var ord = /^(mi|mn|msub|msup|msubsup|mrow|mfrac|msqrt|mroot|mover|munder|munderover|mtext|mspace)$/;
+  function thin() { var s = document.createElementNS(ns, "mspace"); s.setAttribute("width", "0.1667em"); return s; }
+  root.querySelectorAll("mo").forEach(function (e) {
+    if (e.textContent !== "\u2061") { return; }
+    var n = e.nextElementSibling;
+    if (n) {
+      while (n && /^(mrow|msub|msup|msubsup|mstyle)$/.test(n.localName) && n.firstElementChild) { n = n.firstElementChild; }
+      if (n && ord.test(n.localName)) { e.setAttribute("rspace", "0.1667em"); }
+    }
+    /* the name: the mi before U+2061, or the base of a scripted name */
+    var name = e.previousElementSibling;
+    var outer = name;
+    var base = e.parentElement;
+    if (!n && base && base.localName === "mrow" && base.parentElement && /^(munder|msub|munderover|msubsup)$/.test(base.parentElement.localName) && base === base.parentElement.firstElementChild) {
+      outer = base.parentElement;
+      var after = outer.nextElementSibling;
+      if (after && ord.test(after.localName)) { outer.parentNode.insertBefore(thin(), after); }
+    }
+    var before = outer && outer.previousElementSibling;
+    if (before && (/^(mi|mn|msub|msup|msubsup|mfrac|msqrt|mroot|mover|munder)$/.test(before.localName) || (before.localName === "mo" && /^[)\]}]$/.test(before.textContent)))) {
+      outer.parentNode.insertBefore(thin(), outer);
+    }
+  });
+  /* Accents Euler Math can stretch. */
+  root.querySelectorAll("mo").forEach(function (e) {
+    var c = e.textContent, up = e.parentElement && e.parentElement.localName;
+    if (e.getAttribute("stretchy") === "true") {
+      if (c === "\u203E") { e.textContent = up === "munder" ? "\u0332" : "\u0305"; }
+      else if (c === "^") { e.textContent = "\u0302"; }
+      else if (c === "~") { e.textContent = "\u0303"; }
+    } else if (c === "\u02C9") {
+      e.textContent = "\u00AF";
+    }
+  });
+  root.querySelectorAll("mtable").forEach(function (t) {
+    function list(name, re, def) {
+      var v = (t.getAttribute(name) || "").match(re);
+      return v && v.length ? v : [def];
+    }
+    function rule(v) { return v === "solid" || v === "dashed" ? "0.06em " + v : "none"; }
+    var ca = list("columnalign", /[a-z]+/g, "center");
+    var cs = list("columnspacing", /[0-9.]+[a-z]*/g, "0.8em");
+    var cl = list("columnlines", /[a-z]+/g, "none");
+    var rl = list("rowlines", /[a-z]+/g, "none");
+    var rs = list("rowspacing", /[0-9.]+[a-z]*/g, "1ex")[0];
+    for (var k = 1; k <= 12; k++) {
+      var a = ca[Math.min(k, ca.length) - 1];
+      t.style.setProperty("--tufte-ca" + k, "-webkit-" + (/^(left|center|right)$/.test(a) ? a : "center"));
+      t.style.setProperty("--tufte-rl" + k, rule(rl[Math.min(k, rl.length) - 1]));
+      if (k < 12) {
+        t.style.setProperty("--tufte-cs" + k, cs[Math.min(k, cs.length) - 1]);
+        t.style.setProperty("--tufte-cl" + k, rule(cl[Math.min(k, cl.length) - 1]));
+      }
+    }
+    t.style.setProperty("--tufte-rs", rs);
+  });
+}
 document.addEventListener("DOMContentLoaded", function () {
   if (typeof katex === "undefined") { return; }
   var opts = {{ $m.client | jsonify | safeJS }};
@@ -143,17 +276,41 @@ document.addEventListener("DOMContentLoaded", function () {
       var tex = el.textContent.trim();
       var open = tex.slice(0, 2);
       if (open === "\\(" || open === "\\[") { tex = tex.slice(2, -2); }
-      var o = Object.assign({}, opts, { displayMode: el.classList.contains("math-display") });
+      /* Each formula's own output: MathML for the Euler font
+         (data-output="mathml", tufte/math-render.html), also in the
+         summary of an Euler page on a list page that is not. */
+      var o = Object.assign({}, opts, {
+        displayMode: el.classList.contains("math-display"),
+        output: el.getAttribute("data-output") === "mathml" ? "mathml" : "htmlAndMathml"
+      });
       try {
         katex.render(tex, el, o);
       } catch (err) {
         el.classList.add("math-error");
         if (window.console) { console.warn("KaTeX:", err); }
       }
+      if (o.output === "mathml") {
+        mathmlCore(el);
+        /* \notag rows (tufte/math-render.html): their number cells. */
+        var skip = (el.getAttribute("data-notag") || "").split(" ");
+        el.querySelectorAll("mtd.mml-eqn-num").forEach(function (c, i) {
+          if (skip.indexOf(String(i)) >= 0) { c.classList.add("tufte-notag"); }
+        });
+        /* KaTeX's MathML has no display wrapper, nor its fleqn and leqno
+           classes (katex.min.css), as the server adds them. */
+        var k = el.querySelector(":scope > .katex");
+        if (o.displayMode && k) {
+          var d = document.createElement("span");
+          d.className = "katex-display" + (opts.fleqn ? " fleqn" : "") + (opts.leqno ? " leqno" : "");
+          el.replaceChild(d, k);
+          d.appendChild(k);
+        }
+      }
       qed.forEach(function (c) { el.appendChild(c); });
     });
   } else if (typeof renderMathInElement === "function") {
-    renderMathInElement(document.querySelector("article") || document.body, Object.assign({}, opts, {
+    var root = document.querySelector("article") || document.body;
+    renderMathInElement(root, Object.assign({}, opts, {
       delimiters: [
         { left: "$$", right: "$$", display: true },
         { left: "\\[", right: "\\]", display: true },
@@ -161,6 +318,7 @@ document.addEventListener("DOMContentLoaded", function () {
         { left: "$", right: "$", display: false }
       ]
     }));
+    if (opts.output === "mathml") { mathmlCore(root); }
   }
   /* KaTeX colours invalid TeX (span.katex-error) and undefined control
      sequences (a typo, a missing macro: no class at all) with the sentinel
@@ -170,8 +328,18 @@ document.addEventListener("DOMContentLoaded", function () {
   probe.style.color = {{ $m.sentinel }};
   var sentinel = probe.style.color;
   var errorColor = {{ $m.errorColor }};
-  document.querySelectorAll(".katex-error, .katex [style]").forEach(function (e) {
-    if (e.style.color !== sentinel) { return; }
+  /* (MathML output colours with the mathcolor attribute.) */
+  document.querySelectorAll(".katex-error, .katex [style], .katex [mathcolor]").forEach(function (e) {
+    var mc = e.getAttribute("mathcolor");
+    if (mc) {
+      /* (An invalid colour leaves the probe as it was.) */
+      probe.style.color = "";
+      probe.style.color = mc;
+      if (probe.style.color !== sentinel) { return; }
+      e.removeAttribute("mathcolor");
+    } else if (e.style.color !== sentinel) {
+      return;
+    }
     var nested = e.parentElement && e.parentElement.closest(".katex-error");
     e.style.removeProperty("color");
     e.classList.add("katex-error");

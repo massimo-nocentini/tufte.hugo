@@ -20,6 +20,21 @@
   where KATEX is the KaTeX display HTML (server) or
   <span class="math math-display">\[TeX\]</span> (client).
   Invalid TeX: warning plus <code class="math-error">TeX</code>.
+
+  The Euler font (func/math-options.html font "euler"): KaTeX outputs
+  MathML only, which the browser lays out with the Euler Math font
+  (theme.css). The server's MathML is wrapped as KaTeX wraps it in its
+  HTML+MathML output, <span class="katex"><span class="katex-mathml"><math>
+  …</math></span></span>, so every reader of the formula's TeX annotation
+  works unchanged (theme.css shows that span when it is the only child);
+  a display is <span class="katex-display[ fleqn][ leqno]">…</span>. The
+  client engine's span gets data-output="mathml" (tufte/katex.html). A
+  \tag{X} (\tag*{X}) is taken out of the TeX and printed by the theme, as
+  a \label number is, "(X)" ("X"), since browsers do not lay out KaTeX's
+  MathML tag table (a \tag on a row of a multi-row environment warns,
+  tufte-euler-tag, and is left to KaTeX, which drops it):
+    <span class="math-display tagged numbered[ leqno]"[ id="KEY"]>KATEX[TOKEN]<span class="eq-number">(X)</span></span>
+  where TOKEN is the hidden tufte-num of "tagged" above, with a label.
   \qedhere (block only): removed from the TeX; the end-of-proof symbol
   <span class="thm-qed …" … data-qedhere="1">…</span> (tufte/thm/qed.html,
   symbol theorems.qed; an empty thm-qed-none span when that is none, for a
@@ -43,13 +58,59 @@
   {{- $inner = replaceRE `\\qedhere([^A-Za-z]|$)` "$1" $inner -}}
   {{- $qed = partial "tufte/thm/qed.html" (dict "symbol" (partialCached "tufte/opt.html" (dict "page" $page "key" "theorems.qed") (or $page.RelPermalink $page.Path) "theorems.qed") "qedhere" "1") -}}
 {{- end -}}
+{{- $euler := eq $m.font "euler" -}}
+{{- /* Euler: the theme prints \tag{X} / \tag*{X} (see above). */ -}}
+{{- $eulerTag := "" -}}
+{{- $eulerNum := "" -}}
+{{- $eulerTagged := false -}}
+{{- /* (A \tag on a row of a multi-row environment: KaTeX's MathML drops
+       it and numbers the rows itself; it cannot be printed per row.) */ -}}
+{{- $rowTag := and $euler $block (strings.Contains $inner `\tag`) (strings.Contains $inner `\\`) (findRE `\\begin\{(?:align|alignat|gather|equation|multline|flalign)\*?\}` $inner 1) -}}
+{{- if $rowTag -}}
+  {{- warnidf "tufte-euler-tag" "tufte.hugo: \\tag on a row of a multi-row environment is not supported with the Euler font (MathML output: the rows keep KaTeX's own numbers), at %s: write each tagged row as a display of its own, or use mathFont: katex on this page" $position -}}
+{{- end -}}
+{{- if and $euler $block (not $rowTag) -}}
+  {{- with findRESubmatch `\\tag(\*?)\s*\{((?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*)\}` $inner 1 -}}
+    {{- $eulerTagged = true -}}
+    {{- $star := eq (index . 0 1) "*" -}}
+    {{- $t := strings.TrimSpace (index . 0 2) -}}
+    {{- $inner = replace $inner (index . 0 0) "" -}}
+    {{- if findRE `[\\$^_{}&%#~]` $t 1 -}}
+      {{- $t = partial "tufte/math-render.html" (dict "page" $page "inner" (printf `\text{%s}` $t) "block" false "position" $position) -}}
+    {{- else -}}
+      {{- $t = htmlEscape $t -}}
+    {{- end -}}
+    {{- $eulerNum = $t -}}
+    {{- $eulerTag = cond $star $t (printf "(%s)" $t) -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Euler: \notag / \nonumber in a numbered environment. KaTeX's MathML
+       leaves that row without its glue and number cells, which shifts its
+       columns against the other rows; so they are taken out of the TeX
+       (every row keeps its cells) and the rows' number cells are marked
+       tufte-notag (no number, theme.css). Rows are counted by the \\ of
+       the environment, those of nested arrays and matrices left out. */ -}}
+{{- $notag := slice -}}
+{{- if and $euler $block (findRE `\\(?:notag|nonumber)\b` $inner 1) (findRE `\\begin\{(?:align|alignat|gather|equation|flalign)\}` $inner 1) -}}
+  {{- $body := $inner -}}
+  {{- range $n := slice "cases" "dcases" "rcases" "matrix" "pmatrix" "bmatrix" "Bmatrix" "vmatrix" "Vmatrix" "smallmatrix" "array" "darray" "subarray" "aligned" "alignedat" "gathered" "split" "CD" -}}
+    {{- $body = replaceRE (printf `\\begin\{%s\*?\}[\s\S]*?\\end\{%s\*?\}` $n $n) "" $body -}}
+  {{- end -}}
+  {{- $row := 0 -}}
+  {{- range findRE `\\\\|\\(?:notag|nonumber)\b` $body -}}
+    {{- if eq . `\\` }}{{ $row = add $row 1 }}{{ else }}{{ $notag = $notag | append $row }}{{ end -}}
+  {{- end -}}
+  {{- $inner = replaceRE `\\(?:notag|nonumber)\b` "" $inner -}}
+{{- end -}}
 {{- $out := "" -}}
 {{- $failed := false -}}
 {{- if eq $m.engine "client" -}}
+  {{- $attr := cond $euler ` data-output="mathml"` "" -}}
+  {{- with $notag }}{{ $attr = printf `%s data-notag="%s"` $attr (delimit . " ") }}{{ end -}}
   {{- if $block -}}
-    {{- $out = printf `<span class="math math-display">\[%s\]</span>` (htmlEscape $inner) -}}
+    {{- $out = printf `<span class="math math-display"%s>\[%s\]</span>` $attr (htmlEscape $inner) -}}
   {{- else -}}
-    {{- $out = printf `<span class="math math-inline">\(%s\)</span>` (htmlEscape $inner) -}}
+    {{- $out = printf `<span class="math math-inline"%s>\(%s\)</span>` $attr (htmlEscape $inner) -}}
   {{- end -}}
 {{- else -}}
   {{- $html := "" -}}
@@ -77,6 +138,20 @@
       {{- $err = printf "undefined control sequence %s (a typo, or a macro that is not defined?)" (index . 0 1 | htmlUnescape) -}}
     {{- end -}}
   {{- end -}}
+  {{- /* Euler: KaTeX's MathML in the span KaTeX's HTML+MathML output uses. */ -}}
+  {{- if and $euler (not $err) (strings.HasPrefix $html `<span class="katex"><math`) (strings.HasSuffix $html `</math></span>`) -}}
+    {{- $html = printf `<span class="katex"><span class="katex-mathml">%s</span></span>` (strings.TrimSuffix `</span>` (strings.TrimPrefix `<span class="katex">` $html)) -}}
+    {{- $html = partial "tufte/mathml-core.html" $html -}}
+    {{- with $notag -}}
+      {{- $cell := `<mtd class ="mml-eqn-num"></mtd>` -}}
+      {{- $parts := split $html $cell -}}
+      {{- $h := index $parts 0 -}}
+      {{- range $i, $p := after 1 $parts -}}
+        {{- $h = printf "%s%s%s" $h (cond (in $notag $i) `<mtd class="mml-eqn-num tufte-notag"></mtd>` $cell) $p -}}
+      {{- end -}}
+      {{- $html = $h -}}
+    {{- end -}}
+  {{- end -}}
   {{- if $err -}}
     {{- $failed = true -}}
     {{- warnidf "tufte-math-error" "tufte.hugo: KaTeX could not render %q: %s (%s)" $inner $err $position -}}
@@ -88,7 +163,14 @@
   {{- else if $block -}}
     {{- /* KaTeX adds the katex-display wrapper in display mode; add it if missing. */ -}}
     {{- if not (strings.Contains $html "katex-display") -}}
-      {{- $html = printf `<span class="katex-display">%s</span>` $html -}}
+      {{- /* (MathML output: KaTeX adds no wrapper, nor its fleqn and leqno
+             classes, which katex.min.css and the theme style.) */ -}}
+      {{- $cls := "katex-display" -}}
+      {{- if $euler -}}
+        {{- if eq $m.client.fleqn true }}{{ $cls = printf "%s fleqn" $cls }}{{ end -}}
+        {{- if eq $m.client.leqno true }}{{ $cls = printf "%s leqno" $cls }}{{ end -}}
+      {{- end -}}
+      {{- $html = printf `<span class="%s">%s</span>` $cls $html -}}
     {{- end -}}
     {{- $out = $html -}}
   {{- else -}}
@@ -119,12 +201,20 @@
 {{- /* The \qedhere symbol: in the client engine's span (after the TeX
        text, which KaTeX's auto-render replaces); with the server engine
        at the end of the display span (after the equation number). */ -}}
-{{- if and $qed (eq $m.engine "client") (not $label) (strings.HasPrefix $out `<span class="math math-display">`) -}}
+{{- if and $qed (eq $m.engine "client") (not $label) (not $eulerTagged) (strings.HasPrefix $out `<span class="math math-display"`) -}}
   {{- $out = printf "%s%s</span>" (strings.TrimSuffix "</span>" $out) $qed -}}
   {{- $qed = "" -}}
 {{- end -}}
 {{- if $block -}}
-  {{- if $tagged -}}
+  {{- if $eulerTagged -}}
+    {{- $lq := cond (eq $m.client.leqno true) " leqno" "" -}}
+    {{- if $label -}}
+      {{- $k := htmlEscape $label -}}
+      {{- $out = printf `<span class="math-display tagged numbered%s" id="%s">%s<span class="tufte-num" data-kind="eq" data-key="%s" data-labeled="1" data-number="%s" hidden></span><span class="eq-number">%s</span></span>` $lq $k $out $k (htmlEscape $eulerNum) $eulerTag -}}
+    {{- else -}}
+      {{- $out = printf `<span class="math-display tagged numbered%s">%s<span class="eq-number">%s</span></span>` $lq $out $eulerTag -}}
+    {{- end -}}
+  {{- else if $tagged -}}
     {{- $k := htmlEscape $label -}}
     {{- $out = printf `<span class="math-display tagged" id="%s">%s<span class="tufte-num" data-kind="eq" data-key="%s" data-labeled="1" data-number="%s" hidden></span></span>` $k $out $k (htmlEscape $tag) -}}
   {{- else if $label -}}

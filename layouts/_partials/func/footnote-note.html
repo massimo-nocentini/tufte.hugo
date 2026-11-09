@@ -181,7 +181,7 @@
       {{- $t = replaceRE `<span class="eq-number">\(<span class="tufte-num" data-kind="eq"[^>]*></span>\)</span>` "" $t -}}
       {{- $t = replaceRE `<span class="tufte-num" data-kind="eq"[^>]*></span>` "" $t -}}
       {{- $t = replaceRE `<span class="math-display numbered[^"]*" id="[^"]*">` `<span class="math-display">` $t -}}
-      {{- $t = replaceRE `<span class="math-display tagged" id="[^"]*">` `<span class="math-display tagged">` $t -}}
+      {{- $t = replaceRE `<span class="math-display tagged([^"]*)" id="[^"]*">` `<span class="math-display tagged$1">` $t -}}
     {{- end -}}
   {{- end -}}
   {{- range $i, $k := $kept }}{{ $t = replace $t (printf "TUFTEFNKEEP%dEND" $i) $k }}{{ end -}}

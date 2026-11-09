@@ -118,6 +118,42 @@ jobs:
             [ -z "$dups" ] || fail "duplicate ids in $f: $dups"
           done
 
+      # Euler math (posts/euler-math sets mathFont: euler; README "Euler
+      # math"): MathML in KaTeX's katex-mathml span, no KaTeX HTML, the fixes
+      # of tufte/mathml-core.html (math alphabets, the space after an
+      # operator name, table layout), \tag printed by the theme, and the
+      # bundled font with its licence and @font-face.
+      - name: Check Euler math
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          E=public/posts/euler-math/index.html
+          [ -f "$E" ] || fail "missing $E"
+          if grep -q 'katex-html' "$E"; then fail "KaTeX HTML in $E (mathFont: euler)"; fi
+          grep -q '<span class="katex"><span class="katex-mathml"><math' "$E" || fail "no MathML in a katex-mathml span in $E"
+          if grep -q 'mathvariant="double-struck"' "$E"; then fail "mathvariant left for \\mathbb in $E"; fi
+          grep -q '<mi>ℝ</mi>' "$E" || fail "\\mathbb{R} is not U+211D in $E"
+          grep -q '<mi>𝔤</mi>' "$E" || fail "\\mathfrak{g} is not U+1D524 in $E"
+          grep -q '<mi>cos</mi><mo rspace="0.1667em">' "$E" || fail "no thin space after \\cos in $E"
+          grep -q '<mn>2</mn><mspace width="0.1667em"/><mi>sin</mi>' "$E" || fail "no thin space before \\sin in 2\\sin in $E"
+          grep -q '<mo stretchy="false">(</mo><mo lspace="0em" rspace="0em">−</mo>' "$E" || fail "the minus of f(-x) is not unary in $E"
+          grep -q '<menclose notation="box">' "$E" || fail "no \\boxed in $E"
+          grep -qE '<mtable [^>]*style="--tufte-ca1:-webkit-right;--tufte-ca2:-webkit-left;' "$E" || fail "no column alignment on the aligned table in $E"
+          grep -q '<span class="math-display tagged numbered"><span class="katex-display">' "$E" || fail "\\tag not printed by the theme in $E"
+          grep -q '<span class="eq-number">(2.26)</span>' "$E" || fail "no (2.26) tag in $E"
+          # KaTeX's own MathML tag is a 100%-wide table, which browsers do not lay out
+          if grep -q '<mtable width="100%"' "$E"; then fail "KaTeX's \\tag table left in $E"; fi
+          grep -q 'href="#eq-binomial">(1)' "$E" || fail "no eqref (1) in $E"
+          grep -q 'data-qedhere="2"' "$E" || fail "no claimed \\qedhere symbol in $E"
+          grep -q 'katex-html' public/posts/math-and-code/index.html || fail "posts/math-and-code lost KaTeX's HTML (font katex)"
+          [ -s public/euler-math/Euler-Math.woff2 ] || fail "missing public/euler-math/Euler-Math.woff2"
+          grep -q 'SIL Open Font License' public/euler-math/OFL.txt || fail "missing the font licence"
+          B=public$(grep -oE '/css/tufte-hugo[^" >]*\.css' "$E" | head -1)
+          [ -f "$B" ] || fail "missing $B"
+          grep -qi 'font-family: *"\?euler math' "$B" || fail "no Euler Math @font-face in $B"
+          grep -q 'url(\.\./euler-math/Euler-Math\.woff2)\|url("\.\./euler-math/Euler-Math\.woff2")' "$B" || fail "the Euler Math URL is not relative to the bundle in $B"
+
       # Site search (params.search, README "Search"): the index (the home
       # page's "searchindex" output), the header box and its settings on every
       # page, the results page; then the same site with search off, and with
@@ -541,6 +577,36 @@ jobs:
           grep -q 'data-key="eq-coset" data-labeled="1">1</span>)</span><span class="thm-qed thm-qed-[a-z]*" role="img" aria-label="[^"]*" data-qedhere="2">' "$TH" || fail "the \\qedhere symbol of a numbered client-side display is not after its number in $TH"
           # Book landings have no pager: no /page/N/ copies of print.html.
           if find public-client -path '*/page/*' -name print.html | grep -q .; then fail "paginated copies of print.html"; fi
+          # Euler math: KaTeX writes MathML for the spans that ask for it.
+          grep -q 'class="math math-inline" data-output="mathml"' public-client/posts/euler-math/index.html || fail "no data-output=mathml in posts/euler-math (client)"
+          if grep -q 'data-output="mathml"' "$M"; then fail "data-output=mathml in $M (font katex)"; fi
+          grep -q 'function mathmlCore' public-client/posts/euler-math/index.html || fail "no MathML fixes in the client script"
+
+      # The whole site in Euler (params.math.font = "euler", with fleqn and
+      # leqno): every page still passes the marker checks, and no page holds
+      # KaTeX's HTML.
+      - name: Build (math.font = euler)
+        env:
+          HUGO_PARAMS_MATH_FONT: euler
+          HUGO_PARAMS_MATH_FLEQN: "true"
+          HUGO_PARAMS_MATH_LEQNO: "true"
+        run: hugo --gc --panicOnWarning --destination public-euler
+
+      - name: Check Euler math everywhere (math.font = euler)
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          "$RUNNER_TEMP/tufte-latex-check.sh" public-euler markers
+          if grep -rl 'katex-html' public-euler --include='*.html' | grep -q .; then fail "KaTeX HTML with math.font = euler: $(grep -rl 'katex-html' public-euler --include='*.html' | head -3)"; fi
+          M=public-euler/posts/math-and-code/index.html
+          grep -q '<span class="katex"><span class="katex-mathml"><math' "$M" || fail "no MathML in $M"
+          grep -q 'class="math-display tagged numbered leqno" id="eq-euler-tag">' "$M" || fail "the labelled \\tag display of $M is not the theme's (leqno)"
+          grep -q '<span class="katex-display fleqn leqno">' "$M" || fail "no fleqn/leqno display wrapper in $M"
+          grep -q '<span class="eq-number">(A.1)</span>' "$M" || fail "no (A.1) tag in $M"
+          grep -q 'href="#eq-euler-tag">(A.1)</a>' "$M" || fail "eqref to the \\tag display is not (A.1) in $M"
+          TH=public-euler/posts/theorems/index.html
+          grep -q 'data-qedhere="2"' "$TH" || fail "no claimed \\qedhere symbol in $TH"
 
       - name: Build (A4 paper, nobib, numbered sections)
         env:

@@ -1,0 +1,61 @@
+{{- /*
+  The Unicode mathematical alphabets (Mathematical Alphanumeric Symbols,
+  U+1D400–U+1D7FF, and the older letters of Letterlike Symbols that fill
+  its holes, such as ℝ and ℱ), for tufte/mathml-core.html: MathML Core,
+  which Chromium implements, ignores mathvariant (but "normal"), so
+  \mathbb{R}, written <mi mathvariant="double-struck">R</mi> by KaTeX,
+  becomes <mi>ℝ</mi>.
+
+  Call it through partialCached ("alphabets" as the variant).
+
+  Returns: a map from each mathvariant KaTeX writes to a map from a
+  letter (Latin; Greek for the bold and bold italic alphabets) or digit
+  to its character in that alphabet. Characters an alphabet lacks are
+  not listed (they stay as written). The Scratch maps keep the case of
+  their keys ("A" and "a").
+*/ -}}
+{{- $latinU := split "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "" -}}
+{{- $latinL := split "abcdefghijklmnopqrstuvwxyz" "" -}}
+{{- $digits := split "0123456789" "" -}}
+{{- $greekU := split "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡϴΣΤΥΦΧΨΩ∇" "" -}}
+{{- $greekL := split "αβγδεζηθικλμνξοπρςστυφχψω∂ϵϑϰϕϱϖ" "" -}}
+{{- /* variant: [capital A, small a, digit 0, capital Alpha, small alpha]
+       (0 = none) */ -}}
+{{- $bases := dict
+  "bold" (slice 0x1D400 0x1D41A 0x1D7CE 0x1D6A8 0x1D6C2)
+  "italic" (slice 0x1D434 0x1D44E 0 0x1D6E2 0x1D6FC)
+  "bold-italic" (slice 0x1D468 0x1D482 0 0x1D71C 0x1D736)
+  "script" (slice 0x1D49C 0x1D4B6 0 0 0)
+  "bold-script" (slice 0x1D4D0 0x1D4EA 0 0 0)
+  "fraktur" (slice 0x1D504 0x1D51E 0 0 0)
+  "bold-fraktur" (slice 0x1D56C 0x1D586 0 0 0)
+  "double-struck" (slice 0x1D538 0x1D552 0x1D7D8 0 0)
+  "sans-serif" (slice 0x1D5A0 0x1D5BA 0x1D7E2 0 0)
+  "bold-sans-serif" (slice 0x1D5D4 0x1D5EE 0x1D7EC 0x1D756 0x1D770)
+  "sans-serif-italic" (slice 0x1D608 0x1D622 0 0 0)
+  "sans-serif-bold-italic" (slice 0x1D63C 0x1D656 0 0x1D790 0x1D7AA)
+  "monospace" (slice 0x1D670 0x1D68A 0x1D7F6 0 0)
+-}}
+{{- /* The holes of the block: letters encoded earlier in Letterlike
+       Symbols. */ -}}
+{{- $holes := dict
+  "italic" (dict "h" "ℎ")
+  "script" (dict "B" "ℬ" "E" "ℰ" "F" "ℱ" "H" "ℋ" "I" "ℐ" "L" "ℒ" "M" "ℳ" "R" "ℛ" "e" "ℯ" "g" "ℊ" "o" "ℴ")
+  "fraktur" (dict "C" "ℭ" "H" "ℌ" "I" "ℑ" "R" "ℜ" "Z" "ℨ")
+  "double-struck" (dict "C" "ℂ" "H" "ℍ" "N" "ℕ" "P" "ℙ" "Q" "ℚ" "R" "ℝ" "Z" "ℤ")
+-}}
+{{- $s := newScratch -}}
+{{- range $v, $b := $bases -}}
+  {{- range $i, $sets := slice $latinU $latinL $digits $greekU $greekL -}}
+    {{- $base := index $b $i -}}
+    {{- if gt $base 0 -}}
+      {{- range $k, $c := $sets -}}
+        {{- $s.SetInMap $v $c (printf "%c" (add $base $k)) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $c, $r := index $holes $v -}}
+    {{- $s.SetInMap $v $c $r -}}
+  {{- end -}}
+{{- end -}}
+{{- return $s.Values -}}

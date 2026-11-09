@@ -821,6 +821,314 @@ code.math-error {
 }
 
 /* ------------------------------------------------------------------ */
+/* Euler math (params.math.font = "euler", front matter mathFont)      */
+/* ------------------------------------------------------------------ */
+
+/* Hermann Zapf's Euler as an OpenType math font (Euler Math, SIL Open
+   Font License: static/euler-math/OFL.txt). Downloaded only by a page
+   that shows a formula in it. */
+@font-face {
+    font-family: "Euler Math";
+    src: url("../euler-math/Euler-Math.woff2") format("woff2");
+    font-display: swap;
+}
+
+/* KaTeX's MathML output, which the browser lays out with the font's own
+   math metrics (tufte/math-render.html). The server wraps it in
+   span.katex-mathml, which katex.min.css hides (it doubles KaTeX's HTML
+   for screen readers): shown when it is the only child. */
+.katex > .katex-mathml:only-child {
+    position: static;
+    clip: auto;
+    -webkit-clip-path: none;
+    clip-path: none;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: 0;
+    overflow: visible;
+}
+
+/* span.katex names KaTeX_Main (katex.min.css), whose metrics the line
+   box would use, and which the browser would download for that alone. */
+.katex:has(> .katex-mathml:only-child),
+.katex:has(> math) {
+    font-family: "Euler Math", math;
+}
+
+/* The client engine's MathML is math directly in span.katex. The size:
+   span.katex is 1.21em (katex.min.css, for KaTeX's fonts); Euler, with a
+   larger x-height than ET Book, is set a little smaller than the text. */
+.katex > math,
+.katex > .katex-mathml:only-child > math {
+    font-family: "Euler Math", math;
+    font-size: 0.78em;
+}
+
+/* A display is set inline in its centred block (math-style stays
+   display), so that text-align places it: flush left with fleqn
+   (katex.min.css .katex-display.fleqn), and beside its number. */
+.katex > math[display="block"],
+.katex > .katex-mathml:only-child > math[display="block"] {
+    display: inline math;
+}
+
+/* KaTeX's table layout (aligned, matrix, cases, array, align…): MathML
+   Core has no columnalign, columnspacing, rowspacing, columnlines or
+   rowlines, so the theme passes them as custom properties on each mtable
+   (tufte/mathml-core.html; in the browser tufte/katex.html) and sets the
+   cells here: each column's alignment, the space between it and its
+   neighbours (half on each side, so that a rule sits in the middle of
+   the gap) and the rule after it, the rule under each row, and half the row spacing above and
+   below each cell, plus 0.1em: TeX keeps rows a strut apart (KaTeX's HTML
+   does), the browser stacks them by the height of their ink, and a
+   matrix of low letters would touch. The glue and number cells of
+   KaTeX's numbered environments are not columns (":nth-child(… of …)"). */
+.katex mtable[style] > mtr > mtd {
+    padding-block: calc(var(--tufte-rs) / 2 + 0.1em);
+    padding-inline-end: 0;
+}
+
+.katex mtable[style] > mtr > mtd:is(.mtr-glue, .mml-eqn-num) {
+    padding-inline: 0;
+}
+
+/* At least 1em between a row and its number (leqno: the number cell is
+   the first one). */
+.katex mtable[style] > mtr > mtd.mml-eqn-num {
+    padding-inline-start: 1em;
+}
+
+.katex mtable[style] > mtr > mtd.mml-eqn-num:first-child {
+    padding-inline: 0 1em;
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(1 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca1);
+    padding-inline-start: 0;
+    padding-inline-end: calc(var(--tufte-cs1) / 2);
+    border-inline-end: var(--tufte-cl1);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(2 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca2);
+    padding-inline-start: calc(var(--tufte-cs1) / 2);
+    padding-inline-end: calc(var(--tufte-cs2) / 2);
+    border-inline-end: var(--tufte-cl2);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(3 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca3);
+    padding-inline-start: calc(var(--tufte-cs2) / 2);
+    padding-inline-end: calc(var(--tufte-cs3) / 2);
+    border-inline-end: var(--tufte-cl3);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(4 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca4);
+    padding-inline-start: calc(var(--tufte-cs3) / 2);
+    padding-inline-end: calc(var(--tufte-cs4) / 2);
+    border-inline-end: var(--tufte-cl4);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(5 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca5);
+    padding-inline-start: calc(var(--tufte-cs4) / 2);
+    padding-inline-end: calc(var(--tufte-cs5) / 2);
+    border-inline-end: var(--tufte-cl5);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(6 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca6);
+    padding-inline-start: calc(var(--tufte-cs5) / 2);
+    padding-inline-end: calc(var(--tufte-cs6) / 2);
+    border-inline-end: var(--tufte-cl6);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(7 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca7);
+    padding-inline-start: calc(var(--tufte-cs6) / 2);
+    padding-inline-end: calc(var(--tufte-cs7) / 2);
+    border-inline-end: var(--tufte-cl7);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(8 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca8);
+    padding-inline-start: calc(var(--tufte-cs7) / 2);
+    padding-inline-end: calc(var(--tufte-cs8) / 2);
+    border-inline-end: var(--tufte-cl8);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(9 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca9);
+    padding-inline-start: calc(var(--tufte-cs8) / 2);
+    padding-inline-end: calc(var(--tufte-cs9) / 2);
+    border-inline-end: var(--tufte-cl9);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(10 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca10);
+    padding-inline-start: calc(var(--tufte-cs9) / 2);
+    padding-inline-end: calc(var(--tufte-cs10) / 2);
+    border-inline-end: var(--tufte-cl10);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(11 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca11);
+    padding-inline-start: calc(var(--tufte-cs10) / 2);
+    padding-inline-end: calc(var(--tufte-cs11) / 2);
+    border-inline-end: var(--tufte-cl11);
+}
+
+.katex mtable[style] > mtr > mtd:nth-child(n+12 of :not(.mtr-glue, .mml-eqn-num)) {
+    text-align: var(--tufte-ca12);
+    padding-inline-start: calc(var(--tufte-cs11) / 2);
+    padding-inline-end: calc(var(--tufte-cs11) / 2);
+    border-inline-end: var(--tufte-cl11);
+}
+
+.katex mtable[style] > mtr:nth-child(1):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl1);
+}
+
+.katex mtable[style] > mtr:nth-child(2):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl2);
+}
+
+.katex mtable[style] > mtr:nth-child(3):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl3);
+}
+
+.katex mtable[style] > mtr:nth-child(4):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl4);
+}
+
+.katex mtable[style] > mtr:nth-child(5):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl5);
+}
+
+.katex mtable[style] > mtr:nth-child(6):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl6);
+}
+
+.katex mtable[style] > mtr:nth-child(7):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl7);
+}
+
+.katex mtable[style] > mtr:nth-child(8):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl8);
+}
+
+.katex mtable[style] > mtr:nth-child(9):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl9);
+}
+
+.katex mtable[style] > mtr:nth-child(10):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl10);
+}
+
+.katex mtable[style] > mtr:nth-child(11):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl11);
+}
+
+.katex mtable[style] > mtr:nth-child(n+12):not(:last-child) > mtd {
+    border-block-end: var(--tufte-rl12);
+}
+
+/* No rule after the last column (columnlines lists the gaps), nor
+   space: the column spacing is split around the rule between columns. */
+.katex mtable[style] > mtr > mtd:nth-last-child(1 of :not(.mtr-glue, .mml-eqn-num)) {
+    border-inline-end: none;
+    padding-inline-end: 0;
+}
+
+/* A row with \notag or \nonumber (tufte/math-render.html): its number
+   cell stays, empty, so the row keeps the table's columns. */
+.katex mtd.mml-eqn-num.tufte-notag::before {
+    content: none;
+    counter-increment: none;
+}
+
+/* fleqn: a numbered environment (align, gather, equation) is centred by
+   its two glue cells, 50% each (katex.min.css): flush left (after the
+   indent katex.min.css gives fleqn displays), the second takes it all. */
+.katex-display.fleqn mtd.mtr-glue:nth-child(1 of .mtr-glue) {
+    width: 0;
+}
+
+.katex-display.fleqn mtd.mtr-glue:nth-child(2 of .mtr-glue) {
+    width: 100%;
+}
+
+/* Boxes and strikes (\boxed, \fbox, \cancel, \bcancel, \xcancel, an
+   array's outer rules): menclose, which MathML Core does not draw. */
+.katex menclose {
+    padding: 0.1em 0.2em;
+}
+
+.katex menclose[notation~="box"] {
+    border: 0.06em solid;
+    padding: 0.25em;
+}
+
+.katex menclose[notation~="left"] {
+    border-inline-start: 0.06em solid;
+}
+
+.katex menclose[notation~="right"] {
+    border-inline-end: 0.06em solid;
+}
+
+.katex menclose[notation~="top"] {
+    border-block-start: 0.06em solid;
+}
+
+.katex menclose[notation~="bottom"] {
+    border-block-end: 0.06em solid;
+}
+
+.katex menclose[notation~="updiagonalstrike"] {
+    background: linear-gradient(to top right, transparent calc(50% - 0.04em), currentColor calc(50% - 0.04em) calc(50% + 0.04em), transparent calc(50% + 0.04em));
+}
+
+.katex menclose[notation~="downdiagonalstrike"] {
+    background: linear-gradient(to bottom right, transparent calc(50% - 0.04em), currentColor calc(50% - 0.04em) calc(50% + 0.04em), transparent calc(50% + 0.04em));
+}
+
+.katex menclose[notation~="updiagonalstrike"][notation~="downdiagonalstrike"] {
+    background:
+        linear-gradient(to top right, transparent calc(50% - 0.04em), currentColor calc(50% - 0.04em) calc(50% + 0.04em), transparent calc(50% + 0.04em)),
+        linear-gradient(to bottom right, transparent calc(50% - 0.04em), currentColor calc(50% - 0.04em) calc(50% + 0.04em), transparent calc(50% + 0.04em));
+}
+
+.katex menclose[notation~="horizontalstrike"] {
+    background: linear-gradient(transparent calc(50% - 0.04em), currentColor calc(50% - 0.04em) calc(50% + 0.04em), transparent calc(50% + 0.04em));
+}
+
+/* \text{…} in the text font, as eulervm sets it in LaTeX; \textbf,
+   \textit, \texttt, \textsf as their mathvariant says (MathML Core
+   ignores the attribute). */
+.katex math mtext {
+    font-family: var(--tufte-serif, et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif);
+}
+
+.katex math mtext[mathvariant*="bold"] {
+    font-weight: bold;
+}
+
+.katex math mtext[mathvariant*="italic"] {
+    font-style: italic;
+}
+
+.katex math mtext[mathvariant="monospace"] {
+    font-family: var(--tufte-mono, monospace);
+}
+
+.katex math mtext[mathvariant*="sans-serif"] {
+    font-family: var(--tufte-sans, sans-serif);
+}
+
+/* ------------------------------------------------------------------ */
 /* Alerts (GitHub-style blockquotes)                                   */
 /* ------------------------------------------------------------------ */
 

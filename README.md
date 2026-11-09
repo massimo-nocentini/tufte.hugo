@@ -29,7 +29,7 @@ Hugo template system introduced in 0.146 (`layouts/baseof.html`, `home.html`, `p
 - [Shortcodes](#shortcodes)
 - [Render hooks](#render-hooks)
 - [Footnotes and sidenotes](#footnotes-and-sidenotes)
-- [Math](#math)
+- [Math](#math) ([Euler math](#euler-math))
 - [tufte-latex parity](#tufte-latex-parity): [options](#options-paramstufte), [notes](#notes-in-the-margin),
   [floats](#floats-figures-tables-listings), [cross-references](#cross-references-and-labels),
   [theorems](#theorems-and-proofs), [bibliography](#bibliography), [books](#books), [index](#index), [printing](#printing-and-pdf),
@@ -205,6 +205,7 @@ gives the `twitter:site` card of every page (`@jack`, also when it is written as
 |---|---|---|
 | `enable` | `"auto"` | `"auto"`: load the KaTeX assets only on pages that contain math. `true`: load them on every page. `false`: never load them. |
 | `engine` | `"server"` | `"server"`: typeset at build time with Hugo's `transform.ToMath` (no JavaScript). `"client"`: keep the TeX in the page and typeset it in the browser with `katex.min.js`. |
+| `font` | `"katex"` | `"katex"`: KaTeX's own fonts and layout. `"euler"`: the formulas in Hermann Zapf's Euler, as LaTeX's `euler`/`eulervm` packages set them; KaTeX writes MathML and the browser lays it out with the bundled Euler Math font. Front matter `mathFont` overrides it for one page; any other value prints the warning `tufte-bad-option` and is ignored. See [Euler math](#euler-math). |
 | `macros` | `[]` | KaTeX macros for the whole site, merged with front matter `mathMacros` (the page wins). Write them as a list of pairs, `[["\\RR", "\\mathbb{R}"]]`: Hugo lowercases the keys of maps, so the map form `{ "\\RR" = "…" }` would define `\rr`. A list of `{ name = "\\RR", value = "\\mathbb{R}" }` tables works too. |
 | `fleqn` | `false` | Set display math flush left (with a 2em indent). |
 | `leqno` | `false` | Put equation numbers on the left, as LaTeX's `leqno`: both the theme's `\label` numbers and KaTeX's `\tag{…}`. |
@@ -297,6 +298,7 @@ mainSections = ["posts"]
 | `sections` | `"h2"`/`"none"` (or `true`/`false`, also as strings: `"yes"`/`"no"`, `"on"`/`"off"`, `"1"`/`"0"`). Overrides `params.sections`. |
 | `footnotes` | `"sidenotes"`/`"endnotes"`. Overrides `params.footnotes`. |
 | `math` | `true` always loads the KaTeX assets on this page (with the client engine, this also makes KaTeX scan the article for `$…$`, `$$…$$`, `\(…\)`, `\[…\]` when the passthrough extension is off). `false` never loads them, even if the page contains math. The strings `"true"`/`"false"` (also `yes`/`no`, `on`/`off`, `1`/`0`) work the same; `"auto"` keeps the detection. |
+| `mathFont` | `"katex"` or `"euler"`: the math font of this page, over `params.math.font` (see [Euler math](#euler-math)). |
 | `mathMacros` | KaTeX macros for this page, added to `params.math.macros` (same list-of-pairs form), e.g. `mathMacros: [["\\E", "\\mathbb{E}"]]` in YAML. |
 | `comments` | `true`/`false`. Overrides `params.comments.enable`. `true` is needed on pages outside any section (such as `content/about.md`), which have no comments otherwise. |
 | `draft` | Hugo's standard draft flag. |
@@ -1158,6 +1160,65 @@ may take any form a browser accepts: `sha256-`, `sha384-` or `sha512-` (cdnjs pu
 hashes separated by spaces; as in a browser, only the strongest algorithm listed counts, and the file must match
 one of its hashes, or the build stops. The stylesheet loads its fonts from `fonts/` next to itself, so a self-hosted site
 must copy the `dist/fonts/` directory of the **same** KaTeX release to `static/katex/fonts/`.
+
+### Euler math
+
+Hermann Zapf's Euler, the upright mathematical alphabet that the AMS commissioned and *Concrete Mathematics*
+made famous, can set the formulas of a page or of the whole site, as `\usepackage{eulervm}` does in LaTeX: the
+text stays in ET Book, and so does text inside a formula (`\text{…}`).
+
+```toml
+[params.math]
+  font = "euler"     # the whole site
+```
+
+```yaml
+mathFont: euler      # one page (front matter)
+```
+
+KaTeX's own output is drawn for KaTeX's fonts: it places every glyph with their measurements, so another font
+would sit wrongly. With `font = "euler"` KaTeX writes **MathML** only, and the browser lays it out with
+[Euler Math](https://ctan.org/pkg/euler-math), the OpenType math font by Khaled Hosny and Daniel Flipo, which
+carries its own layout rules (script sizes, fraction gaps, stretching delimiters and radicals). The font
+(version 0.77, 261 kB as WOFF2) is bundled with the theme in `static/euler-math/`, under the SIL Open Font
+License (`static/euler-math/OFL.txt`), and is downloaded only by pages that show a formula in it. Chrome and Edge
+109+, Firefox and Safari 16.4+ lay out MathML.
+
+Everything else works as with KaTeX's fonts, with both engines: inline and display math, macros, math in notes
+and captions, `\label` numbers and `eqref`, `fleqn` and `leqno`, `\qedhere`, the search index and the page
+descriptions (both read the formula's TeX). Some details:
+
+- **`\tag{…}`** is printed by the theme, as a `\label` number is (KaTeX's MathML tag is a full-width table that
+  browsers do not lay out): `(X)`, or `X` for `\tag*{X}`, on the right (on the left with `leqno`).
+- **What Chromium leaves out.** MathML Core, which Chrome and Edge implement, ignores `mathvariant`, the
+  layout attributes of tables and `menclose`, and spaces operators by a dictionary that knows nothing of TeX's
+  rules. The theme makes up for them (`tufte/mathml-core.html` at build time, the same in the client
+  engine's script, `theme.css`):
+  - `\mathbb{R}`, `\mathcal`, `\mathscr`, `\mathfrak`, `\mathbf`, `\boldsymbol`, `\mathsf` and `\mathtt`
+    become the characters of the Unicode mathematical alphabets (ℝ, ℱ, 𝔤, 𝐯…), which Euler Math has
+    (but for the lowercase script letters, which come from another font); `\textbf`, `\textit`, `\texttt` and
+    `\textsf` inside a formula are styled by `theme.css`;
+  - a sign is unary where TeX makes it so (`= -1`, `f(-x)`, `x^{-1}`: no space around it);
+  - an operator name (`\sin`, `\det`, `\lim`, `\operatorname`) gets TeX's thin space after it before a letter,
+    a number or a fraction (`\sin\theta`, `\lim_{n} a_n`; `\sin(x)` stays tight) and before it after a
+    letter or a number (`2\sin x`);
+  - the columns of `aligned`, `align`, `gather`, matrices, `cases` and `array` keep their alignment, spacing and
+    rules (`{c|c}`, `\hline`), up to 12 columns (the 13th and later take the 12th's);
+  - `\boxed`, `\fbox`, `\cancel`, `\bcancel` and `\xcancel` are drawn; `\overline`, `\underline`,
+    `\widehat`, `\widetilde` and `\bar` use the accents Euler Math stretches.
+- **Markup.** The MathML sits in the span KaTeX uses for it in its usual output,
+  `<span class="katex"><span class="katex-mathml"><math>…</math></span></span>` (with the client engine,
+  `<span class="katex"><math>`), which `theme.css` shows instead of hiding; a display is wrapped in
+  `span.katex-display`, as before. The KaTeX stylesheet is still loaded (it styles the error output and the
+  display wrappers); its fonts are not downloaded.
+- **Numbered environments.** KaTeX's `equation`, `align` and `gather` number their rows with a CSS counter of
+  their own, as with KaTeX's fonts (it runs through the page and knows nothing of the theme's `\label`
+  numbers: number displays with `\label`, as recommended above). `\notag` and `\nonumber` work; a `\tag` on
+  a row of such an environment cannot be printed (KaTeX's MathML drops it and the row keeps KaTeX's number):
+  the build warns, `tufte-euler-tag`; write the row as a display of its own, or use `mathFont: katex` on that
+  page.
+
+See the example site's [Euler Math](https://massimo-nocentini.github.io/tufte.hugo/posts/euler-math/) post.
 
 ## tufte-latex parity
 
@@ -2111,6 +2172,7 @@ build and cannot be ignored.
 | `tufte-orphan-footnotemark` | A `footnotemark` without its `footnotetext` (only with `debug`). |
 | `tufte-bib-format` | A bibliography database that cannot be read. |
 | `tufte-katex-version` | `params.math.katexVersion` differs from the KaTeX that Hugo embeds (server engine). |
+| `tufte-euler-tag` | A `\tag` on a row of a multi-row `align`, `gather` or similar environment with the Euler font (`params.math.font = "euler"`): MathML output cannot print it (see [Euler math](#euler-math)). |
 | `tufte-search-output` | `params.search.enable` is true but the home page has no `searchindex` output, so there is no index to search (see [Search](#search)); the search box is left out. |
 
 ### LaTeX to Hugo cheat sheet
@@ -2242,6 +2304,7 @@ package, which the classes do not define but mathematical texts load with them.
 | 115 | `\ref`, cleveref `\cref`, `\nameref` to a theorem | `{{< xref "thm:x" >}}`, `{{< xref "thm:x" "full" >}}`, `{{< xref "thm:x" "name" >}}` | should | “2.1”, “Theorem 2.1”, the note |
 | 116 | thmtools `\listoftheorems` | `{{< listoftheorems >}}` (standalone) | should | `kinds="theorem,lemma"`, `heading=""` |
 | 117 | `\swapnumbers`, `\newtheoremstyle`, thmtools `restatable` | — | **wont** | heads come in two looks (`tufte.theorems.look`: `tufte`, `amsthm`); restyle one kind with `thm-kind-k` in `customCSS` |
+| 118 | `\usepackage{euler}`, `eulervm` | `[params.math] font = "euler"`; front matter `mathFont: euler` | could | MathML set in the bundled Euler Math font; text and `\text{…}` stay in ET Book |
 
 ## Syntax highlighting
 
