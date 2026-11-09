@@ -681,6 +681,20 @@ body.tufte-osf .caption-label {
         float: none;
         margin: 0;
     }
+
+    /* A bottom-aligned caption right after a full-width float, whose
+       caption hangs in the margin column below it: placed absolutely, it
+       would print over that caption (in LaTeX the figure* floats away, to
+       the top of a page). It stays a margin float instead, under the
+       hanging caption (the handout's figures 2 and 3). */
+    figure.fullwidth:not(.caption-bottom) + figure.caption-bottom:not(.fullwidth) > span.marginnote {
+        position: relative;
+        bottom: auto;
+        right: auto;
+        float: right;
+        clear: right;
+        margin: calc(0.3rem + var(--tufte-offset, 0px)) -60% 0 0;
+    }
 }
 
 figure[id],
@@ -3840,6 +3854,14 @@ nav.book-nav .next {
         position: absolute;
         right: calc((var(--pw) + var(--pl) - 100) / var(--pw) * 100%);
         margin-right: 0 !important;
+    }
+
+    /* After a full-width float, a margin float (as on screen, §3). */
+    figure.fullwidth:not(.caption-bottom) + figure.caption-bottom:not(.fullwidth) > span.marginnote {
+        float: right !important;
+        position: relative;
+        right: auto;
+        margin-right: calc((var(--pw) + var(--pl) - 100) / var(--pw) * 100%) !important;
     }
 
     /* Notes in a run-in h4: absolutely placed in the section (§6), whose
