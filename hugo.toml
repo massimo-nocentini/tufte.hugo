@@ -45,6 +45,7 @@
   sections = "h2"               # "h2" | "none" — wrap content in <section> at each h2 (front matter `sections` overrides)
   footnotes = "sidenotes"       # "sidenotes" | "endnotes" (front matter `footnotes` overrides)
   etBook = true                 # load the bundled ET Book web fonts
+  font = "etbook"               # text font: "etbook" (ET Book) | "libertinus" (Libertinus Serif, Sans, Mono); front matter `font` overrides
   showReadingTime = true
   showWordCount = false
   showPostNav = true            # previous / next links at the end of posts
@@ -75,7 +76,7 @@
   [params.math]
     enable = "auto"             # "auto" (only pages that contain math) | true | false
     engine = "server"           # "server" (build-time KaTeX, no JS) | "client" (KaTeX JS in the browser)
-    font = "katex"              # "katex" (KaTeX's fonts and layout) | "euler" (MathML set in the bundled Euler Math font); front matter mathFont overrides
+    font = "katex"              # "katex" (KaTeX's fonts and layout) | "euler" | "libertinus" (MathML set in the bundled Euler Math or Libertinus Math font); front matter mathFont overrides
     fleqn = false               # display math flush left
     leqno = false               # equation numbers on the left: \label numbers and \tag
     errorColor = ""             # colour of invalid TeX ("" = the theme's red, adapted to dark mode)
@@ -104,6 +105,27 @@
     maxResults = 8              # results under the header box (the results page shows them all)
     threshold = 0.3             # Fuse.js fuzziness: 0 = exact words … 1 = anything
     hotkey = "/"                # key that focuses the search box ("" = none)
+
+  # Slides (reveal.js): a page whose `outputs` list "slides" also gets
+  # slides.html, its content as a reveal.js deck: a slide at each h2 and
+  # each thematic break (---). Front matter `slides` overrides these, key by
+  # key. Any of these reveal.js options may be set (README "Slides"):
+  # controls, progress, slideNumber, hash, center, transition,
+  # transitionSpeed, backgroundTransition, width, height, margin, minScale,
+  # maxScale, loop, navigationMode, autoSlide, showNotes, fragments,
+  # overview, keyboard, touch, mouseWheel, pdfSeparateFragments,
+  # pdfMaxPagesPerSlide, autoAnimate, viewDistance.
+  [params.slides]
+    titleSlide = true           # a first slide with the title, subtitle, authors and date
+    width = 1024                # the slide size reveal.js scales to the window (16:10)
+    height = 640
+    margin = 0.04
+    center = false              # slides start at the top, so their headings line up
+    transition = "fade"
+    slideNumber = "c/t"
+    hash = true                 # each slide has its own URL (#/3)
+    controls = true
+    progress = true
 
   [params.giscus]               # enabled only when repo, repoId, category and categoryId are all set
     repo = ""
@@ -143,6 +165,18 @@
   # The search index of params.search (layouts/home.searchindex.json): a
   # JSON file, /search-index.json (/LANG/search-index.json on a
   # multilingual site), that a site adds to its home page outputs.
+  # Slides (reveal.js, layouts/page.slides.html): a page lists it in its
+  # `outputs` (outputs: ["html", "slides"]) and gets slides.html next to
+  # its index.html. Not permalinkable, so .Permalink stays the article's
+  # (the slides' canonical link points to it).
+  [outputFormats.slides]
+    mediaType = "text/html"
+    baseName = "slides"
+    isHTML = true
+    noUgly = true
+    permalinkable = false
+    notAlternative = true
+
   [outputFormats.searchindex]
     mediaType = "application/json"
     baseName = "search-index"

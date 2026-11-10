@@ -131,7 +131,9 @@ jobs:
           E=public/posts/euler-math/index.html
           [ -f "$E" ] || fail "missing $E"
           if grep -q 'katex-html' "$E"; then fail "KaTeX HTML in $E (mathFont: euler)"; fi
-          grep -q '<span class="katex"><span class="katex-mathml"><math' "$E" || fail "no MathML in a katex-mathml span in $E"
+          grep -q '<span class="katex tufte-math-euler"><span class="katex-mathml"><math' "$E" || fail "no MathML in a katex-mathml span in $E"
+          # a formula and the comma after it stay on one line (func/content-raw.html)
+          grep -q '<span class="tufte-nobr"><span class="katex tufte-math-euler">' "$E" || fail "no tufte-nobr span in $E"
           if grep -q 'mathvariant="double-struck"' "$E"; then fail "mathvariant left for \\mathbb in $E"; fi
           grep -q '<mi>ℝ</mi>' "$E" || fail "\\mathbb{R} is not U+211D in $E"
           grep -q '<mi>𝔤</mi>' "$E" || fail "\\mathfrak{g} is not U+1D524 in $E"
@@ -153,6 +155,102 @@ jobs:
           [ -f "$B" ] || fail "missing $B"
           grep -qi 'font-family: *"\?euler math' "$B" || fail "no Euler Math @font-face in $B"
           grep -q 'url(\.\./euler-math/Euler-Math\.woff2)\|url("\.\./euler-math/Euler-Math\.woff2")' "$B" || fail "the Euler Math URL is not relative to the bundle in $B"
+
+      # Libertinus (posts/libertinus sets font and mathFont: libertinus;
+      # README "Fonts" and "Euler and Libertinus math"): the class of <html>,
+      # Libertinus Math's MathML, the faces with their unicode-range halves
+      # and licence, and the ET Book pages untouched.
+      - name: Check Libertinus
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          L=public/posts/libertinus/index.html
+          [ -f "$L" ] || fail "missing $L"
+          grep -q '<html lang="[^"]*" class="tufte-font-libertinus">' "$L" || fail "no tufte-font-libertinus class on <html> in $L"
+          if grep -q 'tufte-font-libertinus' public/posts/theme-guide/index.html; then fail "posts/theme-guide (font etbook) has the Libertinus class"; fi
+          grep -q '<span class="katex tufte-math-libertinus"><span class="katex-mathml"><math' "$L" || fail "no Libertinus MathML in $L"
+          if grep -q 'katex-html' "$L"; then fail "KaTeX HTML in $L (mathFont: libertinus)"; fi
+          grep -q 'class="tufte-osf' "$L" || grep -q 'class="[^"]* tufte-osf' "$L" || fail "numerals: oldstyle not applied in $L"
+          for f in LibertinusSerif-Regular-latin LibertinusSerif-Regular-ext LibertinusSerif-Italic-latin LibertinusSerif-Bold-latin LibertinusSans-Regular-latin LibertinusMono-Regular-latin LibertinusSerif-Regular-osf LibertinusMath-Regular; do
+            [ -s "public/libertinus/$f.woff2" ] || fail "missing public/libertinus/$f.woff2"
+          done
+          grep -q 'SIL Open Font License' public/libertinus/OFL.txt || fail "missing the Libertinus licence"
+          B=public$(grep -oE '/css/tufte-hugo[^" >]*\.css' "$L" | head -1)
+          [ -f "$B" ] || fail "missing $B"
+          grep -qi 'font-family: *"\?libertinus serif' "$B" || fail "no Libertinus Serif @font-face in $B"
+          grep -qi 'font-family: *"\?libertinus math' "$B" || fail "no Libertinus Math @font-face in $B"
+          grep -q 'url(\.\./libertinus/LibertinusSerif-Regular-latin\.woff2)\|url("\.\./libertinus/LibertinusSerif-Regular-latin\.woff2")' "$B" || fail "the Libertinus URL is not relative to the bundle in $B"
+          grep -q 'unicode-range' "$B" || fail "no unicode-range in $B"
+          grep -q '\.tufte-font-libertinus' "$B" || fail "no Libertinus font variables in $B"
+
+      # Slides (posts/tufte-slides lists the slides output format; README
+      # "Slides"): slides.html beside the article, one slide per h2 or ---
+      # plus the title slide, no <section> nested in a slide (reveal.js would
+      # take it for a vertical slide), reveal.js with the hashes of
+      # vendor.toml, the options, the speaker notes, the slides stylesheet
+      # without print rules, and the article's link to its slides.
+      - name: Check the slides
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import re, sys, json, tomllib, html
+          def fail(m):
+              print("::error::" + m); sys.exit(1)
+          f = "public/posts/tufte-slides/slides.html"
+          try:
+              h = open(f, encoding="utf-8").read()
+          except OSError:
+              fail(f"missing {f}")
+          a = open("public/posts/tufte-slides/index.html", encoding="utf-8").read()
+          if '<a class="post-slides" href="/posts/tufte-slides/slides.html">' not in a:
+              fail("the article has no link to its slides")
+          if '<aside class="notes">' not in a or "aside.notes" not in open("../assets/css/theme.css").read():
+              fail("the article lost its (hidden) speaker notes")
+          i = h.index('<div class="slides">'); j = h.index("<script", i)
+          body = h[i:j]
+          depth = top = 0
+          for m in re.finditer(r"<(/?)section\b", body):
+              if m.group(1):
+                  depth -= 1
+              else:
+                  if depth:
+                      fail(f"{f}: a <section> nested in a slide")
+                  top += 1
+                  depth += 1
+          if top != 7:
+              fail(f"{f}: expected 7 slides (title + 6), got {top}")
+          if '<section class="tufte-slide-title">' not in body or 'href="/posts/tufte-slides/">' not in body:
+              fail(f"{f}: no title slide with the link to the article")
+          if body.count('<aside class="notes">') != 2:
+              fail(f"{f}: expected 2 speaker notes")
+          if re.search(r"<hr\b", body):
+              fail(f"{f}: a thematic break left in the slides")
+          v = tomllib.load(open("../data/tufte/vendor.toml", "rb"))["reveal"]
+          for k in ("css", "js", "notes"):
+              tag = f'href="{v[k]["url"]}"' if k == "css" else f'src="{v[k]["url"]}"'
+              m = re.search(re.escape(tag) + r' integrity="([^"]+)"', h)
+              if not m or html.unescape(m.group(1)) != v[k]["integrity"]:
+                  fail(f"{f}: reveal.js {k} missing or its hash differs from vendor.toml")
+          m = re.search(r"var options = (\{.*?\});", h)
+          if not m:
+              fail(f"{f}: no reveal.js options")
+          o = json.loads(m.group(1))
+          if o.get("transition") != "slide" or o.get("width") != 1024 or o.get("slideNumber") != "c/t":
+              fail(f"{f}: options {o} (front matter transition slide over params.slides)")
+          if '<link rel="canonical" href="' not in h or not re.search(r'<link rel="canonical" href="[^"]*/posts/tufte-slides/">', h):
+              fail(f"{f}: the canonical link is not the article")
+          css = re.search(r'href="(/css/tufte-hugo-slides[^"]+\.css)"', h)
+          if not css:
+              fail(f"{f}: no slides bundle")
+          c = open("public" + css.group(1), encoding="utf-8").read()
+          if "@media print" in c or "@media print{" in c:
+              fail("the slides bundle keeps print-only rules")
+          if "tufte-section" not in c:
+              fail("the slides bundle does not style tufte-section")
+          print(f"slides: {top} slides")
+          EOF
 
       # Site search (params.search, README "Search"): the index (the home
       # page's "searchindex" output), the header box and its settings on every
@@ -183,7 +281,7 @@ jobs:
               if u in urls:
                   fail(f"search-index.json lists {u} (layout search/archive)")
           text = json.dumps(idx, ensure_ascii=False)
-          for bad in ('class=\\"katex', "katex-html", "TUFTENEST", "\ue000", "\ue001", "\ue002", "\ue003", "<sup", "sn-end", "tufte-num"):
+          for bad in ('class=\\"katex', "katex-html", "TUFTENEST", "\ue000", "\ue001", "\ue002", "\ue003", "<sup", "sn-end", "tufte-num", "These are speaker notes"):
               if bad in text:
                   fail(f"search-index.json holds {bad!r}")
           th = {e["url"]: e for e in idx}.get("/posts/theorems/")
@@ -207,7 +305,7 @@ jobs:
           if not bk or bk["where"] != "A Tufte-Style Book" or bk["date"]:
               fail("/books/sample-book/tufte-book/: where should be the book, without a date")
           vendor = tomllib.load(open("../data/tufte/vendor.toml", "rb"))["fuse"]
-          pages = [f for f in glob.glob("public/**/*.html", recursive=True) if not f.endswith("/print.html")]
+          pages = [f for f in glob.glob("public/**/*.html", recursive=True) if not f.endswith(("/print.html", "/slides.html"))]
           for f in pages:
               h = open(f, encoding="utf-8").read()
               if "<html" not in h or 'http-equiv="refresh"' in h:
@@ -428,8 +526,9 @@ jobs:
             grep -q '<sup class="footnote-ref" id="fnref-' "$L" || fail "$L: no real footnote (footnote shortcode, [^fn-x])"
             grep -q 'data-kind="listing"><li>' "$L" || fail "$L: no list of listings"
           fi
-          # a summary with a forward xref resolves on the list page
-          grep -qE 'class="xref"[^>]*>The cheat sheet<' posts/index.html || fail "posts/index.html: forward xref in the latex-to-hugo summary not resolved"
+          # a summary with a forward xref resolves on the list page (whichever
+          # pager of posts/ shows it)
+          grep -qE 'class="xref"[^>]*>The cheat sheet<' posts/index.html posts/page/*/index.html || fail "posts/: forward xref in the latex-to-hugo summary not resolved"
 
           # 8. Theorems (amsthm): numbers within sections and on a counter of
           # their own, cross-references, proof heads, end-of-proof symbols and
@@ -534,6 +633,7 @@ jobs:
       - name: Build (tufte.style = latex)
         env:
           HUGO_PARAMS_TUFTE_STYLE: latex
+          HUGO_PARAMS_FONT: libertinus
         run: hugo --gc --panicOnWarning --destination public-latex
 
       - name: Check tufte-latex markers (tufte.style = latex)
@@ -546,6 +646,10 @@ jobs:
           TH=public-latex/posts/theorems/index.html
           grep -q 'thm-look-amsthm' "$TH" || { echo "::error::no amsthm look in $TH"; exit 1; }
           grep -q 'class="thm-qed thm-qed-openbox"' "$TH" || { echo "::error::no open-box end-of-proof symbol in $TH"; exit 1; }
+          # This build also sets params.font = "libertinus": every page, and
+          # the running heads (custom properties do not reach @page boxes).
+          grep -q 'class="tufte-font-libertinus"' public-latex/posts/tufte-css/index.html || { echo "::error::params.font = libertinus not applied"; exit 1; }
+          grep -q '@top-right{content:[^}]*font-family:"Libertinus Serif"' public-latex/posts/sample-handout/index.html || { echo "::error::the running heads are not in Libertinus Serif"; exit 1; }
 
       # KaTeX in the browser: the TeX stays in the HTML and the page loads
       # katex.min.js and auto-render of the same release as the stylesheet.
@@ -581,6 +685,8 @@ jobs:
           grep -q 'class="math math-inline" data-output="mathml"' public-client/posts/euler-math/index.html || fail "no data-output=mathml in posts/euler-math (client)"
           if grep -q 'data-output="mathml"' "$M"; then fail "data-output=mathml in $M (font katex)"; fi
           grep -q 'function mathmlCore' public-client/posts/euler-math/index.html || fail "no MathML fixes in the client script"
+          grep -q 'class="math math-inline" data-output="mathml" data-mathfont="libertinus"' public-client/posts/libertinus/index.html || fail "no data-mathfont=libertinus in posts/libertinus (client)"
+          grep -q '<span class="tufte-nobr"><span class="math math-inline" data-output="mathml"' public-client/posts/libertinus/index.html || fail "no tufte-nobr around client MathML in posts/libertinus"
 
       # The whole site in Euler (params.math.font = "euler", with fleqn and
       # leqno): every page still passes the marker checks, and no page holds
@@ -600,7 +706,7 @@ jobs:
           "$RUNNER_TEMP/tufte-latex-check.sh" public-euler markers
           if grep -rl 'katex-html' public-euler --include='*.html' | grep -q .; then fail "KaTeX HTML with math.font = euler: $(grep -rl 'katex-html' public-euler --include='*.html' | head -3)"; fi
           M=public-euler/posts/math-and-code/index.html
-          grep -q '<span class="katex"><span class="katex-mathml"><math' "$M" || fail "no MathML in $M"
+          grep -q '<span class="katex tufte-math-euler"><span class="katex-mathml"><math' "$M" || fail "no MathML in $M"
           grep -q 'class="math-display tagged numbered leqno" id="eq-euler-tag">' "$M" || fail "the labelled \\tag display of $M is not the theme's (leqno)"
           grep -q '<span class="katex-display fleqn leqno">' "$M" || fail "no fleqn/leqno display wrapper in $M"
           grep -q '<span class="eq-number">(A.1)</span>' "$M" || fail "no (A.1) tag in $M"

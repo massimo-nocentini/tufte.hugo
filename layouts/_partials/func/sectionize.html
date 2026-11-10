@@ -24,12 +24,22 @@
   included) closes an open <p>, an <li> closes the previous <li> of its
   list, a <dt> or <dd> the previous <dt> or <dd>.
 
-  Takes: the HTML (string or template.HTML).
+  Takes: the HTML (string or template.HTML), or a dict with
+    html   the HTML
+    tag    the element that starts a section instead of h2 (the slides
+           output, tufte/slides/split.html: "hr", a thematic break, which
+           stays at the start of its section)
   Returns: template.HTML.
 */ -}}
+{{- $in := . -}}
+{{- $tag := "h2" -}}
+{{- if reflect.IsMap . -}}
+  {{- $in = .html -}}
+  {{- $tag = .tag | default "h2" -}}
+{{- end -}}
 {{- /* Comments and script/style/textarea contents (raw HTML) are text:
        a "<h2" or "<div" in them neither splits nor nests (func/raw-mask.html). */ -}}
-{{- $mask := partial "func/raw-mask.html" (dict "html" (string .)) -}}
+{{- $mask := partial "func/raw-mask.html" (dict "html" (string $in)) -}}
 {{- $html := $mask.html -}}
 {{- $marker := "<!--tufte-hugo:section-->" -}}
 {{- $tagRE := `<(/?)([a-zA-Z][a-zA-Z0-9-]*)[^>]*>` -}}
@@ -43,7 +53,7 @@
       "dt" (dict "t" (slice "dt" "dd") "s" (slice "dl" "button" "table" "td" "th" "caption" "object" "template" "applet" "marquee" "html"))
       "dd" (dict "t" (slice "dt" "dd") "s" (slice "dl" "button" "table" "td" "th" "caption" "object" "template" "applet" "marquee" "html")) -}}
 {{- /* A literal "<h2" cannot occur in text or code (Goldmark escapes "<"). */ -}}
-{{- $html = replaceRE `(?i)(<h2[\s>])` (printf "%s${1}" $marker) $html -}}
+{{- $html = replaceRE (printf `(?i)(<%s[\s>/])` $tag) (printf "%s${1}" $marker) $html -}}
 {{- $sections := slice -}}
 {{- $current := "" -}}
 {{- $stack := slice -}}
@@ -51,7 +61,7 @@
   {{- if eq $i 0 -}}
     {{- $current = $part -}}
   {{- else -}}
-    {{- /* The <h2> closes an open <p> first. */ -}}
+    {{- /* The <h2> (<hr>) closes an open <p> first. */ -}}
     {{- $hit := -1 }}{{ $stop := -1 -}}
     {{- range $j, $e := $stack }}{{ if eq $e "p" }}{{ $hit = $j }}{{ else if in $scope $e }}{{ $stop = $j }}{{ end }}{{ end -}}
     {{- if gt $hit $stop }}{{ $stack = first $hit $stack }}{{ end -}}

@@ -1,0 +1,94 @@
+{{- /*
+  The slides output format (hugo.toml [outputFormats.slides]): a page with
+  `outputs: ["html", "slides"]` also gets slides.html, its content as a
+  reveal.js deck (README "Slides").
+
+  The content is the article's own final HTML (the same cached
+  func/content.html call), cut into slides by tufte/slides/split.html: a
+  slide at each h2 and at each thematic break (---). The slides are the
+  <section> elements Tufte CSS lays out, so the text column, sidenotes,
+  margin notes, figures, tables, theorems and math look as in the article,
+  on a canvas reveal.js scales to the window. A title slide comes first
+  (params.slides.titleSlide: the title with its thanks notes, subtitle,
+  authors, date and a link back to the article), then the front-matter
+  abstract, if any, on a slide of its own. The
+  `notes` shortcode writes speaker notes (aside.notes, the "s" key).
+
+  The document is complete in itself (no baseof.html: no site header,
+  navigation or footer). head.html gives it the article's metadata, with
+  the canonical link to the article, the theme stylesheet and KaTeX; then
+  come reveal.js's core stylesheet and assets/css/slides.css, and at the
+  end reveal.js, its notes plugin and Reveal.initialize with the options
+  of tufte/slides/config.html. Third-party files: data/tufte/vendor.toml
+  [reveal] (params.selfHosted applies).
+*/ -}}
+{{- $l := partial "func/lang.html" site.Language -}}
+{{- $key := or .RelPermalink .Path -}}
+{{- $face := partialCached "func/font.html" . $key -}}
+{{- $cfg := partial "tufte/slides/config.html" . -}}
+{{- $reveal := index (partial "func/vendor-data.html" .) "reveal" -}}
+{{- if not (and $reveal $reveal.js $reveal.css) -}}
+  {{- errorf "tufte.hugo: data/tufte/vendor.toml has no [reveal] css and js (the slides of %s)" .RelPermalink -}}
+{{- end -}}
+{{- $dir := $reveal.dir | default "reveal" -}}
+{{- $css := resources.Get "css/slides.css" -}}
+{{- if hugo.IsProduction }}{{ $css = $css | minify }}{{ end -}}
+{{- $css = $css | fingerprint -}}
+{{- $slides := partial "tufte/slides/split.html" (partialCached "func/content.html" . $key false) -}}
+<!DOCTYPE html>
+<html lang="{{ $l.locale }}"{{ with $l.dir }} dir="{{ . }}"{{ end }} class="tufte-slides-root{{ with $face.class }} {{ . }}{{ end }}">
+<head>
+{{ partial "head.html" . }}
+{{ partial "tufte/vendor.html" (dict "url" $reveal.css.url "kind" "css" "integrity" $reveal.css.integrity "dir" $dir) }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}" crossorigin="anonymous">
+</head>
+<body class="tufte-slides {{ partial "tufte/body-class.html" . }}">
+<div class="reveal">
+<div class="slides">
+{{- if $cfg.titleSlide }}
+<section class="tufte-slide-title">
+<h1>{{ partial "tufte/title-html.html" (dict "page" . "title" .Title "heading" true) }}{{ index (partial "tufte/title-notes.html" (dict "page" .)) "title" | default "" | safeHTML }}</h1>
+{{- with .Params.subtitle }}
+<p class="subtitle">{{ . }}</p>
+{{- end }}
+{{- with (partial "tufte/authors.html" (dict "page" . "notes" true)).html }}
+<p class="tufte-slide-byline">{{ . | safeHTML }}</p>
+{{- end }}
+{{- if partial "func/flag.html" (dict "value" .Params.showdate "default" true) }}
+{{- with .Params.datetext }}
+<p class="tufte-slide-date">{{ . }}</p>
+{{- else }}
+{{- if not .Date.IsZero }}
+<p class="tufte-slide-date"><time datetime="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ partial "func/date.html" .Date }}</time></p>
+{{- end }}
+{{- end }}
+{{- end }}
+<p class="tufte-slide-link"><a href="{{ .RelPermalink }}">{{ partial "func/t.html" "slidesArticle" }}</a></p>
+</section>
+{{- end }}
+{{- /* The front-matter abstract (cut off the content, as in the title
+       block): a slide of its own, its section a tufte-section. */}}
+{{- with partial "tufte/abstract.html" . }}
+<section class="tufte-slide-abstract">
+{{ replaceRE `(?i)<(/?)section\b` "<${1}tufte-section" (string .) | safeHTML }}
+</section>
+{{- end }}
+{{- range $slides }}
+{{ . | safeHTML }}
+{{- end }}
+</div>
+</div>
+{{ partial "tufte/vendor.html" (dict "url" $reveal.js.url "kind" "js" "integrity" $reveal.js.integrity "dir" $dir) }}
+{{- with $reveal.notes }}
+{{ partial "tufte/vendor.html" (dict "url" .url "kind" "js" "integrity" .integrity "dir" $dir) }}
+{{- end }}
+<script>
+(function () {
+  var options = {{ $cfg.reveal | jsonify | safeJS }};
+  options.plugins = typeof RevealNotes !== "undefined" ? [RevealNotes] : [];
+  Reveal.initialize(options);
+}());
+</script>
+{{ partial "scripts_custom.html" . }}
+</body>
+</html>

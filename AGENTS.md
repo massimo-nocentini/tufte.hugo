@@ -3,7 +3,8 @@
 This is a **Hugo theme**, not a standalone site. Its job is to turn Markdown into the exact markup that
 [Tufte CSS](https://github.com/edwardtufte/tufte-css) expects. All changes are template-level (Go templates,
 HTML, CSS, YAML i18n). There is no package manager, build tool or unit test suite, and no JavaScript but the
-optional site search (`assets/tufte/search.js`). Hugo's own build is the only check.
+optional site search (`assets/tufte/search.js`) and the slides output (reveal.js and its initialisation in
+`layouts/page.slides.html`). Hugo's own build is the only check.
 
 ## Build / Verify
 
@@ -26,7 +27,12 @@ and for duplicate ids; the step "Check the site search" checks `public/search-in
 `posts/theorems` golden section `groups` with its `$TeX$` and its margin note in `notes`, no markup or private-use
 markers left), the hidden header box, the settings JSON (Fuse.js URL and hash equal to `vendor.toml`) and the
 script on every page and the results page, then builds with `HUGO_PARAMS_SEARCH_ENABLE=false` (no box, the
-search-off line) and with `HUGO_OUTPUTS_HOME=html` (the `tufte-search-output` warning, no index). It then runs a second minified
+search-off line) and with `HUGO_OUTPUTS_HOME=html` (the `tufte-search-output` warning, no index); the search
+box is checked on every page but `print.html` and `slides.html`. "Check Libertinus" checks `posts/libertinus`
+(the `tufte-font-libertinus` class of `<html>`, Libertinus Math's MathML, the font files and their
+`unicode-range` faces in the bundle) and "Check the slides" `posts/tufte-slides/slides.html` (7 slides, no
+`<section>` nested in a slide, the reveal.js files with the hashes of `vendor.toml`, the options, 2 speaker
+notes, the slides bundle without print rules, the article's link). It then runs a second minified
 build with `HUGO_PARAMS_SECTIONS=none` and `HUGO_PARAMS_FOOTNOTES=endnotes`. Two §11 steps check sidenotes and
 real footnotes together (`posts/footnotes-as-sidenotes`: one `section.footnotes`; `posts/footnotes-and-sidenotes`:
 `div.footnotes.footnotes-section` per section; letter marks, links in both directions, no Goldmark leftovers)
@@ -118,7 +124,9 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
 - `assets/css/et-book.css` contains the ET Book `@font-face` rules. They point to `../et-book/` because the bundle
   is published under `/css/`. The fonts are in `static/et-book/`.
 - `layouts/_partials/css.html` concatenates `et-book.css` (if `params.etBook`), `tufte.css`, `theme.css`,
-  `tufte-latex.css`, `syntax.css` and `params.customCSS` into `css/tufte-hugo.css`. Page-dependent CSS values
+  `tufte-latex.css`, `libertinus.css`, `syntax.css` and `params.customCSS` into `css/tufte-hugo.css` (for the
+  slides output, `css/tufte-hugo-slides.css`: without `@media print` blocks, and every `section` type selector
+  as `:is(section,tufte-section)`; see Slides below). Page-dependent CSS values
   go in the `<style>` of `tufte/head-style.html`, emitted after the bundle. It minifies only when `hugo.IsProduction`,
   fingerprints, and emits SRI.
 - `layouts/_partials/func/content.html` post-processes `.Content` and `.Summary`: phase 1
@@ -161,11 +169,24 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   `tufte.theorems.*` (defaults in `tufte/defaults.html`), words the `thm*` i18n keys. In a sidenote, margin note
   or caption a theorem becomes `span[data-sn="section"]` (`tufte/thm/inline.html`, on every path: nest tokens,
   a `caption=` parameter, a Markdown image title), without `tufte-block-in-note` for its root.
-- **Euler math** (README "Euler math"): `params.math.font = "euler"` or front matter `mathFont` makes
-  `func/math-options.html` ask KaTeX for MathML only (`output "mathml"`, both engines). `tufte/math-render.html`
-  wraps the server's MathML as KaTeX's HTML+MathML output does, `<span class="katex"><span class="katex-mathml">`
-  (so every reader of the TeX annotation keeps working; `theme.css` shows that span when it is the only child,
-  `clip-path` included), wraps a display in `span.katex-display[ fleqn][ leqno]`, prints `\tag` itself as an
+- **Fonts** (README "Fonts"): every face is read from the variables `--tufte-serif`, `--tufte-serif-old`
+  (note numbers, `.numeral`), `--tufte-serif-osf` (`numerals = "oldstyle"`), `--tufte-sans` and `--tufte-mono`
+  (defaults in `tufte-latex.css` and `theme.css`, which also points tufte.css's `body` and `code` at them); never
+  write a font stack in a rule. `params.font = "libertinus"` or front matter `font` (`func/font.html`,
+  partialCached per page) puts `tufte-font-libertinus` on `<html>` (`baseof.html`, `page.slides.html`), and
+  `assets/css/libertinus.css` redefines the variables under it (old-style figures from "Libertinus OSF Digits",
+  digits-only faces as ET Book's `et-book-osf-digits`; `.sans` and tables). A book root's `font` sets its
+  chapters. `func/font.html` also returns the lists that `tufte/head-style.html` writes into the running heads and
+  the `tufte.X.font` words (custom properties do not reach `@page` boxes). The faces in `static/libertinus/` are
+  subsets of the 7.051 OTF files, `-latin` and `-ext` halves with complementary `unicode-range`s (provenance in
+  `OFL.txt`); Libertinus Math is whole, made from the OTF (the release's WOFF2 has no MATH table).
+- **MathML math: Euler and Libertinus** (README "Euler and Libertinus math"): `params.math.font = "euler"` or
+  `"libertinus"`, or front matter `mathFont`, makes `func/math-options.html` ask KaTeX for MathML only (`output
+  "mathml"`, both engines; `mathml` true in its result). `tufte/math-render.html` wraps the server's MathML as
+  KaTeX's HTML+MathML output does, `<span class="katex tufte-math-FONT"><span class="katex-mathml">` (so every
+  reader of the TeX annotation keeps working; `theme.css` shows that span when it is the only child, `clip-path`
+  included, in the font of the class on the outer span, which the browser sees before the `<math>`: a rule on a
+  descendant would load the other font), wraps a display in `span.katex-display[ fleqn][ leqno]`, prints `\tag` itself as an
   `eq-number` (`math-display tagged numbered`, hidden token before the number), and runs
   `tufte/mathml-core.html`: mathvariant → Unicode math alphabets (`tufte/mathml-alphabets.html`), unary signs
   (`lspace`/`rspace` 0), TeX's thin space around operator names (U+2061), stretchable accents, and mtable
@@ -174,12 +195,31 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   :not(.mtr-glue, .mml-eqn-num))`, and only the `-webkit-` values of `text-align` move a cell's block math boxes)
   and `menclose` boxes and strikes in CSS. `\notag`/`\nonumber` in a numbered environment are taken out of the
   TeX and the row's number cell marked `tufte-notag`; a `\tag` on a row of such an environment warns
-  (`tufte-euler-tag`). The client engine
-  marks its spans `data-output="mathml"` and `tufte/katex.html` does the same fixes in `mathmlCore()` (plus
-  wrapping KaTeX's bare text nodes in `mtext`). The font is `static/euler-math/Euler-Math.woff2` (OFL, with
-  `OFL.txt`), its `@font-face` in `theme.css`. `posts/euler-math` is the example; CI checks it ("Check Euler
-  math") and builds the whole site with `HUGO_PARAMS_MATH_FONT=euler`, `fleqn` and `leqno` (markers mode, no
-  `katex-html` left).
+  (`tufte-mathml-tag`). The client engine
+  marks its spans `data-output="mathml" data-mathfont="FONT"` and `tufte/katex.html` does the same fixes in
+  `mathmlCore()` (plus wrapping KaTeX's bare text nodes in `mtext`, and the font class, `mathFont()`).
+  `func/content-raw.html` (step 8) puts an inline MathML formula and the punctuation after it in a
+  `span.tufte-nobr` (Chromium breaks a line after a `<math>` element). The fonts are
+  `static/euler-math/Euler-Math.woff2` (its `@font-face` in `theme.css`) and
+  `static/libertinus/LibertinusMath-Regular.woff2` (in `libertinus.css`). `posts/euler-math` and
+  `posts/libertinus` are the examples; CI checks them ("Check Euler math", "Check Libertinus") and builds the
+  whole site with `HUGO_PARAMS_MATH_FONT=euler`, `fleqn` and `leqno` (markers mode, no `katex-html` left); the
+  `tufte.style = latex` build sets `HUGO_PARAMS_FONT=libertinus` (the running heads in Libertinus Serif).
+- **Slides** (README "Slides"): the theme declares the output format `slides` (`hugo.toml`: `slides.html`, not
+  permalinkable, not alternative); a page that lists it in `outputs` gets `layouts/page.slides.html`, a whole
+  document (no `baseof.html`) with `head.html`, reveal.js's core stylesheet and `assets/css/slides.css`, a title
+  slide, the slides and `Reveal.initialize` with the options of `tufte/slides/config.html` (`params.slides`, then
+  front matter `slides`; Hugo lowercases map keys, so it matches reveal.js's camelCase names from a list, and
+  unknown keys warn). `tufte/slides/split.html` cuts the article's final HTML (the same cached
+  `func/content.html` call) at each top-level section and, with `func/sectionize.html` and `tag "hr"`, at each
+  top-level `<hr>`. reveal.js takes every `<section>` inside a slide for a vertical slide, so the nested ones
+  (theorems, proofs) become `<tufte-section>` there, which the slides bundle styles (css.html). While the
+  slides render, "html" is among the page's `AlternativeOutputFormats` (that is how `css.html` knows). The
+  `notes` shortcode writes `<aside class="notes">` (hidden in the article, left out of the search index, the
+  description and the RSS items). The title slide carries the title's `thanks` notes; the abstract gets a slide.
+  `post-meta.html` links the article to its slides. reveal.js is `vendor.toml` `[reveal]`. `posts/tufte-slides`
+  is the example (a page named `slides` would get `posts/slides.html`, Hugo's path for a format named like the
+  page).
 - **Search** (README "Search"; off unless `params.search.enable` and the home page has the theme's
   `searchindex` output format, declared in `hugo.toml`): `layouts/home.searchindex.json` writes the index from
   each page's final HTML (`tufte/search/entry.html`: the same cached `func/content.html` call as the layouts,

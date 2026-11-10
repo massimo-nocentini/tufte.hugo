@@ -51,3 +51,20 @@ version = "7.5.0"
 url = "https://cdn.jsdelivr.net/npm/fuse.js@7.5.0/dist/fuse.min.mjs"
 integrity = "sha384-q0aLEO7RBzlrypvGA6+2CLbdnwCONRgCmmkPYWRTu5isFkLs7tLZshJIZhY5b1Rk"
 dir = "fuse"
+
+# reveal.js, the slides output format (layouts/page.slides.html, README
+# "Slides"): its core stylesheet (no reveal.js theme: the slides keep the
+# theme's typography, assets/css/slides.css), the script (UMD build, the
+# global Reveal) and the speaker notes plugin (RevealNotes, the "s" key).
+[reveal]
+version = "6.0.2"
+dir = "reveal"
+  [reveal.css]
+  url = "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.css"
+  integrity = "sha384-rKClnwfQQ2b7LYSOAhRvm5m4LS7QKciQTAXBpVvr30y6oGB+ZBBXlpDnvFqlv5Eu"
+  [reveal.js]
+  url = "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/reveal.js"
+  integrity = "sha384-UilXW7W77EPIY5TmQGBrjhBPcfX40NqGwuIC8DGs6OeGTCxKy36B+DiOXtfqgk9S"
+  [reveal.notes]
+  url = "https://cdn.jsdelivr.net/npm/reveal.js@6.0.2/dist/plugin/notes.js"
+  integrity = "sha384-XUVoTb/UbE06yoCUaqswCPKSUvPq3q4heijGsemnUSS/JEgW1lNnK0rKlNwjuz7O"

@@ -72,10 +72,12 @@ All parameters live under `[params]` and have sensible defaults. The ones you wi
 | `sections`        | `"h2"`         | Start a new `section` at each `h2`, or `"none"`           |
 | `footnotes`       | `"sidenotes"`  | Turn footnotes into sidenotes, or keep `"endnotes"`       |
 | `etBook`          | `true`         | Load the ET Book web fonts                                |
+| `font`            | `"etbook"`     | `"libertinus"`: text in Libertinus Serif, Sans and Mono   |
 | `showReadingTime` | `true`         | Reading time in the post meta line                        |
 | `toc`             | `false`        | Table of contents at the top of posts                     |
 | `math.enable`     | `"auto"`       | Load the KaTeX stylesheet only where math appears         |
-| `math.font`       | `"katex"`      | `"euler"`: formulas in Zapf's Euler (MathML)              |
+| `math.font`       | `"katex"`      | `"euler"`, `"libertinus"`: formulas in Euler or Libertinus Math (MathML) |
+| `slides.*`        | see README     | reveal.js options of the pages that have slides           |
 | `customCSS`       | `[]`           | Extra stylesheets from your `assets/` folder              |
 | `search.enable`   | `false`        | Search box in the header and a results page               |
 
@@ -90,7 +92,9 @@ title is shown, so no heading or link is left empty), `date`, `tags` and `catego
 - `subtitle`, shown in the style of Tufte's subtitles below the title;
 - `sections`, `footnotes` and `toc`, overriding the site parameters for one page (this page sets `toc: true`);
 - `math: true` to force the KaTeX stylesheet;
-- `mathFont: euler` to set this page's formulas in Euler, as [Euler Math](/posts/euler-math/) does;
+- `mathFont: euler` to set this page's formulas in Euler, as [Euler Math](/posts/euler-math/) does, or `mathFont: libertinus`;
+- `font: libertinus` to set this page's text in Libertinus, as [Libertinus](/posts/libertinus/) does;
+- `outputs: ["html", "slides"]` to show the page as reveal.js slides too, as [Slides](/posts/tufte-slides/) does, with the `notes` shortcode for speaker notes and `slides:` for reveal.js options;
 - `comments: false` to hide comments;
 - `searchHidden: true` to keep the page out of the site search.
 

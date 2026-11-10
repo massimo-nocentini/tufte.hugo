@@ -28,7 +28,8 @@
 */ -}}
 {{- $p := . -}}
 {{- $html := string (partialCached "func/content.html" (dict "page" $p "summary" true) (or $p.RelPermalink $p.Path) true) -}}
-{{- $skipRE := `^<(span|div|label|a|sup)\s[^>]*class="(?:sidenote|marginnote|citation-block|margin-toggle|heading-anchor|footnote-ref|katex-mathml|katex-html|thm-qed)\b` -}}
+{{- /* (aside.notes: speaker notes, the notes shortcode.) */ -}}
+{{- $skipRE := `^<(span|div|label|a|sup|aside)\s[^>]*class="(?:sidenote|marginnote|citation-block|margin-toggle|heading-anchor|footnote-ref|katex-mathml|katex-html|thm-qed|notes)\b` -}}
 {{- $out := "" -}}
 {{- $tag := "" -}}
 {{- $skipMath := false -}}

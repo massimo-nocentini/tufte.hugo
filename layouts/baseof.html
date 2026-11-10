@@ -6,7 +6,10 @@
 {{- /* Locale and text direction of the site language (func/lang.html). */ -}}
 {{- $l := partial "func/lang.html" site.Language -}}
 <!DOCTYPE html>
-<html lang="{{ $l.locale }}"{{ with $l.dir }} dir="{{ . }}"{{ end }}>
+{{- /* The text font (params.font, front matter font): its class switches
+       the theme's font variables (libertinus.css). */}}
+{{- $face := partialCached "func/font.html" . (or .RelPermalink .Path) }}
+<html lang="{{ $l.locale }}"{{ with $l.dir }} dir="{{ . }}"{{ end }}{{ with $face.class }} class="{{ . }}"{{ end }}>
 <head>
 {{ partial "head.html" . }}
 </head>

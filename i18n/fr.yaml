@@ -122,3 +122,5 @@ searchResults:
   other: "{count} résultats pour « {query} »."
 searchNoScript: "La recherche nécessite JavaScript."
 searchOff: "La recherche n’est pas activée sur ce site."
+slidesView: "Diapositives"
+slidesArticle: "Lire comme un article"

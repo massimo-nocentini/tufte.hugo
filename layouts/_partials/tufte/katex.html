@@ -126,10 +126,17 @@
 {{- if eq $m.engine "client" }}
 <script>
 /* What KaTeX's MathML leaves to the browser and MathML Core does not do
-   (the Euler font), as tufte/mathml-core.html does at build time: the
+   (the Euler and Libertinus math fonts), as tufte/mathml-core.html does
+   at build time: the
    Unicode math alphabets for mathvariant, the thin space after an
    operator name, the layout attributes of tables as the custom
    properties theme.css applies. */
+/* The font of each formula (theme.css): span.katex.tufte-math-FONT. */
+function mathFont(root, font) {
+  root.querySelectorAll(".katex").forEach(function (k) {
+    if (k.querySelector("math")) { k.classList.add("tufte-math-" + (font || "euler")); }
+  });
+}
 var mathAlphabets = (function () {
   var sets = ["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789",
     "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡϴΣΤΥΦΧΨΩ∇", "αβγδεζηθικλμνξοπρςστυφχψω∂ϵϑϰϕϱϖ"];
@@ -276,9 +283,10 @@ document.addEventListener("DOMContentLoaded", function () {
       var tex = el.textContent.trim();
       var open = tex.slice(0, 2);
       if (open === "\\(" || open === "\\[") { tex = tex.slice(2, -2); }
-      /* Each formula's own output: MathML for the Euler font
-         (data-output="mathml", tufte/math-render.html), also in the
-         summary of an Euler page on a list page that is not. */
+      /* Each formula's own output and font: MathML for the Euler and
+         Libertinus fonts (data-output="mathml", data-mathfont,
+         tufte/math-render.html), also in the summary of such a page on a
+         list page that is not. */
       var o = Object.assign({}, opts, {
         displayMode: el.classList.contains("math-display"),
         output: el.getAttribute("data-output") === "mathml" ? "mathml" : "htmlAndMathml"
@@ -291,6 +299,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (o.output === "mathml") {
         mathmlCore(el);
+        mathFont(el, el.getAttribute("data-mathfont"));
         /* \notag rows (tufte/math-render.html): their number cells. */
         var skip = (el.getAttribute("data-notag") || "").split(" ");
         el.querySelectorAll("mtd.mml-eqn-num").forEach(function (c, i) {
@@ -318,7 +327,7 @@ document.addEventListener("DOMContentLoaded", function () {
         { left: "$", right: "$", display: false }
       ]
     }));
-    if (opts.output === "mathml") { mathmlCore(root); }
+    if (opts.output === "mathml") { mathmlCore(root); mathFont(root, {{ $m.font }}); }
   }
   /* KaTeX colours invalid TeX (span.katex-error) and undefined control
      sequences (a typo, a missing macro: no class at all) with the sentinel

@@ -1,0 +1,48 @@
+{{- /*
+  Cuts a page's final HTML (func/content.html: one <section> per h2, or
+  one in all with sections = "none") into reveal.js slides: each of those
+  sections is a slide, and a thematic break (Markdown ---, <hr>) at its top
+  level starts another one (func/sectionize.html with tag "hr"; a break in
+  a quote or a list stays where it is). The break itself is dropped.
+
+  A section with attributes (the real-footnote list, section.footnotes)
+  stays one slide with its own tag. The sections are separated by
+  "\n</section>\n" (a theorem's nested section ends "</p></section>", with
+  no newline before it).
+
+  reveal.js takes every <section> inside a slide for a vertical slide, so
+  the sections nested in a slide (theorems, proofs) become <tufte-section>
+  elements, which the slides' stylesheet styles as sections (css.html).
+
+  Takes: the HTML.
+  Returns: a slice of strings, each a <section>…</section> slide.
+*/ -}}
+{{- $slides := slice -}}
+{{- $nested := `(?i)<(/?)section\b` -}}
+{{- $pieces := split (string .) "\n</section>\n" -}}
+{{- range $i, $p := $pieces -}}
+  {{- $piece := strings.TrimSpace $p -}}
+  {{- /* The last section may end without the newline; any other piece ends
+         with its own content (a theorem's "</p></section>" included). */ -}}
+  {{- if eq (add $i 1) (len $pieces) -}}
+    {{- $piece = strings.TrimSpace (strings.TrimSuffix "</section>" $piece) -}}
+  {{- end -}}
+  {{- if not $piece }}{{ continue }}{{ end -}}
+  {{- $open := "<section>" -}}
+  {{- with findRE `^<section\b[^>]*>` $piece 1 -}}
+    {{- $open = index . 0 -}}
+    {{- $piece = strings.TrimSpace (strings.TrimPrefix $open $piece) -}}
+  {{- end -}}
+  {{- if not $piece }}{{ continue }}{{ end -}}
+  {{- if and (eq $open "<section>") (findRE `(?i)<hr[\s>/]` $piece 1) -}}
+    {{- range split (string (partial "func/sectionize.html" (dict "html" $piece "tag" "hr"))) "\n</section>\n" -}}
+      {{- $s := strings.TrimSpace (strings.TrimPrefix "<section>" (strings.TrimSpace .)) -}}
+      {{- $s = strings.TrimSpace (replaceRE `(?i)^<hr\s*/?>` "" $s) -}}
+      {{- $s = replaceRE $nested "<${1}tufte-section" $s -}}
+      {{- with $s }}{{ $slides = $slides | append (printf "<section>\n%s\n</section>" .) }}{{ end -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $slides = $slides | append (printf "%s\n%s\n</section>" $open (replaceRE $nested "<${1}tufte-section" $piece)) -}}
+  {{- end -}}
+{{- end -}}
+{{- return $slides -}}

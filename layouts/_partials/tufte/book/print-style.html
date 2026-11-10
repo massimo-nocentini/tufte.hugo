@@ -24,7 +24,8 @@
        the text). */ -}}
 {{- $ls := "0.05em" -}}
 {{- if not (partial "tufte/truthy.html" (partialCached "tufte/opt.html" (dict "page" $root "key" "letterspacing") $key "letterspacing")) }}{{ $ls = "normal" }}{{ end -}}
-{{- $box := printf "font-family:et-book,Palatino,\"Palatino Linotype\",Georgia,serif;font-size:8pt;font-style:normal;text-transform:uppercase;letter-spacing:%s;vertical-align:bottom;padding-bottom:28pt" $ls }}
+{{- $face := partialCached "func/font.html" $root $key -}}
+{{- $box := printf "font-family:%s;font-size:8pt;font-style:normal;text-transform:uppercase;letter-spacing:%s;vertical-align:bottom;padding-bottom:28pt" $face.serif $ls }}
 {{- if not $continuous }}
 <style>article.chapter,article.part{counter-reset:sidenote-counter}</style>
 {{- end }}

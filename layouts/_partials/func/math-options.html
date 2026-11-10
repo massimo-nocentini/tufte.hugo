@@ -7,11 +7,13 @@
 
   Returns a dict:
     engine      "server" (default) | "client"
-    font        "katex" (default) | "euler": params.math.font, or the
-                page's front matter mathFont. "euler" makes KaTeX output
-                MathML only (server.output "mathml", client.output
-                "mathml"), which the browser lays out with the bundled
-                Euler Math font (README "Euler math")
+    font        "katex" (default) | "euler" | "libertinus":
+                params.math.font, or the page's front matter mathFont.
+                "euler" and "libertinus" make KaTeX output MathML only
+                (server.output "mathml", client.output "mathml"), which the
+                browser lays out with the bundled Euler Math or Libertinus
+                Math font (README "Euler and Libertinus math")
+    mathml      true for those two fonts
     server      options for transform.ToMath (output htmlAndMathml,
                 displayMode, throwOnError false, errorColor, fleqn, leqno,
                 minRuleThickness, strict, macros)
@@ -91,14 +93,15 @@
 {{- range $src := slice (index $cfg "font") (index $page.Params "mathfont") -}}
   {{- with $src -}}
     {{- $v := lower (strings.TrimSpace (printf "%v" .)) -}}
-    {{- if in (slice "katex" "euler") $v -}}
+    {{- if in (slice "katex" "euler" "libertinus") $v -}}
       {{- $font = $v -}}
     {{- else if $v -}}
-      {{- warnidf "tufte-bad-option" "tufte.hugo: the math font (params.math.font or front matter mathFont) must be \"katex\" or \"euler\", not %q, in %s; ignored" $v $page.Path -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: the math font (params.math.font or front matter mathFont) must be \"katex\", \"euler\" or \"libertinus\", not %q, in %s; ignored" $v $page.Path -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
-{{- $output := cond (eq $font "euler") "mathml" "htmlAndMathml" -}}
+{{- $mathml := ne $font "katex" -}}
+{{- $output := cond $mathml "mathml" "htmlAndMathml" -}}
 {{- /* Distinctive (and still red, should it ever be shown) colour. */ -}}
 {{- $sentinel := "#cc0001" -}}
 {{- /* The dict is built in one go (merge would lowercase the macro names). */ -}}
@@ -125,7 +128,7 @@
   "strict" $strict
   "macros" $macros
 -}}
-{{- if eq $font "euler" -}}
+{{- if $mathml -}}
   {{- $client = dict
     "output" "mathml"
     "throwOnError" false
@@ -137,4 +140,4 @@
     "macros" $macros
   -}}
 {{- end -}}
-{{- return (dict "engine" $engine "font" $font "server" $server "client" $client "errorColor" $errorColor "sentinel" $sentinel) -}}
+{{- return (dict "engine" $engine "font" $font "mathml" $mathml "server" $server "client" $client "errorColor" $errorColor "sentinel" $sentinel) -}}

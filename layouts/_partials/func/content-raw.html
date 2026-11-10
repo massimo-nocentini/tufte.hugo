@@ -551,6 +551,16 @@
     {{- $html = $out -}}
   {{- end -}}
 {{- end -}}
+{{- /* 8. Inline math set with a MathML font (params.math.font euler or
+       libertinus, tufte/math-render.html): Chromium breaks a line between
+       a <math> element, an atomic inline, and the punctuation after it
+       ("𝔤" at the end of a line, ", v" on the next). The formula and that
+       punctuation go in a span.tufte-nobr (theme.css: white-space nowrap);
+       with the client engine, its span before KaTeX renders it. (MathML
+       has no span: the formula's markup ends at its first </span>.) */ -}}
+{{- if or (strings.Contains $html `<span class="katex tufte-math-`) (strings.Contains $html `<span class="math math-inline" data-output="mathml"`) -}}
+  {{- $html = replaceRE `(<span class="katex tufte-math-[a-z]+"><span class="katex-mathml"><math(?:[^<]|<[^/]|</[^s]|</s[^p])*</math></span></span>|<span class="math math-inline" data-output="mathml"[^>]*>[^<]*</span>)([.,;:!?)\]’”]+)` `<span class="tufte-nobr">${1}${2}</span>` $html -}}
+{{- end -}}
 {{- $memoRes = $html | safeHTML -}}
 {{- $page.Store.Set $memoKey (dict "v" $memoRes "b" (partialCached "tufte/build-stamp.html" "stamp" "stamp")) -}}
 {{- end -}}

@@ -1,0 +1,128 @@
+/* tufte.hugo — slides.css
+ *
+ * The slides output format (layouts/page.slides.html, README "Slides"),
+ * loaded after the theme stylesheet and reveal.js's core stylesheet (no
+ * reveal.js theme): each slide is a <section> laid out by Tufte CSS, with
+ * its text column and its margin, on the canvas reveal.js scales to the
+ * window (params.slides width and height). Colours follow the theme's
+ * variables, so dark mode works as on the article.
+ */
+
+/* Tufte CSS's body column (87.5% wide, 12.5% padding, at most 1400px)
+   belongs to the article; here reveal.js fills the window. */
+body.tufte-slides {
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* A section nested in a slide (a theorem, a proof): see
+   tufte/slides/split.html. */
+tufte-section {
+    display: block;
+}
+
+.reveal-viewport {
+    background-color: var(--tufte-bg);
+    color: var(--tufte-fg);
+    line-height: normal;
+}
+
+.reveal .slides {
+    text-align: start;
+}
+
+/* Each slide: the text column starts 8% in, and its margin (sidenotes,
+   margin notes, captions) stays on the slide. */
+.reveal .slides > section {
+    box-sizing: border-box;
+    padding: 1rem 2% 1rem 8%;
+}
+
+/* The PDF export (?print-pdf): each slide is in a div.pdf-page, and
+   reveal.js zeroes the padding there. */
+html.reveal-print .reveal .slides .pdf-page > section {
+    padding: 1rem 2% 1rem 8% !important;
+}
+
+.reveal .slides > section > :first-child,
+.reveal .slides .pdf-page > section > :first-child {
+    margin-top: 0;
+}
+
+/* The title slide (params.slides.titleSlide). */
+.reveal .slides > section.tufte-slide-title {
+    padding-top: 6rem;
+}
+
+html.reveal-print .reveal .slides .pdf-page > section.tufte-slide-title {
+    padding-top: 6rem !important;
+}
+
+.tufte-slide-title > p {
+    width: 80%;
+}
+
+.tufte-slide-title > h1 {
+    margin-bottom: 1.5rem;
+}
+
+.tufte-slide-title > p.subtitle {
+    margin-top: 0;
+}
+
+.tufte-slide-title > p.tufte-slide-byline {
+    margin-top: 3rem;
+    margin-bottom: 0;
+}
+
+.tufte-slide-title > p.tufte-slide-date {
+    margin-top: 0.4rem;
+    color: var(--tufte-muted);
+}
+
+.tufte-slide-title > p.tufte-slide-link {
+    margin-top: 3rem;
+    font-family: var(--tufte-sans);
+    font-size: 1.1rem;
+    letter-spacing: 0.03em;
+}
+
+/* reveal.js's own furniture, quiet and in the theme's colours. */
+.reveal .controls {
+    color: var(--tufte-muted);
+}
+
+.reveal .progress {
+    color: var(--tufte-muted);
+    background-color: transparent;
+}
+
+/* Bottom left: the controls take the bottom right corner. */
+.reveal .slide-number {
+    right: auto;
+    left: 8px;
+    background-color: transparent;
+    color: var(--tufte-muted);
+    font-family: var(--tufte-sans);
+    font-size: 0.9rem;
+    letter-spacing: 0.03em;
+}
+
+.reveal .slide-number a {
+    color: inherit;
+    text-decoration: none;
+    background: none;
+    text-shadow: none;
+}
+
+/* Fragments ({.fragment} on a paragraph or list) keep the text's colour. */
+.reveal .slides section .fragment {
+    color: inherit;
+}
+
+/* No heading anchors on a slide (a slide is not a place to link from). */
+.reveal .heading-anchor {
+    display: none;
+}

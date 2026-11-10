@@ -1,12 +1,14 @@
 {{- /*
   Emits the single theme stylesheet. In order: ET Book @font-face rules
   (unless Params.etBook is false or "false", func/flag.html), tufte.css, theme.css, tufte-latex.css,
-  syntax.css and
+  libertinus.css, syntax.css and
   every path listed in Params.customCSS (resolved in the site's assets/;
   their @import statements go first).
   The bundle is published as css/tufte-hugo.<hash>.css, so the relative
   font URLs in et-book.css (../et-book/...) resolve against static/et-book/.
-  Minified in production builds only, always fingerprinted with SRI.
+  Minified in production builds only, always fingerprinted with SRI. The
+  slides output format gets css/tufte-hugo-slides.css, the same bundle
+  without its print-only blocks (see below).
 */ -}}
 {{- $paths := slice -}}
 {{- if partial "func/flag.html" (dict "value" site.Params.etBook "default" true) -}}
@@ -17,6 +19,10 @@
 {{- /* The tufte-latex layer: class options, numbered floats, book views,
        print geometry (its page-dependent values: tufte/head-style.html). */ -}}
 {{- $paths = $paths | append "css/tufte-latex.css" -}}
+{{- /* Libertinus (params.font, front matter font, math font): its faces
+       and the font variables under html.tufte-font-libertinus. A browser
+       downloads a face only for a page that uses it. */ -}}
+{{- $paths = $paths | append "css/libertinus.css" -}}
 {{- $paths = $paths | append "css/syntax.css" -}}
 {{- $resources := slice -}}
 {{- range $paths -}}
@@ -63,8 +69,32 @@
 {{- with $imports -}}
   {{- $resources = slice (resources.FromString "tufte/custom-css/imports.css" (delimit . "\n")) | append $resources -}}
 {{- end -}}
+{{- /* The slides output format (layouts/page.slides.html): reveal.js
+       exports a deck to PDF through the browser's print, where the
+       article's print rules (sizes in points, the paper geometry, link
+       URLs) would replace the slides' layout, so its bundle leaves out the
+       print-only blocks (@media print; "(width > 760px), print" stays).
+       And reveal.js takes every <section> inside a slide for a slide of
+       its own (a vertical one), so the sections nested in a slide (a
+       theorem, a proof) are <tufte-section> elements there
+       (tufte/slides/split.html), and each section type selector becomes
+       :is(section,tufte-section), of the same specificity (through a
+       placeholder, U+E010, in two passes: two selectors can share the
+       space between them).
+       While the slides render, "html" is among the page's alternative
+       formats (Hugo leaves out the one being rendered). */ -}}
+{{- $slides := and (.OutputFormats.Get "slides") (.AlternativeOutputFormats.Get "html") -}}
 {{- with $resources -}}
   {{- $css := . | resources.Concat "css/tufte-hugo.css" -}}
+  {{- if $slides -}}
+    {{- $text := replaceRE `(?s)/\*.*?\*/` "" $css.Content -}}
+    {{- $text = replaceRE `@media\s+print\s*\{(?:[^{}]|\{[^{}]*\})*\}` "" $text -}}
+    {{- range seq 2 -}}
+      {{- $text = replaceRE `(^|[\s,>+~(){};])section([\s.:,>+~\[{)#])` "${1}\uE010${2}" $text -}}
+    {{- end -}}
+    {{- $text = replace $text "\uE010" ":is(section,tufte-section)" -}}
+    {{- $css = resources.FromString "css/tufte-hugo-slides.css" $text -}}
+  {{- end -}}
   {{- if hugo.IsProduction -}}
     {{- $css = $css | minify -}}
   {{- end -}}

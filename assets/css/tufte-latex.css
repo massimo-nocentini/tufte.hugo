@@ -38,7 +38,12 @@
 }
 
 :root {
+    /* The text faces (params.font; libertinus.css redefines them under
+       html.tufte-font-libertinus): the body, its old-style figures (note
+       numbers, .numeral) and the numerals = "oldstyle" digits. */
     --tufte-serif: et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif;
+    --tufte-serif-old: et-book-roman-old-style, et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif;
+    --tufte-serif-osf: et-book-osf-digits, et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif;
     /* \allcapsspacing (\textls[200]), \smallcapsspacing (\textls[50]) and
        \newthought: the values of the letterspace path that tufte-latex takes
        under pdfLaTeX, not those of its soul fallback (0.15em, 0.075em). */
@@ -223,19 +228,19 @@ figcaption,
 }
 
 body.tufte-osf :is(.sans, div.table-wrapper, .open-epigraph blockquote) .sidenote {
-    font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, et-book-osf-digits, var(--tufte-serif)));
+    font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, var(--tufte-serif-osf)));
 }
 
 body.tufte-osf :is(.sans, div.table-wrapper, .open-epigraph blockquote) .marginnote {
-    font-family: var(--tufte-marginnote-family, var(--tufte-margin-family, et-book-osf-digits, var(--tufte-serif)));
+    font-family: var(--tufte-marginnote-family, var(--tufte-margin-family, var(--tufte-serif-osf)));
 }
 
 body.tufte-osf :is(.sans, div.table-wrapper, .open-epigraph blockquote) :is(.marginnote.caption, .marginnote.margin-figure) {
-    font-family: var(--tufte-caption-family, var(--tufte-margin-family, et-book-osf-digits, var(--tufte-serif)));
+    font-family: var(--tufte-caption-family, var(--tufte-margin-family, var(--tufte-serif-osf)));
 }
 
 body.tufte-osf :is(.sans, div.table-wrapper, .open-epigraph blockquote) .sidenote.citation {
-    font-family: var(--tufte-citation-family, var(--tufte-margin-family, et-book-osf-digits, var(--tufte-serif)));
+    font-family: var(--tufte-citation-family, var(--tufte-margin-family, var(--tufte-serif-osf)));
 }
 
 div.table-wrapper :is(.sidenote, .marginnote) {
@@ -249,7 +254,7 @@ div.table-wrapper :is(.sidenote, .marginnote) {
    stays \normalfont. */
 .sidenote::before,
 .sidenote[data-number]::before {
-    font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, et-book-roman-old-style, et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif));
+    font-family: var(--tufte-sidenote-family, var(--tufte-margin-family, var(--tufte-serif-old)));
 }
 
 /* Notes nested in letterspaced or case-changing spans (or in an open
@@ -325,7 +330,7 @@ span[data-sn="pre"] {
     white-space: pre;
     overflow-x: auto;
     margin: 0.2rem 0;
-    font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-family: var(--tufte-mono);
     font-size: 0.9em;
 }
 span[data-sn="pre"] > code {
@@ -633,7 +638,7 @@ div.tufte-anchor {
 }
 
 body.tufte-osf .caption-label {
-    font-family: var(--tufte-caption-family, var(--tufte-margin-family, et-book-roman-old-style, et-book, Palatino, "Palatino Linotype", Georgia, serif));
+    font-family: var(--tufte-caption-family, var(--tufte-margin-family, var(--tufte-serif-old)));
 }
 
 /* The automatic number when a key is unknown (or before postprocess). */
@@ -1045,7 +1050,7 @@ body.tufte-indent section > p:is(.post-meta, .subtitle) + p:where(:not(.post-met
 /* Old-style figures (numerals = "oldstyle"): digits from the old-style
    ET Book faces (et-book.css, unicode-range limited to 0-9). */
 body.tufte-osf {
-    font-family: et-book-osf-digits, et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif;
+    font-family: var(--tufte-serif-osf);
 }
 
 body.tufte-sf .sidenote,

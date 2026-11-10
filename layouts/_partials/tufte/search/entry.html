@@ -47,6 +47,10 @@
   {{- $span := partialCached "tufte/search/nested.html" (dict "tag" "span" "depth" 48) "span48" -}}
   {{- $html = replaceRE (printf `<span class="katex-html"[^>]*>%s</span>` $span) "" $html -}}
 {{- end -}}
+{{- /* Speaker notes (the notes shortcode) are shown only in the slides. */ -}}
+{{- if strings.Contains $html `<aside class="notes">` -}}
+  {{- $html = replaceRE `(?s)<aside class="notes">.*?</aside>` "" $html -}}
+{{- end -}}
 {{- /* Section numbers stay out of the headings ("Groups", not "1Groups"). */ -}}
 {{- $html = replaceRE `<span class="tufte-num" data-kind="sec"[^>]*>[^<]*</span>` "" $html -}}
 {{- $html = replaceRE `<h[2-4]\b[^>]*?\sid="([^"]+)"[^>]*>([\s\S]*?)</h[2-4]>` "\uE000${1}\uE001${2}\uE002" $html -}}

@@ -1,0 +1,55 @@
+{{- /*
+  The reveal.js settings of a page's slides (layouts/page.slides.html):
+  params.slides, then the page's front matter `slides` (a map), key by
+  key; the page wins.
+
+  Hugo lowercases the keys of params and front matter maps, and reveal.js
+  options are camelCase, so the keys are matched against the list below,
+  in any case. An unknown key prints the warning tufte-bad-option. A value
+  written as a string ("true", "1200": an environment variable such as
+  HUGO_PARAMS_SLIDES_WIDTH is always one) becomes a boolean or a number.
+  `titleSlide` is the theme's own: false leaves out the title slide.
+  The direction of the site language sets reveal.js's rtl.
+
+  Takes: the page.
+  Returns: a dict
+    reveal      the options for Reveal.initialize (camelCase keys)
+    titleSlide  bool
+*/ -}}
+{{- $p := . -}}
+{{- $names := slice "controls" "progress" "slideNumber" "hash" "center" "transition" "transitionSpeed" "backgroundTransition" "width" "height" "margin" "minScale" "maxScale" "loop" "navigationMode" "autoSlide" "showNotes" "fragments" "overview" "keyboard" "touch" "mouseWheel" "pdfSeparateFragments" "pdfMaxPagesPerSlide" "autoAnimate" "viewDistance" -}}
+{{- $byLower := dict -}}
+{{- range $names }}{{ $byLower = merge $byLower (dict (lower .) .) }}{{ end -}}
+{{- $where := $p.RelPermalink -}}
+{{- with $p.File }}{{ $where = .Path }}{{ end -}}
+{{- $s := newScratch -}}
+{{- $s.Set "titleSlide" true -}}
+{{- range $i, $src := slice site.Params.slides $p.Params.slides -}}
+  {{- if not $src -}}
+  {{- else if not (reflect.IsMap $src) -}}
+    {{- warnidf "tufte-bad-option" "tufte.hugo: %s must be a map of reveal.js options, not %v (%s); ignored" (cond (eq $i 0) "params.slides" "front matter slides") $src $where -}}
+  {{- else -}}
+    {{- range $k, $v := $src -}}
+      {{- $lk := lower $k -}}
+      {{- /* "true", "false" and numbers written as strings. */ -}}
+      {{- if eq (printf "%T" $v) "string" -}}
+        {{- $t := strings.TrimSpace $v -}}
+        {{- if eq (lower $t) "true" }}{{ $v = true -}}
+        {{- else if eq (lower $t) "false" }}{{ $v = false -}}
+        {{- else if findRE `^-?[0-9]+(?:\.[0-9]+)?$` $t 1 }}{{ $v = float $t -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if eq $lk "titleslide" -}}
+        {{- $s.Set "titleSlide" (eq $v true) -}}
+      {{- else if isset $byLower $lk -}}
+        {{- $s.SetInMap "reveal" (index $byLower $lk) $v -}}
+      {{- else -}}
+        {{- warnidf "tufte-bad-option" "tufte.hugo: unknown slides option %q in %s (%s); ignored" $k (cond (eq $i 0) "params.slides" "front matter slides") $where -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if eq (partial "func/lang.html" site.Language).dir "rtl" -}}
+  {{- $s.SetInMap "reveal" "rtl" true -}}
+{{- end -}}
+{{- return dict "reveal" ($s.Get "reveal" | default dict) "titleSlide" ($s.Get "titleSlide") -}}

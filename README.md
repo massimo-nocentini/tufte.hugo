@@ -29,7 +29,8 @@ Hugo template system introduced in 0.146 (`layouts/baseof.html`, `home.html`, `p
 - [Shortcodes](#shortcodes)
 - [Render hooks](#render-hooks)
 - [Footnotes and sidenotes](#footnotes-and-sidenotes)
-- [Math](#math) ([Euler math](#euler-math))
+- [Fonts](#fonts)
+- [Math](#math) ([Euler and Libertinus math](#euler-and-libertinus-math))
 - [tufte-latex parity](#tufte-latex-parity): [options](#options-paramstufte), [notes](#notes-in-the-margin),
   [floats](#floats-figures-tables-listings), [cross-references](#cross-references-and-labels),
   [theorems](#theorems-and-proofs), [bibliography](#bibliography), [books](#books), [index](#index), [printing](#printing-and-pdf),
@@ -37,6 +38,7 @@ Hugo template system introduced in 0.146 (`layouts/baseof.html`, `home.html`, `p
 - [Syntax highlighting](#syntax-highlighting)
 - [Pages and layouts](#pages-and-layouts)
 - [Search](#search)
+- [Slides](#slides)
 - [Comments, analytics and social links](#comments-analytics-and-social-links)
 - [Customisation](#customisation)
 - [Languages](#languages)
@@ -158,6 +160,7 @@ does not set (`HUGO_PARAMS_ETBOOK=false hugo`).
 | `sections` | `"h2"` | `"h2"`: wrap the article in a new `<section>` at each `<h2>` that is not nested in another element (a quote, a list, a `div`, or any element of raw HTML, such as a `form` or a block link). `"none"`: put the whole article in one `<section>`. The booleans `false` and `true` read as `"none"` and `"h2"`, and so do the strings `"false"`/`"no"`/`"off"`/`"0"` and `"true"`/`"yes"`/`"on"`/`"1"` (a `HUGO_PARAMS_SECTIONS=false` environment variable reaches the theme as a string), and an empty value means `"h2"`; any other value warns (`tufte-bad-option`) and uses `"h2"`. Front matter `sections` overrides it. |
 | `footnotes` | `"sidenotes"` | `"sidenotes"`: Markdown footnotes `[^x]` become numbered sidenotes (labels starting with `fn-` stay real footnotes). `"endnotes"` (alias `"footnotes"`): they are real footnotes, listed by the theme in a `<section class="footnotes">` below the text (labels starting with `sn-` become sidenotes). Front matter `footnotes` overrides it. See [Footnotes and sidenotes](#footnotes-and-sidenotes) for `footnotestyle` and `footnoteplacement`. |
 | `etBook` | `true` | Load the bundled ET Book web fonts. With `false`, the fallback serif stack from Tufte CSS is used. |
+| `font` | `"etbook"` | The text font: `"etbook"` (ET Book, Tufte's own) or `"libertinus"` (Libertinus Serif, with Libertinus Sans and Mono). Front matter `font` overrides it for one page; any other value prints the warning `tufte-bad-option` and is ignored. See [Fonts](#fonts). |
 | `showReadingTime` | `true` | Show the reading time in the post metadata. |
 | `showWordCount` | `false` | Show the word count in the post metadata. |
 | `showPostNav` | `true` | Show previous and next post links at the end of posts. |
@@ -205,7 +208,7 @@ gives the `twitter:site` card of every page (`@jack`, also when it is written as
 |---|---|---|
 | `enable` | `"auto"` | `"auto"`: load the KaTeX assets only on pages that contain math. `true`: load them on every page. `false`: never load them. |
 | `engine` | `"server"` | `"server"`: typeset at build time with Hugo's `transform.ToMath` (no JavaScript). `"client"`: keep the TeX in the page and typeset it in the browser with `katex.min.js`. |
-| `font` | `"katex"` | `"katex"`: KaTeX's own fonts and layout. `"euler"`: the formulas in Hermann Zapf's Euler, as LaTeX's `euler`/`eulervm` packages set them; KaTeX writes MathML and the browser lays it out with the bundled Euler Math font. Front matter `mathFont` overrides it for one page; any other value prints the warning `tufte-bad-option` and is ignored. See [Euler math](#euler-math). |
+| `font` | `"katex"` | `"katex"`: KaTeX's own fonts and layout. `"euler"`: the formulas in Hermann Zapf's Euler, as LaTeX's `euler`/`eulervm` packages set them. `"libertinus"`: in Libertinus Math, the math font of the [Libertinus](#fonts) family. With `"euler"` and `"libertinus"` KaTeX writes MathML and the browser lays it out with the bundled font. Front matter `mathFont` overrides it for one page; any other value prints the warning `tufte-bad-option` and is ignored. See [Euler and Libertinus math](#euler-and-libertinus-math). |
 | `macros` | `[]` | KaTeX macros for the whole site, merged with front matter `mathMacros` (the page wins). Write them as a list of pairs, `[["\\RR", "\\mathbb{R}"]]`: Hugo lowercases the keys of maps, so the map form `{ "\\RR" = "…" }` would define `\rr`. A list of `{ name = "\\RR", value = "\\mathbb{R}" }` tables works too. |
 | `fleqn` | `false` | Set display math flush left (with a 2em indent). |
 | `leqno` | `false` | Put equation numbers on the left, as LaTeX's `leqno`: both the theme's `\label` numbers and KaTeX's `\tag{…}`. |
@@ -298,13 +301,16 @@ mainSections = ["posts"]
 | `sections` | `"h2"`/`"none"` (or `true`/`false`, also as strings: `"yes"`/`"no"`, `"on"`/`"off"`, `"1"`/`"0"`). Overrides `params.sections`. |
 | `footnotes` | `"sidenotes"`/`"endnotes"`. Overrides `params.footnotes`. |
 | `math` | `true` always loads the KaTeX assets on this page (with the client engine, this also makes KaTeX scan the article for `$…$`, `$$…$$`, `\(…\)`, `\[…\]` when the passthrough extension is off). `false` never loads them, even if the page contains math. The strings `"true"`/`"false"` (also `yes`/`no`, `on`/`off`, `1`/`0`) work the same; `"auto"` keeps the detection. |
-| `mathFont` | `"katex"` or `"euler"`: the math font of this page, over `params.math.font` (see [Euler math](#euler-math)). |
+| `font` | `"etbook"` or `"libertinus"`: the text font of this page, over `params.font` (see [Fonts](#fonts)). On a book's root it sets the whole book. |
+| `mathFont` | `"katex"`, `"euler"` or `"libertinus"`: the math font of this page, over `params.math.font` (see [Euler and Libertinus math](#euler-and-libertinus-math)). |
 | `mathMacros` | KaTeX macros for this page, added to `params.math.macros` (same list-of-pairs form), e.g. `mathMacros: [["\\E", "\\mathbb{E}"]]` in YAML. |
 | `comments` | `true`/`false`. Overrides `params.comments.enable`. `true` is needed on pages outside any section (such as `content/about.md`), which have no comments otherwise. |
 | `draft` | Hugo's standard draft flag. |
 | `images` | Images for Open Graph and Twitter cards: page resources, absolute URLs, or paths under the site root (`/images/card.png`, resolved against the base path also on a site hosted under a subpath). A page without `images` uses the site-wide `params.images`, resolved the same way. |
 | `layout` | Set `layout: archive` on a page to render the archives (posts grouped by year; undated pages, such as book chapters, last under “Undated”, in the order of the RSS feed: each book's chapters in its reading order, then the other undated pages), or `layout: search` for the search results page (see [Search](#search)). |
 | `searchHidden` | `true` keeps the page out of the search index (see [Search](#search)). |
+| `outputs` | Hugo's output formats of the page. `["html", "slides"]` also makes the page a reveal.js deck, `slides.html` (see [Slides](#slides)); `["html", "rss", "print"]` on a book gives its `print.html` (see [Books](#books)). |
+| `slides` | reveal.js options for this page's slides, over `params.slides`, key by key (see [Slides](#slides)). |
 
 Create a post with the bundled archetype:
 
@@ -355,7 +361,7 @@ There are two kinds of shortcodes:
   finds nothing), and the others become inline blocks whose caption is a plain line above them (not a margin
   note, so no `tufte-note-in-note`), with the same warning (a generated list too:
   `listoffigures`, `bibliography`, `printindex` or `tableofcontents` in a note is shown there as inline blocks).
-- **Block** (`epigraph`, `blockquote`, `fullwidth`, `details`) are placed **on their own lines**. Their inner text is
+- **Block** (`epigraph`, `blockquote`, `fullwidth`, `details`, `notes`) are placed **on their own lines**. Their inner text is
   rendered as *block* Markdown, so it can contain several paragraphs.
 
 Call every theme shortcode with the `{{< >}}` delimiters, never with `{{% %}}`: the theme renders the inner
@@ -741,6 +747,21 @@ Because the eye never leaves the sentence.[^eye]
 [^eye]: The definition may be anywhere on the page.
 ```
 
+### `notes`
+
+Speaker notes for the [slides](#slides) of a page. The inner text is block Markdown, rendered like the inner
+text of `details`; the output is `<aside class="notes">…</aside>`. reveal.js shows the notes of a slide in its
+speaker view (the **s** key) and hides them on the slide; the article hides them too (`theme.css`), and the
+search index leaves them out.
+
+```markdown
+## The cholera map
+
+{{< notes >}}
+Point at the Broad Street pump before showing the deaths.
+{{< /notes >}}
+```
+
 ## Render hooks
 
 Plain Markdown is rendered into Tufte markup by the hooks in `layouts/_markup/`.
@@ -1068,6 +1089,42 @@ lists of figures, tables and listings) where the footnote list shows them, after
 it, so the numbers on the page run in order. Markdown footnote labels match by exact
 text, as in Goldmark (`[^fn-Proof]` is not a reference to `[^fn-proof]:`).
 
+## Fonts
+
+The text is set in **ET Book**, the typeface Edward Tufte had made for his books (`static/et-book/`), with Gill
+Sans for the sans-serif and Consolas for code, as in Tufte CSS. `params.font = "libertinus"` (or front matter
+`font: libertinus` on one page) sets it in **Libertinus** instead, the OpenType family that Khaled Hosny forked
+from Linux Libertine and Biolinum and Caleb Maclennan maintains, as `\usepackage{libertinus}` does in LaTeX:
+
+```toml
+[params]
+  font = "libertinus"   # Libertinus Serif, Sans and Mono
+[params.math]
+  font = "libertinus"   # and Libertinus Math for the formulas (optional)
+```
+
+- **Faces.** Libertinus Serif for the text, Libertinus Sans wherever the theme sets sans-serif (the `sans`
+  shortcode, tables, the navigation, `sfsidenotes`), Libertinus Mono for code. The math font is a separate
+  choice: `params.math.font = "libertinus"` sets the formulas in Libertinus Math, drawn to match the serif (see
+  [Euler and Libertinus math](#euler-and-libertinus-math)); KaTeX's fonts and Euler work with it too.
+- **Figures and small caps.** Libertinus has true small capitals (the `newthought` and `smallcaps` shortcodes,
+  `font-variant: small-caps`). Its old-style figures come, as ET Book's, from a face of their own, "Libertinus
+  OSF Digits" (the digits of Libertinus Serif, 2 kB): the note numbers use them, and `tufte.numerals =
+  "oldstyle"` (`osf`) turns them on for the serif text, while the sans and code keep their lining figures.
+- **Books.** The `font` of a book's root (its `_index.md`) sets the whole book, its `print.html` included; a
+  chapter may set its own, which `print.html` does not follow (it is one document, in the book's font).
+- **Files.** The fonts are bundled in `static/libertinus/` (version 7.051, SIL Open Font License,
+  `static/libertinus/OFL.txt`). Each text face is split in two files, the Latin characters and the rest (Greek,
+  Cyrillic, Hebrew, IPA, symbols), with the `unicode-range` of each in `assets/css/libertinus.css`: a page
+  downloads only the faces it uses, and the second file only when it shows one of its characters (about
+  100 kB each). Libertinus Math (380 kB) is not split.
+- **How it works.** The theme reads every face from the CSS variables `--tufte-serif`, `--tufte-serif-old`,
+  `--tufte-serif-osf`, `--tufte-sans` and `--tufte-mono`; `font = "libertinus"` puts the class
+  `tufte-font-libertinus` on `<html>`, which redefines them. A `customCSS` file can redefine them too, for
+  another family (and `etBook = false` leaves out ET Book's `@font-face` rules).
+
+See the example site's [Libertinus](https://massimo-nocentini.github.io/tufte.hugo/posts/libertinus/) post.
+
 ## Math
 
 All math is typeset with [KaTeX](https://katex.org). By default (`params.math.engine = "server"`) it is rendered
@@ -1161,28 +1218,32 @@ hashes separated by spaces; as in a browser, only the strongest algorithm listed
 one of its hashes, or the build stops. The stylesheet loads its fonts from `fonts/` next to itself, so a self-hosted site
 must copy the `dist/fonts/` directory of the **same** KaTeX release to `static/katex/fonts/`.
 
-### Euler math
+### Euler and Libertinus math
 
-Hermann Zapf's Euler, the upright mathematical alphabet that the AMS commissioned and *Concrete Mathematics*
-made famous, can set the formulas of a page or of the whole site, as `\usepackage{eulervm}` does in LaTeX: the
-text stays in ET Book, and so does text inside a formula (`\text{…}`).
+Two other fonts can set the formulas of a page or of the whole site:
+
+- **Euler**, Hermann Zapf's upright mathematical alphabet, which the AMS commissioned and *Concrete
+  Mathematics* made famous, as `\usepackage{eulervm}` does in LaTeX: the text stays in its font, and so does
+  text inside a formula (`\text{…}`);
+- **Libertinus Math**, the math font of the Libertinus family (see [Fonts](#fonts)), drawn to match Libertinus
+  Serif, with italic letters, as `\usepackage{libertinus}` sets them.
 
 ```toml
 [params.math]
-  font = "euler"     # the whole site
+  font = "euler"     # or "libertinus": the whole site
 ```
 
 ```yaml
-mathFont: euler      # one page (front matter)
+mathFont: euler      # or libertinus: one page (front matter)
 ```
 
 KaTeX's own output is drawn for KaTeX's fonts: it places every glyph with their measurements, so another font
-would sit wrongly. With `font = "euler"` KaTeX writes **MathML** only, and the browser lays it out with
-[Euler Math](https://ctan.org/pkg/euler-math), the OpenType math font by Khaled Hosny and Daniel Flipo, which
-carries its own layout rules (script sizes, fraction gaps, stretching delimiters and radicals). The font
-(version 0.77, 261 kB as WOFF2) is bundled with the theme in `static/euler-math/`, under the SIL Open Font
-License (`static/euler-math/OFL.txt`), and is downloaded only by pages that show a formula in it. Chrome and Edge
-109+, Firefox and Safari 16.4+ lay out MathML.
+would sit wrongly. With `font = "euler"` or `"libertinus"` KaTeX writes **MathML** only, and the browser lays it
+out with the font, an OpenType math font that carries its own layout rules (script sizes, fraction gaps,
+stretching delimiters and radicals): [Euler Math](https://ctan.org/pkg/euler-math) by Khaled Hosny and Daniel
+Flipo (version 0.77, 261 kB as WOFF2, in `static/euler-math/`) or Libertinus Math (version 7.051, 380 kB, in
+`static/libertinus/`), both under the SIL Open Font License, each downloaded only by pages that show a formula in
+it. Chrome and Edge 109+, Firefox and Safari 16.4+ lay out MathML.
 
 Everything else works as with KaTeX's fonts, with both engines: inline and display math, macros, math in notes
 and captions, `\label` numbers and `eqref`, `fleqn` and `leqno`, `\qedhere`, the search index and the page
@@ -1195,8 +1256,8 @@ descriptions (both read the formula's TeX). Some details:
   rules. The theme makes up for them (`tufte/mathml-core.html` at build time, the same in the client
   engine's script, `theme.css`):
   - `\mathbb{R}`, `\mathcal`, `\mathscr`, `\mathfrak`, `\mathbf`, `\boldsymbol`, `\mathsf` and `\mathtt`
-    become the characters of the Unicode mathematical alphabets (ℝ, ℱ, 𝔤, 𝐯…), which Euler Math has
-    (but for the lowercase script letters, which come from another font); `\textbf`, `\textit`, `\texttt` and
+    become the characters of the Unicode mathematical alphabets (ℝ, ℱ, 𝔤, 𝐯…), which both fonts have
+    (Euler Math but for the lowercase script letters, which come from another font); `\textbf`, `\textit`, `\texttt` and
     `\textsf` inside a formula are styled by `theme.css`;
   - a sign is unary where TeX makes it so (`= -1`, `f(-x)`, `x^{-1}`: no space around it);
   - an operator name (`\sin`, `\det`, `\lim`, `\operatorname`) gets TeX's thin space after it before a letter,
@@ -1205,20 +1266,24 @@ descriptions (both read the formula's TeX). Some details:
   - the columns of `aligned`, `align`, `gather`, matrices, `cases` and `array` keep their alignment, spacing and
     rules (`{c|c}`, `\hline`), up to 12 columns (the 13th and later take the 12th's);
   - `\boxed`, `\fbox`, `\cancel`, `\bcancel` and `\xcancel` are drawn; `\overline`, `\underline`,
-    `\widehat`, `\widetilde` and `\bar` use the accents Euler Math stretches.
+    `\widehat`, `\widetilde` and `\bar` use the accents the fonts stretch;
+  - an inline formula and the punctuation right after it (`$x$,`) stay on one line (`span.tufte-nobr`):
+    Chromium would break the line between them.
 - **Markup.** The MathML sits in the span KaTeX uses for it in its usual output,
-  `<span class="katex"><span class="katex-mathml"><math>…</math></span></span>` (with the client engine,
-  `<span class="katex"><math>`), which `theme.css` shows instead of hiding; a display is wrapped in
-  `span.katex-display`, as before. The KaTeX stylesheet is still loaded (it styles the error output and the
+  `<span class="katex tufte-math-FONT"><span class="katex-mathml"><math>…</math></span></span>` (with the client
+  engine, `<span class="katex tufte-math-FONT"><math>`), which `theme.css` shows instead of hiding, in the font
+  its class names (`tufte-math-euler`, `tufte-math-libertinus`); a display is wrapped in `span.katex-display`, as
+  before. The KaTeX stylesheet is still loaded (it styles the error output and the
   display wrappers); its fonts are not downloaded.
 - **Numbered environments.** KaTeX's `equation`, `align` and `gather` number their rows with a CSS counter of
   their own, as with KaTeX's fonts (it runs through the page and knows nothing of the theme's `\label`
   numbers: number displays with `\label`, as recommended above). `\notag` and `\nonumber` work; a `\tag` on
   a row of such an environment cannot be printed (KaTeX's MathML drops it and the row keeps KaTeX's number):
-  the build warns, `tufte-euler-tag`; write the row as a display of its own, or use `mathFont: katex` on that
+  the build warns, `tufte-mathml-tag`; write the row as a display of its own, or use `mathFont: katex` on that
   page.
 
-See the example site's [Euler Math](https://massimo-nocentini.github.io/tufte.hugo/posts/euler-math/) post.
+See the example site's [Euler Math](https://massimo-nocentini.github.io/tufte.hugo/posts/euler-math/) and
+[Libertinus](https://massimo-nocentini.github.io/tufte.hugo/posts/libertinus/) posts.
 
 ## tufte-latex parity
 
@@ -2172,7 +2237,7 @@ build and cannot be ignored.
 | `tufte-orphan-footnotemark` | A `footnotemark` without its `footnotetext` (only with `debug`). |
 | `tufte-bib-format` | A bibliography database that cannot be read. |
 | `tufte-katex-version` | `params.math.katexVersion` differs from the KaTeX that Hugo embeds (server engine). |
-| `tufte-euler-tag` | A `\tag` on a row of a multi-row `align`, `gather` or similar environment with the Euler font (`params.math.font = "euler"`): MathML output cannot print it (see [Euler math](#euler-math)). |
+| `tufte-mathml-tag` | A `\tag` on a row of a multi-row `align`, `gather` or similar environment with a MathML math font (`params.math.font = "euler"` or `"libertinus"`): MathML output cannot print it (see [Euler and Libertinus math](#euler-and-libertinus-math)). |
 | `tufte-search-output` | `params.search.enable` is true but the home page has no `searchindex` output, so there is no index to search (see [Search](#search)); the search box is left out. |
 
 ### LaTeX to Hugo cheat sheet
@@ -2305,6 +2370,8 @@ package, which the classes do not define but mathematical texts load with them.
 | 116 | thmtools `\listoftheorems` | `{{< listoftheorems >}}` (standalone) | should | `kinds="theorem,lemma"`, `heading=""` |
 | 117 | `\swapnumbers`, `\newtheoremstyle`, thmtools `restatable` | — | **wont** | heads come in two looks (`tufte.theorems.look`: `tufte`, `amsthm`); restyle one kind with `thm-kind-k` in `customCSS` |
 | 118 | `\usepackage{euler}`, `eulervm` | `[params.math] font = "euler"`; front matter `mathFont: euler` | could | MathML set in the bundled Euler Math font; text and `\text{…}` stay in ET Book |
+| 119 | `\usepackage{libertinus}`, `libertinus-otf` | `[params] font = "libertinus"` and `[params.math] font = "libertinus"`; front matter `font`, `mathFont` | could | Libertinus Serif, Sans and Mono for the text, Libertinus Math (MathML) for the formulas |
+| 120 | Beamer slides of a handout | `outputs: ["html", "slides"]`: `slides.html`, a reveal.js deck | could | a slide at each `##` and `---`; `{{< notes >}}` for speaker notes |
 
 ## Syntax highlighting
 
@@ -2330,6 +2397,7 @@ Code uses Hugo's built-in Chroma highlighter and the monospace style of Tufte CS
 | Book landing | `list.html` → `tufte/book/landing.html` | A section with `book: true`: title page, contents, dedication. See [Books](#books). |
 | Book part | `list.html` → `tufte/book/part.html` | A sub-section of a book: part number, title and its chapters. |
 | Book chapter | `page.html` → `tufte/book/chapter.html` | A page inside a book: chapter number, content, book navigation. |
+| Slides | `page.slides.html` | `slides.html` of a page with `outputs: ["html", "slides"]`: its content as a reveal.js deck. See [Slides](#slides). |
 | Whole book | `list.print.html` | `print.html` of a book with `outputs: ["html", "rss", "print"]` (keep `rss`: front-matter `outputs` replaces the default formats, feed included). |
 | RSS feeds | `rss.xml` | Hugo's feed, with each item's description taken from the theme's processed summary (numbers and cross-references resolved). Items are ordered by publication date, newest first (Hugo orders by weight first), so the limit `[services.rss] limit` keeps the newest posts; undated pages (book chapters, which have a weight and no date) come after the dated ones and have no `<pubDate>`: each book's chapters in its reading order (matter, weight, file name, parts kept together, as in the book contents), book after book, then any other undated pages in Hugo's default order (weight, then title). The feed of a book's section (`/BOOK/index.xml`) or of one of its parts lists all its chapters, those inside its parts included (a section outside a book lists its own pages, as in Hugo). |
 
@@ -2425,6 +2493,72 @@ site. Without JavaScript the header box is not shown and the results page says s
 search too: `window.tufteSearch.load()` returns a promise of the engine, whose `search(query, limit)` returns
 `{entry, section, terms}` objects (`entry` is an index entry, `section` the index of its best-matching
 section).
+
+## Slides
+
+A page can also be a slide deck. List the `slides` output format, which the theme declares, in its front matter:
+
+```yaml
+outputs: ["html", "slides"]
+```
+
+and Hugo writes `slides.html` next to the article (`/posts/my-talk/slides.html`), the same content shown with
+[reveal.js](https://revealjs.com). The article's metadata line links to its slides, and the title slide links
+back. A site gives every page slides with Hugo's `[outputs] page = ["html", "slides"]`.
+
+- **Slides.** A slide starts at each `##` heading and at each thematic break (`---`) at the top level of the
+  article; the break itself is not shown. With `sections: none` only the breaks cut. A **title slide** comes
+  first: title (with its `thanks` notes), subtitle, authors, date and the link to the article (`titleSlide =
+  false` leaves it out); a front-matter `abstract` follows on a slide of its own. Speaker notes are left out of
+  the article, its description, the RSS feed and the search index.
+- **Layout.** Each slide is a `<section>` that Tufte CSS lays out as in the article: the text column, the
+  sidenotes and margin notes in the margin, figures, tables, listings, theorems and math, with their numbers
+  and cross-references. reveal.js scales the slide (`width` × `height`, 1024 × 640 by default) to the window.
+  In a narrow window the theme's phone layout applies, with its ⊕ toggles. Dark mode follows the system, as on
+  the article. A slide shows what fits: write slides short (reveal.js does not scroll a slide).
+- **Speaker notes.** The [`notes`](#notes) shortcode; the **s** key opens reveal.js's speaker view.
+- **Fragments.** `{.fragment}` on the line after a paragraph, a list or a table (Goldmark's block attributes)
+  shows it one step later; reveal.js's other fragment classes (`fade-up`, `highlight-red`…) work the same way.
+- **Keys.** **←** **→** or **Space** to move, **Esc** or **o** for the overview, **f** for full screen, **s** for
+  the speaker notes, **?** for the list.
+- **PDF.** Open `slides.html?print-pdf` and print to PDF (Chrome or Edge, margins none, background graphics
+  on): one page per slide, laid out as on screen (the slides' stylesheet leaves out the article's print rules).
+
+Options: `[params.slides]`, and the page's front matter `slides` over it, key by key. Hugo lowercases the
+keys of front matter maps; the theme matches the reveal.js names in any case.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `titleSlide` | `true` | The title slide. |
+| `width`, `height` | `1024`, `640` | The slide size, in pixels, that reveal.js scales to the window (16:10). |
+| `margin` | `0.04` | The space around the slide, a fraction of the window. |
+| `center` | `false` | `false`: each slide starts at the top, so headings line up; `true`: centred vertically. |
+| `transition` | `"fade"` | `none`, `fade`, `slide`, `convex`, `concave` or `zoom`. |
+| `slideNumber` | `"c/t"` | The slide number (`"c/t"`: 3/12; `false`: none), bottom left. |
+| `hash` | `true` | Each slide has its own URL (`slides.html#/3`). |
+| `controls`, `progress` | `true` | The arrows and the progress bar. |
+
+Any other of these reveal.js options may be set too: `transitionSpeed`, `backgroundTransition`, `minScale`,
+`maxScale`, `loop`, `navigationMode`, `autoSlide`, `showNotes`, `fragments`, `overview`, `keyboard`, `touch`,
+`mouseWheel`, `pdfSeparateFragments`, `pdfMaxPagesPerSlide`, `autoAnimate`, `viewDistance`. Another key prints the
+warning `tufte-bad-option`. A string such as `"true"` or `"1200"` (an `HUGO_PARAMS_SLIDES_*` environment
+variable) is read as a boolean or a number. A right-to-left language sets reveal.js's `rtl`.
+
+```yaml
+slides:
+  transition: slide
+  slideNumber: false
+```
+
+reveal.js 6.0.2 (its core stylesheet, script and notes plugin, no reveal.js theme) comes from the jsDelivr CDN
+with SRI hashes (`data/tufte/vendor.toml` `[reveal]`), or from your site with `params.selfHosted`.
+`layouts/page.slides.html` writes the deck (no site header, navigation or footer); its canonical link is the
+article. reveal.js takes every `<section>` inside a slide for a vertical slide of its own, so the sections a
+slide holds (a theorem, a proof) are `<tufte-section>` elements in `slides.html`, and the slides' copy of the
+theme stylesheet styles them as sections. Vertical slides and per-slide backgrounds are not supported.
+
+See the example site's [Slides](https://massimo-nocentini.github.io/tufte.hugo/posts/tufte-slides/) post and its
+[deck](https://massimo-nocentini.github.io/tufte.hugo/posts/tufte-slides/slides.html).
 
 ## Comments, analytics and social links
 

@@ -1,0 +1,57 @@
+{{- /*
+  The text font of a page: front matter `font`, else its book's (the front
+  matter of the book root, so a book is set in one font, its print.html
+  included), else params.font, else "etbook". Call it through partialCached (key: the page's RelPermalink or
+  Path), so an unknown value warns once per page.
+
+    etbook       ET Book (et-book.css, unless params.etBook is false: then
+                 Tufte CSS's fallback stack, Palatino first)
+    libertinus   Libertinus Serif, Sans and Mono (libertinus.css)
+
+  The theme CSS reads the faces from --tufte-serif, --tufte-serif-old,
+  --tufte-serif-osf, --tufte-sans and --tufte-mono, which libertinus.css
+  redefines under html.tufte-font-libertinus (baseof.html). Custom
+  properties do not reach @page margin boxes, so the running heads
+  (tufte/head-style.html, tufte/book/print-style.html) and the font words
+  of tufte.X.font write the lists returned here.
+
+  Takes: the page.
+  Returns: a dict
+    name    "etbook" | "libertinus"
+    class   the class of <html> ("" for etbook)
+    serif, sans, mono   CSS font-family lists (no quotes but the family
+                        names' own double quotes)
+*/ -}}
+{{- $p := . -}}
+{{- $name := "etbook" -}}
+{{- $bookFont := "" -}}
+{{- with partialCached "tufte/book/root.html" $p (or $p.RelPermalink $p.Path) -}}
+  {{- if ne .RelPermalink $p.RelPermalink }}{{ $bookFont = .Params.font }}{{ end -}}
+{{- end -}}
+{{- range $src := slice site.Params.font $bookFont $p.Params.font -}}
+  {{- with $src -}}
+    {{- $v := lower (strings.TrimSpace (printf "%v" .)) -}}
+    {{- if in (slice "etbook" "libertinus") $v -}}
+      {{- $name = $v -}}
+    {{- else -}}
+      {{- $where := $p.RelPermalink -}}
+      {{- with $p.File }}{{ $where = .Path }}{{ end -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: the text font (params.font or front matter font) must be \"etbook\" or \"libertinus\", not %q, in %s; ignored" $v $where -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $fonts := dict
+  "etbook" (dict
+    "name" "etbook"
+    "class" ""
+    "serif" `et-book,Palatino,"Palatino Linotype",Georgia,serif`
+    "sans" `"Gill Sans","Gill Sans MT",Calibri,sans-serif`
+    "mono" `Consolas,"Liberation Mono",Menlo,Courier,monospace`)
+  "libertinus" (dict
+    "name" "libertinus"
+    "class" "tufte-font-libertinus"
+    "serif" `"Libertinus Serif","Linux Libertine O",Palatino,"Palatino Linotype",Georgia,serif`
+    "sans" `"Libertinus Sans","Linux Biolinum O","Gill Sans","Gill Sans MT",Calibri,sans-serif`
+    "mono" `"Libertinus Mono",Consolas,"Liberation Mono",Menlo,Courier,monospace`)
+-}}
+{{- return index $fonts $name -}}

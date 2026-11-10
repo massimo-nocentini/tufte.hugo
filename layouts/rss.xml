@@ -128,6 +128,11 @@
            with the site's scheme and host (the path already holds the
            base path; with canonifyURLs, whose root-relative URLs lack it,
            tufte/postprocess.html has made such a poster= absolute). */}}
+    {{- /* Speaker notes (the notes shortcode) belong to the slides; a feed
+           reader would show them. */}}
+    {{- if strings.Contains (string $summary) `<aside class="notes">` }}
+      {{- $summary = replaceRE `(?s)<aside class="notes">.*?</aside>` "" (string $summary) }}
+    {{- end }}
     {{- if strings.Contains (string $summary) ` poster="/` }}
       {{- $bu := urls.Parse site.BaseURL }}
       {{- if $bu.Host }}

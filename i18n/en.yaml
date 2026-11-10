@@ -136,3 +136,5 @@ searchResults:
   other: "{count} results for “{query}”."
 searchNoScript: "The search needs JavaScript."
 searchOff: "Search is not enabled on this site."
+slidesView: "Slides"
+slidesArticle: "Read as an article"

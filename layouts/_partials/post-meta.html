@@ -35,7 +35,9 @@
 {{- $showDate := partial "func/flag.html" (dict "value" $p.Params.showdate "default" true) -}}
 {{- $dateText := "" -}}
 {{- with $p.Params.datetext }}{{ $dateText = printf "%v" . }}{{ end -}}
-{{- if or (not $p.Date.IsZero) $tags $categories (and $showDate $dateText) (gt $notes 0) (and $p.Params.author $author) -}}
+{{- /* The page's slides (the slides output format, layouts/page.slides.html). */ -}}
+{{- $slides := $p.OutputFormats.Get "slides" -}}
+{{- if or (not $p.Date.IsZero) $tags $categories (and $showDate $dateText) (gt $notes 0) (and $p.Params.author $author) $slides -}}
 {{- $sep := false }}
 <p class="post-meta sans">
   {{- if $showDate -}}
@@ -62,6 +64,11 @@
   {{- if and (partial "func/flag.html" (dict "value" ($p.Param "showWordCount") "default" false)) (gt $p.WordCount 0) -}}
     {{- if $sep }} &middot; {{ end -}}
     {{ partial "func/t.html" (dict "key" "wordCount" "count" $p.WordCount) }}
+    {{- $sep = true -}}
+  {{- end -}}
+  {{- with $slides -}}
+    {{- if $sep }} &middot; {{ end -}}
+    <a class="post-slides" href="{{ .RelPermalink }}">{{ partial "func/t.html" "slidesView" }}</a>
     {{- $sep = true -}}
   {{- end -}}
   {{- with $categories -}}

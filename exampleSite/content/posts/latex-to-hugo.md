@@ -155,6 +155,8 @@ classes do not define but mathematical texts load with them.
 | 116 | thmtools `\listoftheorems` | `{{</* listoftheorems */>}}` (standalone) | should | `kinds="theorem,lemma"`, `heading=""` |
 | 117 | `\swapnumbers`, `\newtheoremstyle`, thmtools `restatable` | — | **wont** | heads come in two looks (`tufte.theorems.look`: `tufte`, `amsthm`); restyle one kind with `thm-kind-k` in `customCSS` |
 | 118 | `\usepackage{euler}`, `eulervm` | `[params.math] font = "euler"`; front matter `mathFont: euler` | could | MathML set in the bundled Euler Math font; text and `\text{…}` stay in ET Book |
+| 119 | `\usepackage{libertinus}`, `libertinus-otf` | `[params] font = "libertinus"` and `[params.math] font = "libertinus"`; front matter `font`, `mathFont` | could | Libertinus Serif, Sans and Mono for the text, Libertinus Math (MathML) for the formulas |
+| 120 | Beamer slides of a handout | `outputs: ["html", "slides"]`: `slides.html`, a reveal.js deck | could | a slide at each `##` and `---`; `{{</* notes */>}}` for speaker notes |
 {.fullwidth}
 
 ## Notes {#sec:notes}

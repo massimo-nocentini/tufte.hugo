@@ -50,11 +50,9 @@
 
 {{- /* 1. Marginalia variables. */ -}}
 {{- $alignMap := dict "justified" "justify" "justify" "justify" "raggedright" "left" "raggedleft" "right" "raggedouter" "left" -}}
-{{- $families := dict
-  "sans" `"Gill Sans","Gill Sans MT",Calibri,sans-serif`
-  "serif" `et-book,Palatino,"Palatino Linotype",Georgia,serif`
-  "mono" `Consolas,"Liberation Mono",Menlo,Courier,monospace`
--}}
+{{- /* The page's text font (params.font, func/font.html). */ -}}
+{{- $face := partialCached "func/font.html" $p $key -}}
+{{- $families := dict "sans" $face.sans "serif" $face.serif "mono" $face.mono -}}
 {{- $vars := slice -}}
 {{- $hyphens := false -}}
 {{- $marginals := lower (printf "%v" (or (index $opt "marginals") "auto")) -}}
@@ -152,7 +150,7 @@
        without includehead is the distance to the text block, so the head
        sits in it); a top margin box is centred vertically by default, so
        it is pushed down to that position. */ -}}
-{{- $box := printf "font-family:et-book,Palatino,\"Palatino Linotype\",Georgia,serif;font-size:8pt;font-style:normal;text-transform:uppercase;letter-spacing:%s;vertical-align:bottom;padding-bottom:28pt" $ls -}}
+{{- $box := printf "font-family:%s;font-size:8pt;font-style:normal;text-transform:uppercase;letter-spacing:%s;vertical-align:bottom;padding-bottom:28pt" $face.serif $ls -}}
 {{- /* html/template treats a CSS string like a URL: an action right after
        the opening quote goes through its URL filter (a title with a colon
        would read as a scheme and become #ZgotmplZ), and an {{ if }} inside

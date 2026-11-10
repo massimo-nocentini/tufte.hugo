@@ -1,0 +1,18 @@
+{{- /*
+  Speaker notes of a slide (block; the slides output format, README
+  "Slides"). Put it on its own lines inside the slide; the inner text is
+  block Markdown:
+
+    {{< notes >}}
+    Mention the 1854 cholera map here.
+    {{< /notes >}}
+
+  reveal.js shows the notes in its speaker view (the "s" key) and hides
+  them on the slide; the article hides them too (theme.css).
+
+  Output: <aside class="notes">…</aside>
+*/ -}}
+{{- $text := strings.TrimSpace .InnerDeindent -}}
+{{- $html := partial "tufte/render-inner.html" (dict "page" .Page "inner" $text "text" $text "display" "block" "where" (printf "%s shortcode in %v" .Name .Position)) | string -}}
+{{- $out := printf "<aside class=\"notes\">\n%s\n</aside>" $html -}}
+{{- partial "tufte/nest.html" (dict "ctx" . "html" $out) | safeHTML -}}
