@@ -327,6 +327,12 @@ Some Tufte CSS conventions are produced automatically:
   `##` gets a section of its own. Empty sections are never emitted.
 - **Article header.** The page title becomes `<h1>`, front matter `subtitle` becomes `<p class="subtitle">`,
   and the date, author, reading time and tags appear in a small sans-serif line under them.
+- **Headings keep to the text column.** The title, the subtitle and every heading (`#` to `######`, the
+  summary titles of list pages) are at most as wide as the paragraphs, as tufte-latex sets `\section`,
+  `\subsection` and the handout's title in the text block: a long one wraps there instead of running over the
+  margin column, and its notes (a heading's sidenote, a `thanks` note on the title) land in the margin column
+  as a paragraph's do. On paper too; on phones everything is one column. The titles tufte-book sets full width
+  stay so: a book's chapter and part titles and its title page.
 - **Tables** are wrapped in `<div class="table-wrapper">` so they scroll on small screens.
 - **Note ids.** Every sidenote, margin note, margin figure and figure caption made by a shortcode or a render
   hook gets a unique id (`<hash of the page URL>-<n>`, from a per-page counter, e.g. `sn-1a2b3c-4`). A Markdown

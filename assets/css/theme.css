@@ -2067,15 +2067,18 @@ html[dir="rtl"] :is(pre, code, kbd, samp, .katex, .math-display, .katex-display)
 }
 
 /* A heading spanning the article would put its (right-aligned) text over
-   the margin: keep it over the text column, as the paragraphs. */
+   the margin: keep it over the text column, as the paragraphs. Every
+   direction does so for the headings that tufte-latex sets in the text
+   block (tufte-latex.css §6); right to left, the full-width chapter and
+   part titles too, whose text would otherwise start over the margin. */
 html[dir="rtl"] :is(main, article, section, header, div.post-summary) > :is(h1, h2, h3, h4, h5, h6, p.subtitle) {
     max-width: 55%;
 }
 
 /* Its notes (a heading note, a \thanks note in the title or the chapter
-   title) then take the paragraph geometry, not the section-wide heading
-   geometry of tufte-latex.css (27.5%/12%, or 30.6%/2.2% in a chapter
-   title), which would put them inside the text column. Desktop screens:
+   title) then take the paragraph geometry, not the full-width chapter
+   title's (30.6%/2.2%, tufte-latex.css), which would put them inside the
+   text column. Desktop screens:
    phones use the toggle rules, print the --pw/--pl geometry (below). A
    run-in h4 is left out: its notes are placed in section coordinates. */
 @media screen and (width > 760px) {

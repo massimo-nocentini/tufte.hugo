@@ -1212,19 +1212,41 @@ span.run-in {
     margin-right: 1em;
 }
 
-/* Notes in section headings (## Title{{< sidenote >}}…), a level-one
-   heading of the content (# Title) included. A heading is as
-   wide as its section, not 55% like a paragraph, so tufte.css's paragraph
-   geometry (50%, -60%) would put the note off the page: use the section
-   geometry of the safety net in §2 (27.5% wide, right edge at 88%). The
-   print block (§12) places them with --pw = 100, which is right for a
-   heading. */
-@media (width > 760px), print {
-    section > :is(h1, h2, h3, h5, h6) :is(.sidenote, .marginnote) {
-        width: 27.5%;
-        margin-right: 12%;
+/* Headings keep to the text column, as \section, \subsection and
+   tufte-handout's \maketitle set their titles in the text block: a long
+   title wraps there instead of running over the margin column, where the
+   notes are. The page title and subtitle, the content's headings, the
+   summary titles and the list pages' headings; not the titles that
+   tufte-book sets full width (\titleformat{…}{fullwidth}): chapter, part
+   and title page. Phones have one column (tufte.css's 760px rules); on
+   paper the text column is --pt% of the page. (Right to left: theme.css,
+   which keeps chapter titles in the column too.) */
+@media screen and (width > 760px) {
+    :is(main, article, section, header, div.post-summary) > :is(h1, h2, h3, h4, h5, h6, p.subtitle):not(.chapter-title, .part-title, .title-page-title) {
+        max-width: 55%;
     }
 
+    /* Their notes (## Title{{< sidenote >}}…, a \thanks note in the title)
+       then take tufte.css's paragraph geometry (50%, -60%). A run-in h4 is
+       left out: its notes are placed in section coordinates (below). */
+    :is(main, article, section, header, div.post-summary) > :is(h1, h2, h3, h4:not(.run-in), h5, h6, p.subtitle):not(.chapter-title, .part-title, .title-page-title) :is(.sidenote, .marginnote) {
+        min-width: 0;
+        width: 50%;
+        margin-right: -60%;
+    }
+}
+
+/* On paper the heading is the text column, and its notes measure it
+   (--pw/--pl, §12). */
+@media print {
+    :is(main, article, section, header, div.post-summary) > :is(h1, h2, h3, h4, h5, h6, p.subtitle):not(.chapter-title, .part-title, .title-page-title) {
+        max-width: calc(var(--pt) * 1%);
+        --pw: var(--pt);
+        --pl: 0;
+    }
+}
+
+@media (width > 760px), print {
     /* The run-in h4 is a shrink-to-fit float: percentages would resolve
        against its small box. Its notes are placed absolutely in section
        coordinates instead, at the height of the heading line. Limit: an
