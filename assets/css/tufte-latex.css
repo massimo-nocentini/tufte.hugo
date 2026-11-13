@@ -1162,6 +1162,15 @@ section > p {
     hanging-punctuation: first last;
 }
 
+/* Not inside a formula: WebKit (Safari, and every browser on iPhone and
+   iPad) lays out each MathML token, and each inline block of KaTeX's own
+   output, as a line of its own, so the inherited value hung every "(" of
+   an inline formula out of its token, over the letter before it ("S(A)"
+   read "$ A)"), and pushed its commas and stops out to the right. */
+.katex {
+    hanging-punctuation: none;
+}
+
 cite {
     font-style: italic;
 }

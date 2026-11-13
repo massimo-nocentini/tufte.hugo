@@ -157,6 +157,8 @@ jobs:
           grep -q 'url(\.\./euler-math/Euler-Math\.woff2)\|url("\.\./euler-math/Euler-Math\.woff2")' "$B" || fail "the Euler Math URL is not relative to the bundle in $B"
           # WebKit scatters a table cell's row under an inherited -webkit- alignment (theme.css).
           tr -d ' \n' < "$B" | grep -q 'mtd>\*{text-align:start' || fail "no text-align reset of the MathML cells' content (WebKit) in $B"
+          # WebKit hangs a token-initial "(" of an inline formula out of the token (tufte-latex.css).
+          tr -d ' \n' < "$B" | grep -q '\.katex{hanging-punctuation:none' || fail "no hanging-punctuation reset in formulas (WebKit) in $B"
 
       # Libertinus (posts/libertinus sets font and mathFont: libertinus;
       # README "Fonts" and "Euler and Libertinus math"): the class of <html>,

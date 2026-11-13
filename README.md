@@ -1309,7 +1309,9 @@ descriptions (both read the formula's TeX). Some details:
   the column alignment that Chromium needs would scatter the content of a table cell in WebKit, so it reaches
   the cell only; a numbered `equation`, `align` or `gather` spans the line, so that its rows sit in the
   middle and its numbers at the margin (WebKit showed it empty, a million pixels to the right); and a display
-  is an inline block where `display: inline math` is unknown, so that `fleqn` sets it flush left.
+  is an inline block where `display: inline math` is unknown, so that `fleqn` sets it flush left. The
+  hanging punctuation of the paragraphs (Safari only) stops at a formula: WebKit lays out each token of an
+  inline formula as a line of its own, and hung its opening parentheses over the letter before them.
   WebKit draws no generated content in MathML, so the row numbers of those environments, a CSS counter of
   KaTeX's, do not show in Safari: number the displays with `\label`.
 - **Markup.** The MathML sits in the span KaTeX uses for it in its usual output,

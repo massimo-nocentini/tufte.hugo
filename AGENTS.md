@@ -209,7 +209,9 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   `equation`, `align`, `gather`) spans the line (`math`, `semantics` and `mtable` at `width: 100%`), since
   WebKit and Firefox size the math to its content; other displays are `display: inline-block` before `inline
   math`, the fallback of the engines without `inline math` (WebKit, Firefox), so that `fleqn` places them.
-  WebKit draws no `::before` in MathML, so KaTeX's counter numbers of those environments do not show there. `\notag`/`\nonumber` in a numbered environment are taken out of the
+  WebKit draws no `::before` in MathML, so KaTeX's counter numbers of those environments do not show there.
+  `.katex` sets `hanging-punctuation: none` (`tufte-latex.css`): the paragraphs' `first last` would hang every
+  token-initial `(` of an inline formula in WebKit, which lays out each token as a line. `\notag`/`\nonumber` in a numbered environment are taken out of the
   TeX and the row's number cell marked `tufte-notag`; a `\tag` on a row of such an environment warns
   (`tufte-mathml-tag`). The client engine
   marks its spans `data-output="mathml" data-mathfont="FONT"` and `tufte/katex.html` does the same fixes in
