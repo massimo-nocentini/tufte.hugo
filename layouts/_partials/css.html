@@ -1,7 +1,7 @@
 {{- /*
   Emits the single theme stylesheet. In order: ET Book @font-face rules
   (unless Params.etBook is false or "false", func/flag.html), tufte.css, theme.css, tufte-latex.css,
-  libertinus.css, syntax.css and
+  libertinus.css, source.css, syntax.css and
   every path listed in Params.customCSS (resolved in the site's assets/;
   their @import statements go first).
   The bundle is published as css/tufte-hugo.<hash>.css, so the relative
@@ -23,6 +23,11 @@
        and the font variables under html.tufte-font-libertinus. A browser
        downloads a face only for a page that uses it. */ -}}
 {{- $paths = $paths | append "css/libertinus.css" -}}
+{{- /* Adobe's Source families: Source Code Pro, the default monospace face
+       (theme.css --tufte-mono), and Source Serif 4 and Source Sans 3 with
+       their font variables under html.tufte-font-source (params.font =
+       "source"). */ -}}
+{{- $paths = $paths | append "css/source.css" -}}
 {{- $paths = $paths | append "css/syntax.css" -}}
 {{- $resources := slice -}}
 {{- range $paths -}}

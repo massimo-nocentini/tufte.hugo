@@ -184,6 +184,34 @@ jobs:
           grep -q 'unicode-range' "$B" || fail "no unicode-range in $B"
           grep -q '\.tufte-font-libertinus' "$B" || fail "no Libertinus font variables in $B"
 
+      # Source (posts/source sets font: source; README "Fonts"): the class of
+      # <html>, Adobe's unchanged faces, the renamed old-style digits and the
+      # licence, Source Code Pro as the default monospaced face of the bundle,
+      # and the other pages untouched.
+      - name: Check Source
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          L=public/posts/source/index.html
+          [ -f "$L" ] || fail "missing $L"
+          grep -q '<html lang="[^"]*" class="tufte-font-source">' "$L" || fail "no tufte-font-source class on <html> in $L"
+          if grep -q 'tufte-font-source' public/posts/theme-guide/index.html; then fail "posts/theme-guide (font etbook) has the Source class"; fi
+          grep -q 'class="tufte-osf' "$L" || grep -q 'class="[^"]* tufte-osf' "$L" || fail "numerals: oldstyle not applied in $L"
+          for f in SourceSerif4-Regular SourceSerif4-It SourceSerif4-Bold SourceSerif4-BoldIt SourceSans3-Regular SourceSans3-It SourceSans3-Bold SourceSans3-BoldIt SourceCodePro-Regular SourceCodePro-It SourceCodePro-Bold SourceCodePro-BoldIt TufteSerif4OSFDigits-Regular TufteSerif4OSFDigits-It TufteSerif4OSFDigits-Bold TufteSerif4OSFDigits-BoldIt; do
+            [ -s "public/source/$f.woff2" ] || fail "missing public/source/$f.woff2"
+          done
+          grep -q 'SIL Open Font License' public/source/OFL.txt || fail "missing the Source licence"
+          grep -q "Reserved Font Name" public/source/OFL.txt || fail "the Source licence lost its Reserved Font Name"
+          B=public$(grep -oE '/css/tufte-hugo[^" >]*\.css' "$L" | head -1)
+          [ -f "$B" ] || fail "missing $B"
+          for fam in 'source serif 4' 'source sans 3' 'source code pro' 'tufte serif4 osf digits'; do
+            grep -qi "font-family: *\"\\?$fam" "$B" || fail "no $fam @font-face in $B"
+          done
+          grep -q 'url(\.\./source/SourceSerif4-Regular\.woff2)\|url("\.\./source/SourceSerif4-Regular\.woff2")' "$B" || fail "the Source URL is not relative to the bundle in $B"
+          grep -q '\.tufte-font-source' "$B" || fail "no Source font variables in $B"
+          grep -qi -- '--tufte-mono: *"\?source code pro' "$B" || fail "Source Code Pro is not the default --tufte-mono in $B"
+
       # Slides (posts/tufte-slides lists the slides output format; README
       # "Slides"): slides.html beside the article, one slide per h2 or ---
       # plus the title slide, no <section> nested in a slide (reveal.js would

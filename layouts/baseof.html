@@ -7,7 +7,7 @@
 {{- $l := partial "func/lang.html" site.Language -}}
 <!DOCTYPE html>
 {{- /* The text font (params.font, front matter font): its class switches
-       the theme's font variables (libertinus.css). */}}
+       the theme's font variables (libertinus.css, source.css). */}}
 {{- $face := partialCached "func/font.html" . (or .RelPermalink .Path) }}
 <html lang="{{ $l.locale }}"{{ with $l.dir }} dir="{{ . }}"{{ end }}{{ with $face.class }} class="{{ . }}"{{ end }}>
 <head>

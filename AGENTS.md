@@ -30,7 +30,9 @@ script on every page and the results page, then builds with `HUGO_PARAMS_SEARCH_
 search-off line) and with `HUGO_OUTPUTS_HOME=html` (the `tufte-search-output` warning, no index); the search
 box is checked on every page but `print.html` and `slides.html`. "Check Libertinus" checks `posts/libertinus`
 (the `tufte-font-libertinus` class of `<html>`, Libertinus Math's MathML, the font files and their
-`unicode-range` faces in the bundle) and "Check the slides" `posts/tufte-slides/slides.html` (7 slides, no
+`unicode-range` faces in the bundle), "Check Source" checks `posts/source` (the `tufte-font-source` class of
+`<html>`, the sixteen files of `static/source/` with their licence, the faces in the bundle and Source Code Pro as
+the default `--tufte-mono`) and "Check the slides" `posts/tufte-slides/slides.html` (7 slides, no
 `<section>` nested in a slide, the reveal.js files with the hashes of `vendor.toml`, the options, 2 speaker
 notes, the slides bundle without print rules, the article's link). It then runs a second minified
 build with `HUGO_PARAMS_SECTIONS=none` and `HUGO_PARAMS_FOOTNOTES=endnotes`. Two §11 steps check sidenotes and
@@ -124,7 +126,7 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
 - `assets/css/et-book.css` contains the ET Book `@font-face` rules. They point to `../et-book/` because the bundle
   is published under `/css/`. The fonts are in `static/et-book/`.
 - `layouts/_partials/css.html` concatenates `et-book.css` (if `params.etBook`), `tufte.css`, `theme.css`,
-  `tufte-latex.css`, `libertinus.css`, `syntax.css` and `params.customCSS` into `css/tufte-hugo.css` (for the
+  `tufte-latex.css`, `libertinus.css`, `source.css`, `syntax.css` and `params.customCSS` into `css/tufte-hugo.css` (for the
   slides output, `css/tufte-hugo-slides.css`: without `@media print` blocks, and every `section` type selector
   as `:is(section,tufte-section)`; see Slides below). Page-dependent CSS values
   go in the `<style>` of `tufte/head-style.html`, emitted after the bundle. It minifies only when `hugo.IsProduction`,
@@ -180,6 +182,13 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   the `tufte.X.font` words (custom properties do not reach `@page` boxes). The faces in `static/libertinus/` are
   subsets of the 7.051 OTF files, `-latin` and `-ext` halves with complementary `unicode-range`s (provenance in
   `OFL.txt`); Libertinus Math is whole, made from the OTF (the release's WOFF2 has no MATH table).
+  `params.font = "source"` puts `tufte-font-source` on `<html>`, and `assets/css/source.css` redefines the
+  serif and sans variables under it (Source Serif 4, Source Sans 3; old-style figures from "Tufte Serif4 OSF
+  Digits"). Source Code Pro is the default `--tufte-mono` (`theme.css`) and the `mono` list of `etbook` and
+  `source` in `func/font.html`; only `libertinus` names another (Libertinus Mono). The files in `static/source/`
+  are Adobe's release WOFF2 files, **unchanged**: "Source" is a Reserved Font Name of their OFL, so never subset
+  or otherwise modify them under that name; the digits faces, Modified Versions, carry a name of their own
+  (provenance in `static/source/OFL.txt`).
 - **MathML math: Euler and Libertinus** (README "Euler and Libertinus math"): `params.math.font = "euler"` or
   `"libertinus"`, or front matter `mathFont`, makes `func/math-options.html` ask KaTeX for MathML only (`output
   "mathml"`, both engines; `mathml` true in its result). `tufte/math-render.html` wraps the server's MathML as

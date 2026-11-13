@@ -160,7 +160,7 @@ does not set (`HUGO_PARAMS_ETBOOK=false hugo`).
 | `sections` | `"h2"` | `"h2"`: wrap the article in a new `<section>` at each `<h2>` that is not nested in another element (a quote, a list, a `div`, or any element of raw HTML, such as a `form` or a block link). `"none"`: put the whole article in one `<section>`. The booleans `false` and `true` read as `"none"` and `"h2"`, and so do the strings `"false"`/`"no"`/`"off"`/`"0"` and `"true"`/`"yes"`/`"on"`/`"1"` (a `HUGO_PARAMS_SECTIONS=false` environment variable reaches the theme as a string), and an empty value means `"h2"`; any other value warns (`tufte-bad-option`) and uses `"h2"`. Front matter `sections` overrides it. |
 | `footnotes` | `"sidenotes"` | `"sidenotes"`: Markdown footnotes `[^x]` become numbered sidenotes (labels starting with `fn-` stay real footnotes). `"endnotes"` (alias `"footnotes"`): they are real footnotes, listed by the theme in a `<section class="footnotes">` below the text (labels starting with `sn-` become sidenotes). Front matter `footnotes` overrides it. See [Footnotes and sidenotes](#footnotes-and-sidenotes) for `footnotestyle` and `footnoteplacement`. |
 | `etBook` | `true` | Load the bundled ET Book web fonts. With `false`, the fallback serif stack from Tufte CSS is used. |
-| `font` | `"etbook"` | The text font: `"etbook"` (ET Book, Tufte's own) or `"libertinus"` (Libertinus Serif, with Libertinus Sans and Mono). Front matter `font` overrides it for one page; any other value prints the warning `tufte-bad-option` and is ignored. See [Fonts](#fonts). |
+| `font` | `"etbook"` | The text font: `"etbook"` (ET Book, Tufte's own), `"libertinus"` (Libertinus Serif, with Libertinus Sans and Mono) or `"source"` (Adobe's Source Serif 4, with Source Sans 3). Code is in Source Code Pro with every value but `"libertinus"`. Front matter `font` overrides it for one page; any other value prints the warning `tufte-bad-option` and is ignored. See [Fonts](#fonts). |
 | `showReadingTime` | `true` | Show the reading time in the post metadata. |
 | `showWordCount` | `false` | Show the word count in the post metadata. |
 | `showPostNav` | `true` | Show previous and next post links at the end of posts. |
@@ -301,7 +301,7 @@ mainSections = ["posts"]
 | `sections` | `"h2"`/`"none"` (or `true`/`false`, also as strings: `"yes"`/`"no"`, `"on"`/`"off"`, `"1"`/`"0"`). Overrides `params.sections`. |
 | `footnotes` | `"sidenotes"`/`"endnotes"`. Overrides `params.footnotes`. |
 | `math` | `true` always loads the KaTeX assets on this page (with the client engine, this also makes KaTeX scan the article for `$…$`, `$$…$$`, `\(…\)`, `\[…\]` when the passthrough extension is off). `false` never loads them, even if the page contains math. The strings `"true"`/`"false"` (also `yes`/`no`, `on`/`off`, `1`/`0`) work the same; `"auto"` keeps the detection. |
-| `font` | `"etbook"` or `"libertinus"`: the text font of this page, over `params.font` (see [Fonts](#fonts)). On a book's root it sets the whole book. |
+| `font` | `"etbook"`, `"libertinus"` or `"source"`: the text font of this page, over `params.font` (see [Fonts](#fonts)). On a book's root it sets the whole book. |
 | `mathFont` | `"katex"`, `"euler"` or `"libertinus"`: the math font of this page, over `params.math.font` (see [Euler and Libertinus math](#euler-and-libertinus-math)). |
 | `mathMacros` | KaTeX macros for this page, added to `params.math.macros` (same list-of-pairs form), e.g. `mathMacros: [["\\E", "\\mathbb{E}"]]` in YAML. |
 | `comments` | `true`/`false`. Overrides `params.comments.enable`. `true` is needed on pages outside any section (such as `content/about.md`), which have no comments otherwise. |
@@ -1092,7 +1092,12 @@ text, as in Goldmark (`[^fn-Proof]` is not a reference to `[^fn-proof]:`).
 ## Fonts
 
 The text is set in **ET Book**, the typeface Edward Tufte had made for his books (`static/et-book/`), with Gill
-Sans for the sans-serif and Consolas for code, as in Tufte CSS. `params.font = "libertinus"` (or front matter
+Sans for the sans-serif, as in Tufte CSS, and Adobe's **Source Code Pro** for code (bundled; Tufte CSS names
+Consolas). Two other families can set the text: Libertinus and Source.
+
+### Libertinus
+
+`params.font = "libertinus"` (or front matter
 `font: libertinus` on one page) sets it in **Libertinus** instead, the OpenType family that Khaled Hosny forked
 from Linux Libertine and Biolinum and Caleb Maclennan maintains, as `\usepackage{libertinus}` does in LaTeX:
 
@@ -1124,6 +1129,36 @@ from Linux Libertine and Biolinum and Caleb Maclennan maintains, as `\usepackage
   another family (and `etBook = false` leaves out ET Book's `@font-face` rules).
 
 See the example site's [Libertinus](https://massimo-nocentini.github.io/tufte.hugo/posts/libertinus/) post.
+
+### Source
+
+`params.font = "source"` (or front matter `font: source`) sets the text in Adobe's **Source Serif 4** and the
+sans-serif in **Source Sans 3**; code is in **Source Code Pro** with every `font` but `libertinus` (which keeps
+Libertinus Mono), so the three families, drawn to the same proportions, set a page together:
+
+```toml
+[params]
+  font = "source"   # Source Serif 4 and Source Sans 3 (code: Source Code Pro, always)
+```
+
+- **Faces.** Source Serif 4 for the text, Source Sans 3 wherever the theme sets sans-serif (the `sans`
+  shortcode, tables, the navigation, `sfsidenotes`), Source Code Pro for `code`, code blocks, `kbd` and
+  `samp`. Each family in Regular, Italic, Bold and Bold Italic, with Latin, Greek and Cyrillic; Source Serif 4
+  and Source Sans 3 have true small capitals. The math font is a separate choice (`params.math.font`).
+- **Figures.** Old-style figures come, as ET Book's and Libertinus's, from a face of their own, "Tufte Serif4
+  OSF Digits" (the digits of Source Serif 4 mapped to its `onum` forms, 2 kB): the note numbers use them, and
+  `tufte.numerals = "oldstyle"` turns them on for the serif text, while the sans and code keep their lining
+  figures.
+- **Files.** The fonts are bundled in `static/source/`: Adobe's static WOFF2 files of Source Serif 4 4.005
+  (its default "Text" optical size), Source Sans 3 3.052 and Source Code Pro 2.042, **unchanged**, about 60 to
+  110 kB each, each downloaded only by a page that uses it. They are under the SIL Open Font License with the
+  Reserved Font Name “Source” (`static/source/OFL.txt`), so the theme does not subset them, unlike Libertinus,
+  and the digits face, a Modified Version, carries a name of its own.
+- **How it works.** As for Libertinus: `font = "source"` puts the class `tufte-font-source` on `<html>`, which
+  redefines `--tufte-serif`, `--tufte-serif-old`, `--tufte-serif-osf` and `--tufte-sans`
+  (`assets/css/source.css`); `--tufte-mono` names Source Code Pro already.
+
+See the example site's [Source](https://massimo-nocentini.github.io/tufte.hugo/posts/source/) post.
 
 ## Math
 
@@ -2372,6 +2407,7 @@ package, which the classes do not define but mathematical texts load with them.
 | 118 | `\usepackage{euler}`, `eulervm` | `[params.math] font = "euler"`; front matter `mathFont: euler` | could | MathML set in the bundled Euler Math font; text and `\text{…}` stay in ET Book |
 | 119 | `\usepackage{libertinus}`, `libertinus-otf` | `[params] font = "libertinus"` and `[params.math] font = "libertinus"`; front matter `font`, `mathFont` | could | Libertinus Serif, Sans and Mono for the text, Libertinus Math (MathML) for the formulas |
 | 120 | Beamer slides of a handout | `outputs: ["html", "slides"]`: `slides.html`, a reveal.js deck | could | a slide at each `##` and `---`; `{{< notes >}}` for speaker notes |
+| 121 | `\usepackage{sourceserifpro}`, `sourcesanspro`, `sourcecodepro` | `[params] font = "source"`; front matter `font` | could | Source Serif 4 for the text, Source Sans 3 for the sans-serif; Source Code Pro is the code font of every page but Libertinus's |
 
 ## Syntax highlighting
 

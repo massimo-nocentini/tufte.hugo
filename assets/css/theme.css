@@ -30,7 +30,8 @@
     --tufte-mark: #fff1a8;
     --tufte-focus: #1f5fa8;
     --tufte-sans: "Gill Sans", "Gill Sans MT", Calibri, "Trebuchet MS", sans-serif;
-    --tufte-mono: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    /* Source Code Pro, bundled (source.css), then Tufte CSS's own stack. */
+    --tufte-mono: "Source Code Pro", Consolas, "Liberation Mono", Menlo, Courier, monospace;
     --tufte-alert-note: #2f5d8a;
     --tufte-alert-tip: #3b6e3f;
     --tufte-alert-important: #6b4a8f;

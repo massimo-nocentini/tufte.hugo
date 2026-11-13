@@ -5,19 +5,23 @@
   Path), so an unknown value warns once per page.
 
     etbook       ET Book (et-book.css, unless params.etBook is false: then
-                 Tufte CSS's fallback stack, Palatino first)
+                 Tufte CSS's fallback stack, Palatino first), Tufte CSS's
+                 Gill Sans and Source Code Pro (source.css)
     libertinus   Libertinus Serif, Sans and Mono (libertinus.css)
+    source       Source Serif 4, Source Sans 3 and Source Code Pro
+                 (source.css)
 
   The theme CSS reads the faces from --tufte-serif, --tufte-serif-old,
   --tufte-serif-osf, --tufte-sans and --tufte-mono, which libertinus.css
-  redefines under html.tufte-font-libertinus (baseof.html). Custom
+  and source.css redefine under html.tufte-font-libertinus and
+  html.tufte-font-source (baseof.html). Custom
   properties do not reach @page margin boxes, so the running heads
   (tufte/head-style.html, tufte/book/print-style.html) and the font words
   of tufte.X.font write the lists returned here.
 
   Takes: the page.
   Returns: a dict
-    name    "etbook" | "libertinus"
+    name    "etbook" | "libertinus" | "source"
     class   the class of <html> ("" for etbook)
     serif, sans, mono   CSS font-family lists (no quotes but the family
                         names' own double quotes)
@@ -31,12 +35,12 @@
 {{- range $src := slice site.Params.font $bookFont $p.Params.font -}}
   {{- with $src -}}
     {{- $v := lower (strings.TrimSpace (printf "%v" .)) -}}
-    {{- if in (slice "etbook" "libertinus") $v -}}
+    {{- if in (slice "etbook" "libertinus" "source") $v -}}
       {{- $name = $v -}}
     {{- else -}}
       {{- $where := $p.RelPermalink -}}
       {{- with $p.File }}{{ $where = .Path }}{{ end -}}
-      {{- warnidf "tufte-bad-option" "tufte.hugo: the text font (params.font or front matter font) must be \"etbook\" or \"libertinus\", not %q, in %s; ignored" $v $where -}}
+      {{- warnidf "tufte-bad-option" "tufte.hugo: the text font (params.font or front matter font) must be \"etbook\", \"libertinus\" or \"source\", not %q, in %s; ignored" $v $where -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
@@ -46,12 +50,18 @@
     "class" ""
     "serif" `et-book,Palatino,"Palatino Linotype",Georgia,serif`
     "sans" `"Gill Sans","Gill Sans MT",Calibri,sans-serif`
-    "mono" `Consolas,"Liberation Mono",Menlo,Courier,monospace`)
+    "mono" `"Source Code Pro",Consolas,"Liberation Mono",Menlo,Courier,monospace`)
   "libertinus" (dict
     "name" "libertinus"
     "class" "tufte-font-libertinus"
     "serif" `"Libertinus Serif","Linux Libertine O",Palatino,"Palatino Linotype",Georgia,serif`
     "sans" `"Libertinus Sans","Linux Biolinum O","Gill Sans","Gill Sans MT",Calibri,sans-serif`
     "mono" `"Libertinus Mono",Consolas,"Liberation Mono",Menlo,Courier,monospace`)
+  "source" (dict
+    "name" "source"
+    "class" "tufte-font-source"
+    "serif" `"Source Serif 4","Source Serif Pro",Georgia,serif`
+    "sans" `"Source Sans 3","Source Sans Pro","Gill Sans","Gill Sans MT",Calibri,sans-serif`
+    "mono" `"Source Code Pro",Consolas,"Liberation Mono",Menlo,Courier,monospace`)
 -}}
 {{- return index $fonts $name -}}

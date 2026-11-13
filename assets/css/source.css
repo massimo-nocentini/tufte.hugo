@@ -1,0 +1,174 @@
+/* tufte.hugo — source.css
+ *
+ * Adobe's Source families (SIL Open Font License: static/source/OFL.txt,
+ * which also says where the files come from):
+ *
+ *   Source Code Pro   the theme's monospace face, for code and kbd/samp,
+ *                     whatever params.font is, but "libertinus" (which has
+ *                     its own, Libertinus Mono): --tufte-mono (theme.css);
+ *   Source Serif 4    the text, and
+ *   Source Sans 3     the sans-serif, with params.font = "source" (front
+ *                     matter `font`), which puts the class
+ *                     tufte-font-source on <html> (func/font.html,
+ *                     baseof.html) and redefines the font variables below.
+ *
+ * The files are Adobe's static instances, unchanged (Regular, Italic, Bold,
+ * Bold Italic; Latin, Greek and Cyrillic in each): 'Source' is a Reserved
+ * Font Name, so they are not subset. A browser downloads a face only for a
+ * page that uses it.
+ */
+
+@font-face {
+    font-family: "Source Code Pro";
+    src: url("../source/SourceCodePro-Regular.woff2") format("woff2");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Code Pro";
+    src: url("../source/SourceCodePro-It.woff2") format("woff2");
+    font-weight: normal;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Code Pro";
+    src: url("../source/SourceCodePro-Bold.woff2") format("woff2");
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Code Pro";
+    src: url("../source/SourceCodePro-BoldIt.woff2") format("woff2");
+    font-weight: bold;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Serif 4";
+    src: url("../source/SourceSerif4-Regular.woff2") format("woff2");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Serif 4";
+    src: url("../source/SourceSerif4-It.woff2") format("woff2");
+    font-weight: normal;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Serif 4";
+    src: url("../source/SourceSerif4-Bold.woff2") format("woff2");
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Serif 4";
+    src: url("../source/SourceSerif4-BoldIt.woff2") format("woff2");
+    font-weight: bold;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Sans 3";
+    src: url("../source/SourceSans3-Regular.woff2") format("woff2");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Sans 3";
+    src: url("../source/SourceSans3-It.woff2") format("woff2");
+    font-weight: normal;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Sans 3";
+    src: url("../source/SourceSans3-Bold.woff2") format("woff2");
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Source Sans 3";
+    src: url("../source/SourceSans3-BoldIt.woff2") format("woff2");
+    font-weight: bold;
+    font-style: italic;
+    font-display: swap;
+}
+
+/* Old-style figures, as ET Book's et-book-osf-digits and Libertinus OSF
+   Digits: the digits 0-9 of Source Serif 4 with their onum forms in their
+   place (2 kB each), a family listed before Source Serif 4 where the theme
+   wants old-style figures (note numbers, .numeral, tufte.numerals =
+   "oldstyle"), so that only the serif's figures change: the sans, the mono
+   and the elements that name another family keep their own. A Modified
+   Version, hence its name, which may not hold the Reserved Font Name. */
+@font-face {
+    font-family: "Tufte Serif4 OSF Digits";
+    src: url("../source/TufteSerif4OSFDigits-Regular.woff2") format("woff2");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0030-0039;
+}
+
+@font-face {
+    font-family: "Tufte Serif4 OSF Digits";
+    src: url("../source/TufteSerif4OSFDigits-It.woff2") format("woff2");
+    font-weight: normal;
+    font-style: italic;
+    font-display: swap;
+    unicode-range: U+0030-0039;
+}
+
+@font-face {
+    font-family: "Tufte Serif4 OSF Digits";
+    src: url("../source/TufteSerif4OSFDigits-Bold.woff2") format("woff2");
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0030-0039;
+}
+
+@font-face {
+    font-family: "Tufte Serif4 OSF Digits";
+    src: url("../source/TufteSerif4OSFDigits-BoldIt.woff2") format("woff2");
+    font-weight: bold;
+    font-style: italic;
+    font-display: swap;
+    unicode-range: U+0030-0039;
+}
+
+/* The font variables (defaults: tufte-latex.css and theme.css, whose
+   --tufte-mono is already Source Code Pro). */
+:root.tufte-font-source {
+    --tufte-serif: "Source Serif 4", "Source Serif Pro", Georgia, serif;
+    --tufte-serif-old: "Tufte Serif4 OSF Digits", "Source Serif 4", "Source Serif Pro", Georgia, serif;
+    --tufte-serif-osf: "Tufte Serif4 OSF Digits", "Source Serif 4", "Source Serif Pro", Georgia, serif;
+    --tufte-sans: "Source Sans 3", "Source Sans Pro", "Gill Sans", "Gill Sans MT", Calibri, sans-serif;
+}
+
+/* Tufte CSS names Gill Sans (and Trebuchet MS) itself for .sans and the
+   tables. */
+.tufte-font-source .sans,
+.tufte-font-source div.table-wrapper {
+    font-family: var(--tufte-sans);
+}

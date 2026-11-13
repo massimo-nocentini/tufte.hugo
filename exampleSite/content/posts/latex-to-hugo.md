@@ -157,6 +157,7 @@ classes do not define but mathematical texts load with them.
 | 118 | `\usepackage{euler}`, `eulervm` | `[params.math] font = "euler"`; front matter `mathFont: euler` | could | MathML set in the bundled Euler Math font; text and `\text{…}` stay in ET Book |
 | 119 | `\usepackage{libertinus}`, `libertinus-otf` | `[params] font = "libertinus"` and `[params.math] font = "libertinus"`; front matter `font`, `mathFont` | could | Libertinus Serif, Sans and Mono for the text, Libertinus Math (MathML) for the formulas |
 | 120 | Beamer slides of a handout | `outputs: ["html", "slides"]`: `slides.html`, a reveal.js deck | could | a slide at each `##` and `---`; `{{</* notes */>}}` for speaker notes |
+| 121 | `\usepackage{sourceserifpro}`, `sourcesanspro`, `sourcecodepro` | `[params] font = "source"`; front matter `font` | could | Source Serif 4 for the text, Source Sans 3 for the sans-serif; Source Code Pro is the code font of every page but Libertinus's |
 {.fullwidth}
 
 ## Notes {#sec:notes}

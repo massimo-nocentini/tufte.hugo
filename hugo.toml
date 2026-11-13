@@ -45,7 +45,7 @@
   sections = "h2"               # "h2" | "none" — wrap content in <section> at each h2 (front matter `sections` overrides)
   footnotes = "sidenotes"       # "sidenotes" | "endnotes" (front matter `footnotes` overrides)
   etBook = true                 # load the bundled ET Book web fonts
-  font = "etbook"               # text font: "etbook" (ET Book) | "libertinus" (Libertinus Serif, Sans, Mono); front matter `font` overrides
+  font = "etbook"               # text font: "etbook" (ET Book) | "libertinus" (Libertinus Serif, Sans, Mono) | "source" (Source Serif 4, Source Sans 3); code is in Source Code Pro but with "libertinus"; front matter `font` overrides
   showReadingTime = true
   showWordCount = false
   showPostNav = true            # previous / next links at the end of posts
