@@ -155,6 +155,8 @@ jobs:
           [ -f "$B" ] || fail "missing $B"
           grep -qi 'font-family: *"\?euler math' "$B" || fail "no Euler Math @font-face in $B"
           grep -q 'url(\.\./euler-math/Euler-Math\.woff2)\|url("\.\./euler-math/Euler-Math\.woff2")' "$B" || fail "the Euler Math URL is not relative to the bundle in $B"
+          # WebKit scatters a table cell's row under an inherited -webkit- alignment (theme.css).
+          tr -d ' \n' < "$B" | grep -q 'mtd>\*{text-align:start' || fail "no text-align reset of the MathML cells' content (WebKit) in $B"
 
       # Libertinus (posts/libertinus sets font and mathFont: libertinus;
       # README "Fonts" and "Euler and Libertinus math"): the class of <html>,

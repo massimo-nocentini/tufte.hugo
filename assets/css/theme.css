@@ -902,9 +902,13 @@ code.math-error {
 
 /* A display is set inline in its centred block (math-style stays
    display), so that text-align places it: flush left with fleqn
-   (katex.min.css .katex-display.fleqn), and beside its number. */
+   (katex.min.css .katex-display.fleqn), and beside its number. WebKit and
+   Firefox have no "inline math" and drop the declaration, so their
+   displays stayed blocks, centred even with fleqn: inline-block first,
+   which keeps the display style (the math's display attribute). */
 .katex > math[display="block"],
 .katex > .katex-mathml:only-child > math[display="block"] {
+    display: inline-block;
     display: inline math;
 }
 
@@ -1068,6 +1072,34 @@ code.math-error {
 
 .katex mtable[style] > mtr:nth-child(n+12):not(:last-child) > mtd {
     border-block-end: var(--tufte-rl12);
+}
+
+/* The -webkit- alignments above are the only ones that move a cell's math
+   box in Chromium, but WebKit (Safari, and every browser on iOS), which
+   lays out columnalign itself, passes an inherited -webkit-left/right/center
+   on to the children of the cell's row and scatters them across the column:
+   "(a+b)^2" became "(", "a+b" over the next column and ")^2" at the far
+   end. The cell's own content keeps the start alignment, so only the cell
+   places its box: no change in Chromium and Firefox. */
+.katex mtable[style] > mtr > mtd > * {
+    text-align: start;
+}
+
+/* KaTeX's numbered environments (equation, align, gather) centre their rows
+   between two glue cells of width 50% (katex.min.css), which presumes a
+   table as wide as the line, as MathML Core's is in Chromium. WebKit and
+   Firefox size the math to its content instead: Firefox put the numbers
+   right after the rows, and WebKit, which resolves the percentages against
+   an unbounded width, a million pixels to the right, so the display looked
+   empty. Such a display spans the line. */
+.katex math:has(mtd.mtr-glue) {
+    display: block math;
+    width: 100%;
+}
+
+.katex math:has(mtd.mtr-glue) > semantics,
+.katex mtable:has(> mtr > mtd.mtr-glue) {
+    width: 100%;
 }
 
 /* No rule after the last column (columnlines lists the gaps), nor

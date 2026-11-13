@@ -1304,6 +1304,14 @@ descriptions (both read the formula's TeX). Some details:
     `\widehat`, `\widetilde` and `\bar` use the accents the fonts stretch;
   - an inline formula and the punctuation right after it (`$x$,`) stay on one line (`span.tufte-nobr`):
     Chromium would break the line between them.
+- **What Safari and Firefox need.** WebKit (Safari, and every browser on iPhone and iPad) and Firefox lay out
+  the MathML attributes themselves, but differ from Chromium elsewhere, and `theme.css` takes care of it:
+  the column alignment that Chromium needs would scatter the content of a table cell in WebKit, so it reaches
+  the cell only; a numbered `equation`, `align` or `gather` spans the line, so that its rows sit in the
+  middle and its numbers at the margin (WebKit showed it empty, a million pixels to the right); and a display
+  is an inline block where `display: inline math` is unknown, so that `fleqn` sets it flush left.
+  WebKit draws no generated content in MathML, so the row numbers of those environments, a CSS counter of
+  KaTeX's, do not show in Safari: number the displays with `\label`.
 - **Markup.** The MathML sits in the span KaTeX uses for it in its usual output,
   `<span class="katex tufte-math-FONT"><span class="katex-mathml"><math>…</math></span></span>` (with the client
   engine, `<span class="katex tufte-math-FONT"><math>`), which `theme.css` shows instead of hiding, in the font

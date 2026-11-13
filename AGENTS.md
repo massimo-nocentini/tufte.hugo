@@ -201,8 +201,15 @@ plus `layouts/_partials/`, `layouts/_shortcodes/` and `layouts/_markup/`.
   (`lspace`/`rspace` 0), TeX's thin space around operator names (U+2061), stretchable accents, and mtable
   `columnalign`/`columnspacing`/`columnlines`/`rowlines`/`rowspacing` as `--tufte-ca*`/`cs*`/`cl*`/`rl*`/`rs`
   custom properties (MathML Core has none of them; `theme.css` applies them with `:nth-child(K of
-  :not(.mtr-glue, .mml-eqn-num))`, and only the `-webkit-` values of `text-align` move a cell's block math boxes)
-  and `menclose` boxes and strikes in CSS. `\notag`/`\nonumber` in a numbered environment are taken out of the
+  :not(.mtr-glue, .mml-eqn-num))`, and only the `-webkit-` values of `text-align` move a cell's block math boxes
+  in Chromium; WebKit passes an inherited `-webkit-` alignment on to the children of a cell's row and scatters
+  them, so the cell's children are reset to `text-align: start`: keep that rule, and check any change to the
+  table rules in WebKit too, e.g. Playwright's)
+  and `menclose` boxes and strikes in CSS. A display with KaTeX's glue cells (`mtd.mtr-glue`, 50% each:
+  `equation`, `align`, `gather`) spans the line (`math`, `semantics` and `mtable` at `width: 100%`), since
+  WebKit and Firefox size the math to its content; other displays are `display: inline-block` before `inline
+  math`, the fallback of the engines without `inline math` (WebKit, Firefox), so that `fleqn` places them.
+  WebKit draws no `::before` in MathML, so KaTeX's counter numbers of those environments do not show there. `\notag`/`\nonumber` in a numbered environment are taken out of the
   TeX and the row's number cell marked `tufte-notag`; a `\tag` on a row of such an environment warns
   (`tufte-mathml-tag`). The client engine
   marks its spans `data-output="mathml" data-mathfont="FONT"` and `tufte/katex.html` does the same fixes in
