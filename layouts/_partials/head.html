@@ -245,6 +245,9 @@
       {{- end -}}
     {{- end -}}
   {{- end -}}
+  {{- /* Other pages' titles with math: summary titles, the archive, term
+         and taxonomy lists, category and tag links. */ -}}
+  {{- if and (not $math) (partial "tufte/list-titles-math.html" .) }}{{ $math = true }}{{ end -}}
 {{- end -}}
 {{- /* Front matter math: a bool or a string ("true", "false", "yes",
        "off"…, as func/flag.html reads other booleans); "auto" or "" keep

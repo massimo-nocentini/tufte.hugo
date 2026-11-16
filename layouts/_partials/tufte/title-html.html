@@ -4,20 +4,22 @@
   so a title reads the same everywhere: Markdown in it (`code`, *emphasis*,
   [links](…), ~~strike~~) is rendered with the page's RenderString.
 
-  Two modes:
+  Three modes:
   - list (default), for summary titles, the archive, term and taxonomy
-    lists and the post navigation, where the title sits inside a link:
-    links in it are unwrapped (no <a> inside the list's <a>), and math
-    ($…$, $$…$$, \(…\), \[…\]) is left as written, as in
-    tufte/plain-title.html (a list page may not load the KaTeX stylesheet
-    for it). The math spans are taken out before rendering (placeholders)
-    and put back escaped, so the Markdown around them is still rendered
-    and the Markdown characters inside them (a_1, a*b) are not.
+    lists and the tag and category links, where the title sits inside a
+    link: links in it are unwrapped (no <a> inside the list's <a>), and
+    math ($…$, $$…$$, \(…\), \[…\]) is typeset (the passthrough render
+    hook, with the macros of `page`); head.html loads KaTeX on the pages
+    that show such a title (tufte/list-titles-math.html).
   - heading (`heading` true), for the h1 of pages, sections, terms,
     taxonomies, the archive, book parts and chapters (tufte/title-block.html,
     tufte/book/part.html, list.print.html): links are kept and math is
-    typeset (the passthrough render hook; tufte/head.html loads KaTeX when
-    the title holds math delimiters).
+    typeset (head.html loads KaTeX when the title holds math delimiters).
+  - plain (`plain` true), for tufte/plain-title.html: as list, but math is
+    left as written. The math spans are taken out before rendering
+    (placeholders) and put back escaped, so the Markdown around them is
+    still rendered and the Markdown characters inside them (a_1, a*b) are
+    not.
 
   A title without Markdown characters is only escaped. Quotes, -- and
   ... count as Markdown here: they go through RenderString too, so the
@@ -29,6 +31,7 @@
     title    optional: the text (default: the page's LinkTitle; when both
              are empty, tufte/page-title.html's fallback)
     heading  optional bool: heading mode
+    plain    optional bool: plain mode (ignored with heading)
   Returns: template.HTML.
 */ -}}
 {{- $p := .page -}}
@@ -40,11 +43,12 @@
        book contents) passes that page's tufte/page-title.html itself. */ -}}
 {{- if not (strings.TrimSpace $t) }}{{ $t = printf "%v" (partial "tufte/page-title.html" $p) }}{{ end -}}
 {{- $heading := eq .heading true -}}
+{{- $plain := and (eq .plain true) (not $heading) -}}
 {{- $out := htmlEscape $t -}}
 {{- if findRE "[`*_~$\\\\\\['\"]|--|\\.\\.\\." $t 1 -}}
   {{- /* Tokens that cover the whole title: code spans, math, a lone $ or \,
-         other text. Math is kept (heading) or taken out (list: TUFTETMnEND
-         placeholders, put back escaped after rendering). A "<" outside
+         other text. Math is kept (heading, list) or taken out (plain:
+         TUFTETMnEND placeholders, put back escaped after rendering). A "<" outside
          code spans and math is written as &lt;, so the title's text is
          never read as raw HTML (Goldmark would drop it, and warn). */ -}}
   {{- $mathRE := `(?s)^(?:\$\$.+?\$\$|\$[^$]+\$|\\\(.+?\\\)|\\\[.+?\\\])$` -}}
@@ -54,7 +58,7 @@
     {{- if strings.HasPrefix . "`" -}}
       {{- $src = printf "%s%s" $src . -}}
     {{- else if findRE $mathRE . 1 -}}
-      {{- if $heading -}}
+      {{- if not $plain -}}
         {{- $src = printf "%s%s" $src . -}}
       {{- else -}}
         {{- $src = printf "%sTUFTETM%dEND" $src (len $math) -}}

@@ -1477,10 +1477,12 @@ text of `title`. `linkTitle` (default: `title`), the `\title[plain]{…}` of LaT
 title is a link or a locator: summary titles, the archive and the term and taxonomy lists, the post navigation,
 the book contents and navigation, the running heads and the chapter title of an `xref` `page`. Every h1 (pages, sections, the home page, terms, taxonomies, the archive, book parts
 and chapters, `print.html`), summary titles, the archive, the term and taxonomy lists, the tag and category links of a page and the term page's link back to its taxonomy render it, so a title may contain inline Markdown such as `` `tufte-book` ``, `*emphasis*` or a
-`[link](…)`. Math (`$…$`, `\(…\)`) is typeset in an h1 and in the generated contents that copy a title (the book
+`[link](…)`. Math (`$…$`, `\(…\)`) is typeset in an h1, in summary titles, the archive, term and taxonomy
+lists and the tag and category links (with `math.enable = "auto"` the pages that show such a title load KaTeX),
+and in the generated contents that copy a title (the book
 contents, a `tableofcontents`, an `xref` `name`, `page` or `auto` that prints the title, and the index and
-list locators), and left as written in `<title>`,
-the metadata, summary titles, the archive and term lists, and the post and book navigation, while the
+list locators); it is left as written in `<title>`,
+the metadata, the search index, and the post and book navigation, while the
 Markdown around it is still rendered (`"*Fast* Euler $e^{i\pi}$"` gives `Fast Euler $e^{i\pi}$` in
 `<title>`). Links are kept in an h1 and unwrapped in lists; `<` is text, never raw HTML.
 The OpenGraph, Twitter and schema.org descriptions are the same
