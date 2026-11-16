@@ -1279,8 +1279,8 @@ section > h6 {
 /* \titleformat{\section} and {\subsection} of tufte-common.def: \Large
    (12/16pt) and \large (11/15pt), i.e. 1.68rem and 1.54rem at the 10pt =
    1.4rem body (sample-handout.pdf: 11.96pt and 10.91pt). Under style =
-   "latex" and on every page with the LaTeX title block (\LARGE 1.96rem
-   title), so the title stays the largest heading; the css preset keeps
+   "latex" and on every page with the LaTeX title block (its 2.8rem \huge
+   title, section 7), so the title stays the largest heading; the css preset keeps
    tufte.css's 2.2rem and 1.7rem under its 3.2rem title. The chrome of
    list pages (summary titles, archive years) keeps its own sizes. */
 :is(body.tufte-style-latex, article:has(> header.title-block.latex)) section > h2:not(.post-summary-title, .archive-year) {
@@ -1310,12 +1310,18 @@ section > h6 {
    (\LARGE 14/18pt, \Large 12/16pt; sample-handout.pdf sets the title at
    14.35pt and author and date at 11.96pt over a 9.96pt body): at a 10pt
    body of 1.4rem, 1.96rem and 1.68rem. The subtitle (not in LaTeX) takes
-   the \Large of the author line. */
+   the \Large of the author line.
+   On screen a \LARGE title over three \Large lines reads as four lines
+   of nearly one size (the PDF keeps the title apart with its \vskip and
+   its page of white). The title is set in \huge (20/30pt, 2.8rem, the
+   size of .chapter-title), so it heads the block: the subtitle, author
+   and date keep their \Large. The line height is tighter than \huge's
+   30pt baseline because long titles wrap in the text column. */
 .title-block.latex h1 {
     font-style: italic;
-    font-size: 1.96rem;
-    line-height: 1.286;
-    margin-bottom: 0.4rem;
+    font-size: 2.8rem;
+    line-height: 1.25;
+    margin-bottom: 0.8rem;
 }
 
 .title-block.latex .subtitle {
@@ -3236,6 +3242,13 @@ nav.book-nav .next {
     article.part header.part-head,
     article.book-landing > nav.book-toc > h2 {
         margin: 3rem 0 2.5rem;
+    }
+
+    /* The \huge title of the LaTeX title block shrinks with the chapter
+       title, still well above the \Large subtitle. */
+    .title-block.latex h1 {
+        font-size: 2.2rem;
+        line-height: 1.3;
     }
 
     .chapter-title {
