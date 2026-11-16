@@ -24,7 +24,7 @@
     {{- $title := partial "tufte/title-html.html" (dict "page" .) }}
     <h2 class="post-summary-title">{{ with .RelPermalink }}<a href="{{ . }}">{{ $title }}</a>{{ else }}{{ $title }}{{ end }}</h2>
     {{- with .Params.subtitle }}
-    <p class="subtitle">{{ . }}</p>
+    <p class="subtitle">{{ partial "tufte/title-html.html" (dict "page" $ "title" . "heading" true) }}</p>
     {{- end }}
     {{ partial "post-meta.html" . }}
     {{ partialCached "func/content.html" (dict "page" . "summary" true) (or .RelPermalink .Path) true }}

@@ -24,7 +24,7 @@
   <h1 class="visually-hidden">{{ site.Title }}</h1>
   {{- end }}
   {{- with .Params.subtitle }}
-  <p class="subtitle">{{ . }}</p>
+  <p class="subtitle">{{ partial "tufte/title-html.html" (dict "page" $ "title" . "heading" true) }}</p>
   {{- end }}
   {{- if partial "func/flag.html" (dict "value" site.Params.homeIntro "default" true) }}
   {{ partial "tufte/abstract.html" . }}

@@ -69,7 +69,7 @@
   {{- $out = `<header class="chapter-head title-block">` -}}
   {{- with $num }}{{ $out = printf `%s<p class="chapter-number">%s</p>` $out (htmlEscape .) }}{{ end -}}
   {{- $out = printf `%s<h1 class="chapter-title">%s%s</h1>` $out $titleHTML $thanksHTML -}}
-  {{- with $p.Params.subtitle }}{{ $out = printf `%s<p class="subtitle">%s</p>` $out (htmlEscape .) }}{{ end -}}
+  {{- with $p.Params.subtitle }}{{ $out = printf `%s<p class="subtitle">%s</p>` $out (string (partial "tufte/title-html.html" (dict "page" $p "title" . "heading" true))) }}{{ end -}}
   {{- $out = printf "%s</header>" $out -}}
 {{- else -}}
   {{- $mode := lower (printf "%v" (or (partialCached "tufte/opt.html" (dict "page" $p "key" "titleblock") $key "titleblock") "css")) -}}
@@ -93,7 +93,7 @@
     {{- end -}}
     {{- $out = `<header class="title-block latex">` -}}
     {{- $out = printf `%s<h1>%s%s</h1>` $out $titleHTML $thanksHTML -}}
-    {{- with $p.Params.subtitle }}{{ $out = printf `%s<p class="subtitle">%s</p>` $out (htmlEscape .) }}{{ end -}}
+    {{- with $p.Params.subtitle }}{{ $out = printf `%s<p class="subtitle">%s</p>` $out (string (partial "tufte/title-html.html" (dict "page" $p "title" . "heading" true))) }}{{ end -}}
     {{- with $authorHTML }}{{ $out = printf `%s<p class="title-author">%s</p>` $out . }}{{ end -}}
     {{- with $dateHTML }}{{ $out = printf `%s<p class="title-date">%s</p>` $out . }}{{ end -}}
     {{- $out = printf "%s</header>" $out -}}
@@ -115,7 +115,7 @@
   {{- else -}}
     {{- $out = `<header class="title-block">` -}}
     {{- $out = printf `%s<h1>%s%s</h1>` $out $titleHTML $thanksHTML -}}
-    {{- with $p.Params.subtitle }}{{ $out = printf `%s<p class="subtitle">%s</p>` $out (htmlEscape .) }}{{ end -}}
+    {{- with $p.Params.subtitle }}{{ $out = printf `%s<p class="subtitle">%s</p>` $out (string (partial "tufte/title-html.html" (dict "page" $p "title" . "heading" true))) }}{{ end -}}
     {{- /* The post-meta line, with the authors' {name, thanks} sidenotes
            (post-meta.html honours dateText and showDate). */ -}}
     {{- $a := partial "tufte/authors.html" (dict "page" $p "notes" true) -}}

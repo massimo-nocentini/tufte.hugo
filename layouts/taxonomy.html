@@ -4,7 +4,7 @@
 <article>
   <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" (partial "tufte/page-title.html" .) "heading" true) }}</h1>
   {{- with .Params.subtitle }}
-  <p class="subtitle">{{ . }}</p>
+  <p class="subtitle">{{ partial "tufte/title-html.html" (dict "page" $ "title" . "heading" true) }}</p>
   {{- end }}
   {{ partial "tufte/abstract.html" . }}
   {{ partialCached "func/content.html" . (or .RelPermalink .Path) false }}

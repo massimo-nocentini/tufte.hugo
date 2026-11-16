@@ -13,8 +13,10 @@
     that show such a title (tufte/list-titles-math.html).
   - heading (`heading` true), for the h1 of pages, sections, terms,
     taxonomies, the archive, book parts and chapters (tufte/title-block.html,
-    tufte/book/part.html, list.print.html): links are kept and math is
-    typeset (head.html loads KaTeX when the title holds math delimiters).
+    tufte/book/part.html, list.print.html) and for every p.subtitle (and
+    the book title page's subtitle), on the page and in its summary: links
+    are kept and math is typeset (head.html loads KaTeX when the title or
+    subtitle holds math delimiters).
   - plain (`plain` true), for tufte/plain-title.html: as list, but math is
     left as written. The math spans are taken out before rendering
     (placeholders) and put back escaped, so the Markdown around them is

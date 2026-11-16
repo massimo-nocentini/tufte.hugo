@@ -5,7 +5,7 @@
 <article>
   <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" .Title "heading" true) }}</h1>
   {{- with .Params.subtitle }}
-  <p class="subtitle">{{ . }}</p>
+  <p class="subtitle">{{ partial "tufte/title-html.html" (dict "page" $ "title" . "heading" true) }}</p>
   {{- end }}
   {{- with .Parent }}
   <p class="sans"><a href="{{ .RelPermalink }}">{{ cond (eq (partial "func/lang.html" site.Language).dir "rtl") "&rarr;" "&larr;" | safeHTML }}&nbsp;{{ partial "tufte/title-html.html" (dict "page" . "title" (cond (eq .Kind "taxonomy") (partial "tufte/page-title.html" .) .LinkTitle)) }}</a></p>

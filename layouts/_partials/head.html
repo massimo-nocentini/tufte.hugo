@@ -190,10 +190,10 @@
   {{- $mathRE := `class="(?:katex|math math-)` -}}
   {{- $isPrint := and (.OutputFormats.Get "print") (.AlternativeOutputFormats.Get "html") -}}
   {{- /* Markdown front matter rendered by the templates after the head
-         (title, thanks, authors, the book landing's epigraphs,
+         (title, subtitle, thanks, authors, the book landing's epigraphs,
          frontispiece, publisher, dedication and copyright page): look for
          math delimiters. */ -}}
-  {{- $fm := slice .Title .Params.thanks .Params.author .Params.epigraphs .Params.frontispiece .Params.publisher .Params.dedication .Params.copyrightpage -}}
+  {{- $fm := slice .Title .Params.subtitle .Params.thanks .Params.author .Params.epigraphs .Params.frontispiece .Params.publisher .Params.dedication .Params.copyrightpage -}}
   {{- if findRE `\$|\\\(|\\\[` (printf "%v" $fm) 1 }}{{ $math = true }}{{ end -}}
   {{- /* The page's processed content and abstract (home: only when it
          shows its content, params.homeIntro; a home book landing always
@@ -219,7 +219,7 @@
           {{- $c := .Page -}}
           {{- $ck := or $c.RelPermalink $c.Path -}}
           {{- $body := printf "%s%s" (partial "tufte/abstract.html" (dict "page" $c "print" true)) (partialCached "func/content.html" (dict "page" $c "summary" false "print" true) $ck false "print") -}}
-          {{- if or (findRE $mathRE $body 1) (findRE `\$|\\\(|\\\[` (printf "%v" (slice $c.Title $c.Params.thanks $c.Params.author)) 1) (partial "tufte/truthy.html" $c.Params.math) }}{{ $math = true }}{{ end -}}
+          {{- if or (findRE $mathRE $body 1) (findRE `\$|\\\(|\\\[` (printf "%v" (slice $c.Title $c.Params.subtitle $c.Params.thanks $c.Params.author)) 1) (partial "tufte/truthy.html" $c.Params.math) }}{{ $math = true }}{{ end -}}
         {{- end -}}
       {{- end -}}
       {{- range partialCached "tufte/book/parts.html" . $key -}}

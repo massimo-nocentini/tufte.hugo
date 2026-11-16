@@ -1,13 +1,13 @@
 {{- /*
-  Whether a page shows another page's title, in the list mode of
-  tufte/title-html.html (math typeset), that holds math delimiters
+  Whether a page shows another page's title (in the list mode of
+  tufte/title-html.html, math typeset) or subtitle that holds math delimiters
   ($, \(, \[), so that head.html loads KaTeX for it (math.enable = "auto").
   The titles are those of:
 
   - the page's categories and tags (post-meta.html, the taxonomy line of
     the LaTeX title block);
   - home and section pages outside a book: the pages of the current pager
-    (post-summary.html) and their categories and tags;
+    (post-summary.html), their subtitles, and their categories and tags;
   - the archive page (layout "archive"): the posts of the main sections
     (archive.html);
   - a term page: its pages (tufte/archive-list.html) and its taxonomy
@@ -27,6 +27,7 @@
 {{- if and (not $inBook) (or .IsHome (eq .Kind "section")) -}}
   {{- range (partial "func/paginate.html" .).Pages -}}
     {{- $titles = $titles | append .LinkTitle -}}
+    {{- with .Params.subtitle }}{{ $titles = $titles | append (printf "%v" .) }}{{ end -}}
     {{- $q := . -}}
     {{- range $terms }}{{ range $q.GetTerms . }}{{ $titles = $titles | append .LinkTitle }}{{ end }}{{ end -}}
   {{- end -}}

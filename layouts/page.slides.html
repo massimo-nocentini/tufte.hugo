@@ -49,7 +49,7 @@
 <section class="tufte-slide-title">
 <h1>{{ partial "tufte/title-html.html" (dict "page" . "title" .Title "heading" true) }}{{ index (partial "tufte/title-notes.html" (dict "page" .)) "title" | default "" | safeHTML }}</h1>
 {{- with .Params.subtitle }}
-<p class="subtitle">{{ . }}</p>
+<p class="subtitle">{{ partial "tufte/title-html.html" (dict "page" $ "title" . "heading" true) }}</p>
 {{- end }}
 {{- with (partial "tufte/authors.html" (dict "page" . "notes" true)).html }}
 <p class="tufte-slide-byline">{{ . | safeHTML }}</p>

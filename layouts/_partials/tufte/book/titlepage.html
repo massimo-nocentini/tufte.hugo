@@ -51,7 +51,7 @@
 <header class="title-page">
   {{- with $author }}<p class="title-page-author allcaps sans">{{ . }}</p>{{ end }}
   <h1 class="title-page-title allcaps sans">{{ $titleHTML | safeHTML }}{{ $notes | safeHTML }}</h1>
-  {{- with $p.Params.subtitle }}<p class="title-page-subtitle">{{ . }}</p>{{ end }}
+  {{- with $p.Params.subtitle }}<p class="title-page-subtitle">{{ partial "tufte/title-html.html" (dict "page" $p "title" . "heading" true) }}</p>{{ end }}
   {{- /* Inline Markdown (tufte/render-inner.html: a publisher that starts
          like a block, "1984. Press", stays text). */}}
   {{- with $p.Params.publisher }}<p class="title-page-publisher allcaps sans">{{ partial "tufte/book/front-fields.html" (dict "page" $p "slot" "publisher") | safeHTML }}</p>{{ end }}
